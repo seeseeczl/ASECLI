@@ -44,12 +44,19 @@ class McpClient:
         except urllib.error.URLError as e:
             raise McpError(f"cannot reach MCP server at {self.url}: {e.reason}") from e
         if "text/event-stream" in ctype:
+            collected: list[dict] = []
             for line in raw.splitlines():
                 if line.startswith("data:"):
                     chunk = line[5:].strip()
                     if chunk and chunk != "[DONE]":
-                        return json.loads(chunk)
-            return None
+                        collected.append(json.loads(chunk))
+            if not collected:
+                return None
+            # prefer the JSON-RPC response matching our latest request id, else last frame
+            for frame in reversed(collected):
+                if "id" in frame:
+                    return frame
+            return collected[-1]
         return json.loads(raw) if raw.strip() else None
 
     def _rpc(self, method: str, params: dict | None = None, notify: bool = False) -> dict | None:

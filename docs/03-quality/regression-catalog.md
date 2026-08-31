@@ -6,7 +6,7 @@
 | REG-0002 | FR-0002 | mutate-set-prop-minimal-diff：仅目标字段变化 | `uv run pytest tests/test_mutate.py::test_set_prop_minimal_diff` | 已登记 |
 | REG-0003 | FR-0003 | validate-invalid-graph：断线/悬空引用被检出 | `uv run pytest tests/test_validate.py` | 已登记 |
 | REG-0004 | FR-0003 | checksum-fix：破坏 CHKSM 后重算恢复 | `uv run pytest tests/test_checksum.py` | 已登记 |
-| REG-0005 | FR-0004 | bridge-recompile：触发后 HLSL 变更且 CHKSM 更新 | `uv run pytest -m bridge tests/test_bridge_recompile.py` | 已登记 |
+| REG-0005 | FR-0004 CR-0001 | bridge-recompile：触发后 HLSL 变更且 CHKSM 更新 | `uv run pytest -m bridge tests/test_bridge_recompile.py` | 已登记 |
 | REG-0006 | FR-0005 | create-from-template：模板创建在 Unity 正常打开 | `uv run pytest -m bridge tests/test_bridge_create.py` | 已登记 |
 | REG-0007 | FR-0007 | cli-json-contract：所有子命令 stdout 合法 JSON | `uv run pytest tests/test_cli_contract.py` | 已登记 |
 | REG-0008 | FR-0004 FR-0005 | assumption-experiments：盲改图数据/CHKSM/纯文本创建三实验结论回填 | 人工实验记录归档 `docs/01-architecture/assumption-experiments.md` | 已登记 |

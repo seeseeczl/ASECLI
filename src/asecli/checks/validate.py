@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..core.model import AseFile
+from ..core import AseFile
 from .checksum import verify_checksum
 
 

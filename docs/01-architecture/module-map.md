@@ -5,7 +5,7 @@
 | MOD-CORE | src/asecli/core | FR-0001 FR-0002 | ASE 文本解析器与序列化引擎：提取 `/*ASEBEGIN...ASEEND*/` 图数据，行式 Node/WireConnection 模型，最小差异写回 | `parse(path) -> AseGraph`；`serialize(graph) -> str` | 仅依赖标准库；禁止依赖 schema/bridge/cli |
 | MOD-SCHEMA | src/asecli/schema | FR-0002 | 节点参数 schema 库与源码提取工具；未知节点降级为 passthrough | `schema_for(node_type) -> NodeSchema` | 允许依赖 MOD-CORE 类型；禁止依赖 bridge/cli |
 | MOD-CHECK | src/asecli/checks | FR-0003 | 图结构校验（节点引用/连线完整性）与 CHKSM 重算修复 | `validate(graph) -> list[Issue]`；`fix_checksum(text) -> str` | 允许依赖 MOD-CORE；禁止依赖 bridge/cli |
-| MOD-BRIDGE | src/asecli/bridge | FR-0004 FR-0005 | 调用 Codely（unity_menu/execute_custom_tool）触发 Unity 内 ASE 重新编译与模板创建 | `recompile(shader_path)`；`create_from_template(template, path)` | 允许依赖 MOD-CORE（只读路径工具）；禁止依赖 cli |
+| MOD-BRIDGE | src/asecli/bridge | FR-0004 FR-0005 CR-0001 | MCP for Unity 客户端（主通道）与重编译触发；Codely/batchmode 为备选 | `recompile_via_mcp(shader_path)` | 允许依赖 MOD-CORE（只读路径工具）；禁止依赖 cli |
 | MOD-CLI | src/asecli/cli | FR-0007 | 命令入口与 JSON 输出契约：stdout 恒为机器可读 JSON，诊断走 stderr，统一错误码 | `asecli <command>` 子命令族 | 允许依赖 core/schema/check/bridge；组合根 |
 | MOD-SKILL | skills/asecli | FR-0006 | Agent 技能文档：ASE 格式说明、三链路操作手册、错误处理指引 | SKILL.md（文档资产） | 无代码依赖；文档引用 CLI 契约 |
 | MOD-LAYOUT | src/asecli/core/layout.py | FR-0008 | 节点布局算法：数据流分层（Sugiyama-lite）、行内对齐与等距、确定性输出 | `layout_positions(graph, gap_x, gap_y) -> dict` | 允许依赖 core 模型；禁止依赖 schema/bridge/cli |

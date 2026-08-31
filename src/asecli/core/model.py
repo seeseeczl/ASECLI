@@ -45,6 +45,7 @@ class AseGraph:
 
     version: str = ""
     instructions: list[tuple[str, str]] = field(default_factory=list)  # (kind, raw)
+    eol: str = "\n"
 
     def node_by_id(self, node_id: str) -> NodeLine | None:
         for kind, raw in self.instructions:
@@ -89,7 +90,7 @@ class AseGraph:
         parts = [f"Version={self.version}" if not self.version.startswith("Version=") else self.version]
         for _, raw in self.instructions:
             parts.append(raw)
-        return "\n".join(parts) + "\n"
+        return self.eol.join(parts) + self.eol
 
 
 def parse_graph_text(body: str) -> AseGraph:
@@ -108,6 +109,7 @@ def parse_graph_text(body: str) -> AseGraph:
     for line in lines[1:]:
         line = line.rstrip("\r")
         if not line:
+            graph.instructions.append(("other", ""))
             continue
         if line.startswith("Node;"):
             _parse_node_line(line)
@@ -159,12 +161,17 @@ class AseFile:
         prefix = text[: begin + len(BEGIN)]
         # body starts after the newline following BEGIN, ends before END marker
         body_start = begin + len(BEGIN)
-        if text[body_start] == "\n":
+        if text[body_start : body_start + 2] == "\r\n":
+            body_start += 2
+            prefix += "\r\n"
+        elif text[body_start] == "\n":
             body_start += 1
             prefix += "\n"
+        eol = "\r\n" if "\r\n" in text[body_start:end] else "\n"
         body = text[body_start:end]
         suffix = text[end:]
         graph = parse_graph_text(body)
+        graph.eol = eol
         return cls(prefix=prefix, body=body, suffix=suffix, graph=graph)
 
     @classmethod

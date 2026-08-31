@@ -15,8 +15,9 @@ if (shader == null) throw new System.Exception("shader not found: " + assetPath)
 var win = UnityEditor.EditorWindow.CreateInstance<AmplifyShaderEditor.AmplifyShaderEditorWindow>();
 AmplifyShaderEditor.UIUtils.CurrentWindow = win;
 win.LoadObject(shader);
-win.SaveToDisk(false);
-return "recompiled";
+bool saved = win.SaveToDisk(false);
+UnityEngine.Object.DestroyImmediate(win);
+return "recompiled, saved=" + saved;
 '''
 
 

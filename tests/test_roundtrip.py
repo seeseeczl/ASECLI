@@ -13,6 +13,20 @@ def test_shader_roundtrip_byte_identical():
     assert f.serialize() == text
 
 
+def test_blank_line_inside_body_roundtrip():
+    """AA-OPT-002: blank line before ASEEND must not be dropped."""
+    text = (FIXTURES / "HLIT.shader").read_text(encoding="utf-8").replace("ASEEND*/", "\nASEEND*/")
+    f = AseFile.from_text(text)
+    assert f.serialize() == text
+
+
+def test_crlf_file_roundtrip():
+    """AA-OPT-001: CRLF shaders roundtrip byte-identically."""
+    text = (FIXTURES / "HLIT.shader").read_text(encoding="utf-8").replace("\n", "\r\n")
+    f = AseFile.from_text(text)
+    assert f.serialize() == text
+
+
 def test_shader_parses_expected_nodes():
     f = AseFile.from_path(FIXTURES / "HLIT.shader")
     assert f.graph.version == "19109"

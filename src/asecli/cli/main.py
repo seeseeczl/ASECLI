@@ -4,187 +4,22 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-from pathlib import Path
 
-from ..bridge.mcp_client import McpError
-from ..bridge.recompile import recompile_via_mcp
-from ..checks import compute_checksum, fix_checksum, validate_file, verify_checksum
-from ..core import AseFile, NodeLine
-from ..core.model import _parse_node_line
-from ..core.graph_ops import connect, disconnect, node_from_schema, remove_node, set_node_field
-from ..core.layout import tidy
-from ..schema import allows_mutation, schema_for
-
-EXIT_OK = 0
-EXIT_ERROR = 2
-EXIT_BRIDGE = 3
-
-
-class CliError(Exception):
-    def __init__(self, code: str, message: str):
-        super().__init__(message)
-        self.code = code
-
-
-def _load(path: str) -> AseFile:
-    try:
-        return AseFile.from_path(path)
-    except FileNotFoundError:
-        raise CliError("NOT_FOUND", f"file not found: {path}")
-    except ValueError as e:
-        raise CliError("PARSE_ERROR", str(e))
-
-
-def _save(ase_file: AseFile, path: str, write: bool) -> dict:
-    if not write:
-        return {"written": False, "preview_bytes": len(ase_file.serialize())}
-    Path(path).write_text(ase_file.serialize(), encoding="utf-8")
-    return {"written": True, "path": str(path)}
-
-
-def _parse_endpoint(ep: str) -> tuple[str, str]:
-    if ":" not in ep:
-        raise CliError("USAGE_ERROR", f"endpoint must be node:port, got {ep!r}")
-    node, port = ep.split(":", 1)
-    return node, port
-
-
-def cmd_parse(args) -> dict:
-    f = _load(args.file)
-    g = f.graph
-    return {
-        "file": args.file,
-        "version": g.version,
-        "node_count": len(g.nodes),
-        "wire_count": len(g.wires),
-        "nodes": [{"id": n.node_id, "type": n.type_name, "pos": n.raw_fields[3]} for n in g.nodes],
-    }
-
-
-def cmd_set_field(args) -> dict:
-    f = _load(args.file)
-    try:
-        node = set_node_field(f.graph, args.node, args.field, args.value)
-    except (KeyError, IndexError) as e:
-        raise CliError("NOT_FOUND", str(e))
-    saved = _save(f, args.file, args.write)
-    return {"node": node.node_id, "field": args.field, "value": args.value, **saved}
-
-
-def cmd_add_node(args) -> dict:
-    f = _load(args.file)
-    if args.line is not None:
-        _parse_node_line(args.line)
-        fields = args.line.split(";")
-        node = NodeLine(type_name=fields[1], node_id=fields[2], raw_fields=fields)
-    else:
-        if not args.type:
-            raise CliError("USAGE_ERROR", "either --type or --line is required")
-        s = schema_for(args.type)
-        if s is None:
-            raise CliError("SCHEMA_UNAVAILABLE", f"unknown node type: {args.type} (use --line to insert raw)")
-        if not allows_mutation(args.type):
-            raise CliError("SCHEMA_UNAVAILABLE", f"{args.type} has opaque layout; use --line with a real serialized line")
-        node = node_from_schema(f.graph, s, args.id, args.pos, args.type)
-    f.graph.add_node(node)
-    saved = _save(f, args.file, args.write)
-    return {"node_id": node.node_id, "type": node.type_name, **saved}
-
-
-def cmd_connect(args) -> dict:
-    f = _load(args.file)
-    src, sport = _parse_endpoint(args.src)
-    dst, dport = _parse_endpoint(args.dst)
-    try:
-        wire = connect(f.graph, src, sport, dst, dport)
-    except KeyError as e:
-        raise CliError("NOT_FOUND", str(e))
-    saved = _save(f, args.file, args.write)
-    return {"from": args.src, "to": args.dst, "line": wire.to_line(), **saved}
-
-
-def cmd_disconnect(args) -> dict:
-    f = _load(args.file)
-    src, sport = _parse_endpoint(args.src)
-    dst, dport = _parse_endpoint(args.dst)
-    if not disconnect(f.graph, src, sport, dst, dport):
-        raise CliError("NOT_FOUND", f"wire {args.src} -> {args.dst} not found")
-    saved = _save(f, args.file, args.write)
-    return {"removed": True, **saved}
-
-
-def cmd_remove_node(args) -> dict:
-    f = _load(args.file)
-    try:
-        wires = remove_node(f.graph, args.node)
-    except KeyError as e:
-        raise CliError("NOT_FOUND", str(e))
-    saved = _save(f, args.file, args.write)
-    return {"removed_node": args.node, "removed_wires": wires, **saved}
-
-
-def cmd_validate(args) -> dict:
-    f = _load(args.file)
-    issues = validate_file(f)
-    return {
-        "file": args.file,
-        "issues": issues,
-        "error_count": sum(1 for i in issues if i["severity"] == "error"),
-    }
-
-
-def cmd_fix_checksum(args) -> dict:
-    path = Path(args.file)
-    try:
-        text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        raise CliError("NOT_FOUND", f"file not found: {args.file}")
-    ok, stored, actual = verify_checksum(text)
-    fixed = fix_checksum(text)
-    path.write_text(fixed, encoding="utf-8")
-    return {"was_valid": ok, "stored": stored, "fixed_to": actual, "written": True}
-
-
-def cmd_layout(args) -> dict:
-    f = _load(args.file)
-    moved = tidy(f.graph, gap_x=args.gap_x, gap_y=args.gap_y)
-    saved = _save(f, args.file, args.write)
-    return {"moved": moved, **saved}
-
-
-def cmd_create(args) -> dict:
-    f = _load(args.from_template)
-    text = f.serialize()
-    if args.name:
-        m = re.search(r'Shader "([^"]+)"', text)
-        if not m:
-            raise CliError("USAGE_ERROR", 'template has no Shader "..." declaration to rename')
-        text = text.replace(f'Shader "{m.group(1)}"', f'Shader "{args.name}"', 1)
-    if args.graph_from:
-        donor = _load(args.graph_from)
-        begin = text.index("/*ASEBEGIN")
-        end = text.index("ASEEND*/", begin)
-        text = text[:begin] + donor.prefix.lstrip("\n") + donor.graph.serialize() + text[end:]
-    chk = text.find("//CHKSM=")
-    if chk >= 0:
-        text = text[:chk] + "//CHKSM=" + compute_checksum(text[:chk])
-    if Path(args.out).exists() and not args.force:
-        raise CliError("USAGE_ERROR", f"{args.out} exists (use --force)")
-    Path(args.out).write_text(text, encoding="utf-8")
-    return {"created": args.out, "name": args.name, "graph_from": args.graph_from}
-
-
-def cmd_recompile(args) -> dict:
-    try:
-        return recompile_via_mcp(args.file, mcp_url=args.mcp_url, instance_token=args.instance_token)
-    except McpError as e:
-        raise CliError("BRIDGE_ERROR", str(e))
-    except FileNotFoundError as e:
-        raise CliError("NOT_FOUND", str(e))
-    except ValueError as e:
-        raise CliError("USAGE_ERROR", str(e))
+from .commands import EXIT_BRIDGE, EXIT_ERROR, EXIT_OK, CliError
+from .commands import (
+    cmd_add_node,
+    cmd_connect,
+    cmd_create,
+    cmd_disconnect,
+    cmd_fix_checksum,
+    cmd_layout,
+    cmd_parse,
+    cmd_recompile,
+    cmd_remove_node,
+    cmd_set_field,
+    cmd_validate,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
