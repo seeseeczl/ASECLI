@@ -1,0 +1,8 @@
+source_id,source_type,status,architecture_or_design,module_or_contract,task_or_commit,regression_id,last_verification,release_id,owner,notes
+FR-0001,功能,已确认,ADR-0001,MOD-CORE,TASK-0003 TASK-0004,REG-0001 REG-0011,2026-08-31 启动评审通过基线,,long,ASE 图数据解析与序列化
+FR-0002,功能,已确认,ADR-0003,MOD-SCHEMA,TASK-0005 TASK-0006 TASK-0007,REG-0002 REG-0009,2026-08-31 启动评审通过基线,,long,图数据修改与 schema 库
+FR-0003,功能,已确认,ADR-0003,MOD-CHECK,TASK-0008 TASK-0009,REG-0003 REG-0004,2026-08-31 启动评审通过基线,,long,校验与 checksum 修复
+FR-0004,功能,已确认,ADR-0002,MOD-BRIDGE,TASK-0001 TASK-0011,REG-0005 REG-0008,2026-08-31 启动评审通过基线,,long,经 Codely 桥触发重新编译
+FR-0005,功能,已确认,ADR-0002,MOD-BRIDGE,TASK-0012,REG-0006 REG-0008,2026-08-31 启动评审通过基线,,long,模板创建新 shader
+FR-0006,功能,已确认,ADR-0001,MOD-SKILL,TASK-0013,REG-0010,2026-08-31 启动评审通过基线,,long,Agent 技能文档
+FR-0007,功能,已确认,ADR-0001,MOD-CLI,TASK-0010 TASK-0013,REG-0007 REG-0010,2026-08-31 启动评审通过基线,,long,CLI JSON 契约与错误码

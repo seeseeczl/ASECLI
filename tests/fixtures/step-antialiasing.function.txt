@@ -1,0 +1,21 @@
+// Made with Amplify Shader Editor v1.9.1
+// Available at the
+    Unity Asset Store - http://u3d.as/y3X 
+/*ASEBEGIN
+Version=19100
+Node;AmplifyShaderEditor.SimpleSubtractOpNode;3;-640,0;Inherit;False;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SaturateNode;6;-160,0;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleDivideOpNode;5;-304,0;Inherit;False;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.FWidthOpNode;4;-464,64;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.FunctionInput;1;-832,48;Inherit;False;A;1;0;False;1;0;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.FunctionInput;2;-832,-32;Inherit;False;B;1;1;False;1;0;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.FunctionOutput;0;0,0;Inherit;False;True;-1;;0;False;1;0;FLOAT;0;False;1;FLOAT;0
+WireConnection;3;0;2;0
+WireConnection;3;1;1;0
+WireConnection;6;0;5;0
+WireConnection;5;0;3;0
+WireConnection;5;1;4;0
+WireConnection;4;0;3;0
+WireConnection;0;0;6;0
+ASEEND*/
+//CHKSM=72962A1DE3BCBF8D06F18BA3C084D26F20381C12

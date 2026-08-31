@@ -1,0 +1,14 @@
+{
+  "project_id": "PRJ-ASECLI",
+  "profiles": ["core", "ai-agent"],
+  "loc_thresholds": {
+    "source": {"warning": 250, "limit": 400},
+    "test": {"warning": 400, "limit": 600},
+    "config": {"warning": 160, "limit": 200}
+  },
+  "module_roots": ["src/asecli"],
+  "module_public_patterns": ["src/asecli/cli/**", "src/asecli/core/**", "contracts/**"],
+  "module_import_aliases": {},
+  "fitness": {"module_dependency_warning": 5, "module_dependency_limit": 8},
+  "audit": {"output_dir": "docs/05-audits", "reuse_legacy_history": false}
+}
