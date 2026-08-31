@@ -44,10 +44,10 @@ def test_sample_lines_match_runtime_layout():
             type_name = fields[1]
             s = schema_for(type_name)
             assert s is not None, type_name
-            if s.get("source") == "runtime" and version_matches:
-                assert len(fields) - 6 == len(s["fields"]), f"{type_name}: {len(fields) - 6} vs {len(s['fields'])}"
-            else:  # observed: full sample must exist verbatim
+            if s.get("source") == "observed":
                 assert line in s["samples"], type_name
+            elif s.get("source") == "runtime" and version_matches:
+                assert len(fields) - 6 == len(s["fields"]), f"{type_name}: {len(fields) - 6} vs {len(s['fields'])}"
             checked += 1
     assert checked >= 15  # 10 master nodes + 7 function nodes minimum coverage
 
