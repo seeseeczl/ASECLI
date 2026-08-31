@@ -10,13 +10,14 @@
 - 理由：用户环境 Python 3.12 已就绪；Agent 生态（skill 文档 + CLI 调用）天然匹配；打包分发用 `uv tool install`。
 - 备选被拒：Node/Go 单二进制（跨语言维护成本高，无团队熟悉度收益）；纯 shell 脚本（无法承载 schema 数据库与 roundtrip 测试）。
 
-### ADR-0002 编译桥接复用 Codely Bridge，不自建 IPC
+### ADR-0002 编译桥接：Unity 侧薄能力层 + MCP for Unity 主传输（修订 2026-09-01）
 
 - 状态：已确认（2026-08-31）
-- 背景：ASE 编译后 HLSL 必须由 Unity/团结引擎生成；用户环境已装 Codely CLI 与 `cn.tuanjie.codely.bridge@1.0.54`。
-- 决策：在目标工程放置一个 C# MenuItem 桥接脚本（ASECliBridge），经 Codely 的 `unity_menu` / `execute_custom_tool` 触发；Python 侧 bridge 模块只负责拼装调用。
-- 理由：零新增基础设施；团结引擎第一方兼容。
-- 备选被拒：自建 Editor WebSocket 服务（维护成本高、权限面大）；Unity batchmode 冷启动（每次 30s+，交互式使用不可接受；保留为无 Codely 环境的降级路径）。
+- 背景：ASE 编译后 HLSL 必须由 Unity/团结引擎生成。TASK-0001 实验确认了确切的 Unity 侧调用序列（隐藏 ASE 窗口实例 + ParentGraph.Init + LoadFromMeta），且用户工程已运行 MCP for Unity（HTTP :8080），其 `execute_code`/`execute_custom_tool` 可直接执行该序列。
+- 决策：三层传输——① 主通道：MCP for Unity（确定性 RPC，无 LLM 介入，asecli 内置最小 MCP 客户端）；② 备选：Codely（`unity_menu`/`execute_custom_tool` 触发同一 C# 方法）；③ 兜底：Unity batchmode（已验证，约 10-20s/次）。Unity 侧能力封装为约 30 行的可复用 C# 片段/方法（ASECliBridge），随 MCP execute_code 注入或注册为 custom tool，不强依赖工程内常驻脚本文件。
+- 理由：MCP 传输最薄且用户环境已就绪并实测可达；Codely 为交互式 agent 设计，非交互脚本化不是其主路径，作为备选保留；batchmode 无需编辑器常开。
+- 备选被拒：自建 Editor WebSocket 服务（维护成本高、权限面大）；以 Codely 为主通道（多一层 agent 运行时间接层，故障定位链长）。
+- 修订记录：原决策以 Codely 为主通道；TASK-0001 实验与用户环境实测（MCP 会话可达）后于 2026-09-01 修订，经用户确认。
 
 ### ADR-0003 节点 schema 由 ASE 源码静态提取 + 样本比对验证
 
