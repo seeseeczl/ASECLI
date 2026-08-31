@@ -2,7 +2,7 @@
 id: PLAN-0001
 type: project-plan-task-charter
 status: 已确认
-version: 1.0.0
+version: 1.1.0
 created_at: 2026-08-31T23:30:00+08:00
 owner: long
 related: [ARCH-REQ-0001, PRJ-ASECLI]
@@ -16,7 +16,7 @@ kickoff_completion: complete
 ## 计划依据与目标
 
 - 上游架构与需求总纲版本/链接：ARCH-REQ-0001 v1.0.0 — docs/01-architecture/project-architecture-and-requirements.md
-- 本计划覆盖的 FR/NFR/CR：FR-0001～FR-0007、NFR-0001～NFR-0004
+- 本计划覆盖的 FR/NFR/CR：FR-0001～FR-0008、NFR-0001～NFR-0004、CR-0001（ADR-0002 修订）
 - 首个可交付垂直切片：MS-2 结束时——对真实 ASE shader 完成 parse→set-prop→写回→roundtrip 校验（纯文本链路，无 Unity）
 - 交付假设、依赖与不包含范围：假设 D4/D6/D10 由 TASK-0001 实验验证；依赖用户环境 Codely+团结引擎已就绪；不包含 Hub 发布与 UI
 
@@ -26,7 +26,7 @@ kickoff_completion: complete
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | MS-1 假设验证与骨架 | 三实验结论归档 + Git/uv/pytest 工程骨架 | TASK-0001 TASK-0002 | 无 | 实验结论写入架构文档；pytest 空跑通过 | long | 2026-09-02 | 2026-09-02 | 未开始 |
 | MS-2 文本引擎与 schema | core 解析/序列化 + schema 提取 v1 + 修改命令 | TASK-0003 TASK-0004 TASK-0005 TASK-0006 TASK-0007 | MS-1 | REG-0001 REG-0002 REG-0009 REG-0011 全绿 | long | 2026-09-05 | 2026-09-05 | 未开始 |
-| MS-3 校验修复与 CLI 契约 | validate/checksum-fix + JSON 契约 | TASK-0008 TASK-0009 TASK-0010 | MS-2 | REG-0003 REG-0004 REG-0007 全绿 | long | 2026-09-07 | 2026-09-07 | 未开始 |
+| MS-3 校验修复与 CLI 契约 | validate/checksum-fix + JSON 契约 + 布局引擎 | TASK-0008 TASK-0009 TASK-0010 TASK-0015 | MS-2 | REG-0003 REG-0004 REG-0007 REG-0012 全绿 | long | 2026-09-07 | 2026-09-07 | 未开始 |
 | MS-4 桥接与技能 | C# 桥 + 模板创建 + SKILL.md | TASK-0011 TASK-0012 TASK-0013 | MS-3 | REG-0005 REG-0006 REG-0010 全绿 | long | 2026-09-10 | 2026-09-10 | 未开始 |
 | MS-5 验收与复审 | 端到端验收 + 快速审计 | TASK-0014 | MS-4 | 审计 S0/S1 清零 | long | 2026-09-12 | 2026-09-12 | 未开始 |
 
@@ -48,6 +48,7 @@ kickoff_completion: complete
 | TASK-0012 | FR-0005 | create-from-template：模板复制 + 图初始化 + 经桥创建 | TASK-0011 | src/asecli/bridge/create.py；src/asecli/cli/cmd_create.py；tests/test_bridge_create.py | 纯文本生成 HLSL（假设 D10 否决路径） | TASK-0011/long/2026-09-09 | REG-0006：创建的 shader 在 Unity 打开正常；命令：`uv run pytest -m bridge tests/test_bridge_create.py` | 模板清单不全时停止并登记缺失 | 提交 hash 回填 | 未开始 |
 | TASK-0013 | FR-0006 FR-0007 | Agent 技能 SKILL.md：格式说明+三链路手册+错误处理 | TASK-0010 TASK-0012 | skills/asecli/SKILL.md | 描述未实现的命令；偏离 JSON 契约 | TASK-0012/long/2026-09-10 | REG-0010：Agent 按文档完成一次自然语言全流程并归档会话记录；命令：人工执行 REG-0010 | 全流程失败且非文档原因时停止 | 归档路径回填 | 未开始 |
 | TASK-0014 | NFR-0003 REG-0011 | 性能基线测试：千节点级文件单命令 <1s | TASK-0010 | tests/test_perf.py；tests/fixtures/generated/** | 优化实现超出 NFR-0003 需求范围 | TASK-0010/long/2026-09-12 | REG-0011：基线断言通过；命令：`uv run pytest tests/test_perf.py` | 性能差距>2x 且短期不可修复时停止登记 AUD | 提交 hash 回填 | 未开始 |
+| TASK-0015 | FR-0008 | 布局引擎：拓扑分层 + 对齐等距（Sugiyama-lite），仅改 x/y | TASK-0004 | src/asecli/core/layout.py；tests/test_layout.py | 改动位置以外任何字段；破坏 roundtrip | TASK-0010/long/2026-09-06 | REG-0012：布局后连线集合不变、同输入同输出、仅位置变化；命令：`uv run pytest tests/test_layout.py` | 布局不可行或破坏保真时停止 | 提交 hash 回填 | 未开始 |
 
 ## 验证、风险与回滚
 

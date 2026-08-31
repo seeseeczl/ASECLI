@@ -2,7 +2,7 @@
 id: ARCH-REQ-0001
 type: project-architecture-and-requirements
 status: 已确认
-version: 1.0.0
+version: 1.1.0
 created_at: 2026-08-31T23:25:00+08:00
 owner: long
 related: [PRJ-ASECLI, docs/first-principles/2026-08-31-231401-optimization-plan.md]
@@ -46,6 +46,7 @@ kickoff_completion: complete
 | FR-0005 | 功能 | 经桥从模板创建新 shader | Unity 中打开正常 | REG-0006 REG-0008 | 已确认 |
 | FR-0006 | 功能 | Agent 技能文档 SKILL.md：格式说明+三链路手册+错误处理 | Agent 按文档完成一次全流程 | REG-0010 | 已确认 |
 | FR-0007 | 功能 | CLI JSON 输出契约：stdout 恒为合法 JSON（含 ok 字段），统一错误码 | 所有子命令契约测试通过 | REG-0007 | 已确认 |
+| FR-0008 | 功能 | 节点布局整理：按数据流拓扑自动排列节点位置（分层、对齐、等距），保持连线与参数不变 | 布局后连线集合不变；同输入确定性输出；仅 x/y 字段变化 | REG-0012 | 已确认 |
 | NFR-0001 | 非功能 | Roundtrip 保真：未修改字段逐字节不变 | roundtrip 测试断言 | REG-0001 | 已确认 |
 | NFR-0002 | 非功能 | 未知节点 passthrough：schema 未覆盖时保真透传 | 混合样本测试 | REG-0002 | 已确认 |
 | NFR-0003 | 非功能 | 性能：千节点级文件单命令 <1s | perf 基线测试 | REG-0011 | 已确认 |
@@ -78,6 +79,7 @@ kickoff_completion: complete
 | MOD-BRIDGE | src/asecli/bridge | Codely/Unity 调用适配；进程调用所有权 | recompile/create_from_template | 允许 core（只读工具）；禁止 cli | FR-0004 FR-0005 ADR-0002 | long |
 | MOD-CLI | src/asecli/cli | 命令入口与 JSON 输出契约；组合根 | `asecli <command>` | 允许 core/schema/check/bridge | FR-0007 ADR-0001 | long |
 | MOD-SKILL | skills/asecli | Agent 技能文档（文档资产） | SKILL.md | 无代码依赖 | FR-0006 ADR-0001 | long |
+| MOD-LAYOUT | src/asecli/core/layout.py | 节点布局算法（分层拓扑 + 交叉减少 + 等距网格）；布局结果所有权 | `layout_positions(graph) -> dict[id, (x, y)]` | 允许依赖 core 模型；禁止依赖 schema/bridge/cli | FR-0008 ADR-0005 | long |
 
 - 数据、权限、第三方集成与安全边界：仅读写用户显式指定的文件路径；仅调用本机 `codely` 命令；不联网；不读取/存储任何凭证；桥接脚本不开放任意代码执行入口（只暴露 recompile/create 两个 MenuItem）。
 - UI/设计来源、令牌与无障碍约束：不适用（无 UI）；JSON 输出结构即对外界面，字段变更视为 CR。

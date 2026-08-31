@@ -29,7 +29,7 @@ def test_add_node_and_wire():
     f = AseFile.from_text(text)
     before = len(f.graph.instructions)
     f.graph.add_node(NodeLine(type_name="AmplifyShaderEditor.SaturateNode", node_id="99", raw_fields=["Node", "AmplifyShaderEditor.SaturateNode", "99", "-160,0", "Inherit", "False", "1", "0", "FLOAT", "0", "False", "1", "FLOAT", "0"]))
-    f.graph.add_wire(WireLine(out_node="99", out_port="0", in_node="6", in_port="0"))
+    f.graph.add_wire(WireLine(in_node="6", in_port="0", out_node="99", out_port="0"))
     out = f.serialize()
     f2 = AseFile.from_text(out)
     assert len(f2.graph.instructions) == before + 2

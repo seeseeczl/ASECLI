@@ -19,7 +19,11 @@ class NodeLine:
 
 @dataclass
 class WireLine:
-    """A raw ``WireConnection;`` instruction: out node/port -> in node/port."""
+    """A raw ``WireConnection;`` instruction.
+
+    ASE format: ``WireConnection;<in_node>;<in_port>;<out_node>;<out_port>``
+    (destination first, source second — verified against real files).
+    """
 
     out_node: str
     out_port: str
@@ -27,7 +31,7 @@ class WireLine:
     in_port: str
 
     def to_line(self) -> str:
-        return f"WireConnection;{self.out_node};{self.out_port};{self.in_node};{self.in_port}"
+        return f"WireConnection;{self.in_node};{self.in_port};{self.out_node};{self.out_port}"
 
 
 @dataclass
@@ -127,7 +131,7 @@ def _parse_wire_line(line: str) -> WireLine:
     fields = line.split(";")
     if len(fields) != 5:
         raise ValueError(f"malformed WireConnection line: {line!r}")
-    return WireLine(out_node=fields[1], out_port=fields[2], in_node=fields[3], in_port=fields[4])
+    return WireLine(in_node=fields[1], in_port=fields[2], out_node=fields[3], out_port=fields[4])
 
 
 BEGIN = "/*ASEBEGIN"

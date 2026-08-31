@@ -13,3 +13,4 @@
 | REG-0009 | FR-0002 | schema-extract-sample-match：10 种节点 schema 与真实文本逐字段一致 | `uv run pytest tests/test_schema_samples.py` | 已登记 |
 | REG-0010 | FR-0006 FR-0007 | agent-end-to-end：技能指引下自然语言全流程 | 人工执行并归档会话记录 | 已登记 |
 | REG-0011 | FR-0001 | perf-baseline：千节点级文件单命令 <1s | `uv run pytest tests/test_perf.py` | 已登记 |
+| REG-0012 | FR-0008 | layout-deterministic-and-safe：布局确定性、连线不变、仅位置字段变化 | `uv run pytest tests/test_layout.py` | 已登记 |

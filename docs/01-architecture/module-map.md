@@ -8,9 +8,11 @@
 | MOD-BRIDGE | src/asecli/bridge | FR-0004 FR-0005 | 调用 Codely（unity_menu/execute_custom_tool）触发 Unity 内 ASE 重新编译与模板创建 | `recompile(shader_path)`；`create_from_template(template, path)` | 允许依赖 MOD-CORE（只读路径工具）；禁止依赖 cli |
 | MOD-CLI | src/asecli/cli | FR-0007 | 命令入口与 JSON 输出契约：stdout 恒为机器可读 JSON，诊断走 stderr，统一错误码 | `asecli <command>` 子命令族 | 允许依赖 core/schema/check/bridge；组合根 |
 | MOD-SKILL | skills/asecli | FR-0006 | Agent 技能文档：ASE 格式说明、三链路操作手册、错误处理指引 | SKILL.md（文档资产） | 无代码依赖；文档引用 CLI 契约 |
+| MOD-LAYOUT | src/asecli/core/layout.py | FR-0008 | 节点布局算法：数据流分层（Sugiyama-lite）、行内对齐与等距、确定性输出 | `layout_positions(graph, gap_x, gap_y) -> dict` | 允许依赖 core 模型；禁止依赖 schema/bridge/cli |
 
 ## 依赖规则
 
 1. 依赖方向唯一：CLI → {core, schema, check, bridge}；schema/check/bridge → core；core 无内部依赖。
 2. 任何模块禁止反向依赖 CLI；禁止跨层直接调用 bridge 内部函数（只能走公开 API）。
 3. 未知节点类型不得被 schema 层丢弃或改写（passthrough 保真）。
+4. 布局只改节点位置的 x/y 字段，禁止改动任何其他字段；连线集合布局前后必须一致。
