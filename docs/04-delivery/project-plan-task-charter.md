@@ -24,11 +24,11 @@ kickoff_completion: complete
 
 | 里程碑 | 目标/交付物 | 关联 ID | 依赖 | 验收/验证 | Owner | 目标日期 | AUD 日期 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| MS-1 假设验证与骨架 | 三实验结论归档 + Git/uv/pytest 工程骨架 | TASK-0001 TASK-0002 | 无 | 实验结论写入架构文档；pytest 空跑通过 | long | 2026-09-02 | 2026-09-02 | 未开始 |
-| MS-2 文本引擎与 schema | core 解析/序列化 + schema 提取 v1 + 修改命令 | TASK-0003 TASK-0004 TASK-0005 TASK-0006 TASK-0007 | MS-1 | REG-0001 REG-0002 REG-0009 REG-0011 全绿 | long | 2026-09-05 | 2026-09-05 | 未开始 |
-| MS-3 校验修复与 CLI 契约 | validate/checksum-fix + JSON 契约 + 布局引擎 | TASK-0008 TASK-0009 TASK-0010 TASK-0015 | MS-2 | REG-0003 REG-0004 REG-0007 REG-0012 全绿 | long | 2026-09-07 | 2026-09-07 | 未开始 |
-| MS-4 桥接与技能 | C# 桥 + 模板创建 + SKILL.md | TASK-0011 TASK-0012 TASK-0013 | MS-3 | REG-0005 REG-0006 REG-0010 全绿 | long | 2026-09-10 | 2026-09-10 | 未开始 |
-| MS-5 验收与复审 | 端到端验收 + 快速审计 | TASK-0014 | MS-4 | 审计 S0/S1 清零 | long | 2026-09-12 | 2026-09-12 | 未开始 |
+| MS-1 假设验证与骨架 | 三实验结论归档 + Git/uv/pytest 工程骨架 | TASK-0001 TASK-0002 | 无 | 实验结论写入架构文档；pytest 空跑通过 | long | 2026-09-02 | 2026-09-02 | 已完成 |
+| MS-2 文本引擎与 schema | core 解析/序列化 + schema 提取 v1 + 修改命令 | TASK-0003 TASK-0004 TASK-0005 TASK-0006 TASK-0007 | MS-1 | REG-0001 REG-0002 REG-0009 REG-0011 全绿 | long | 2026-09-05 | 2026-09-05 | 已完成 |
+| MS-3 校验修复与 CLI 契约 | validate/checksum-fix + JSON 契约 + 布局引擎 | TASK-0008 TASK-0009 TASK-0010 TASK-0015 | MS-2 | REG-0003 REG-0004 REG-0007 REG-0012 全绿 | long | 2026-09-07 | 2026-09-07 | 已完成 |
+| MS-4 桥接与技能 | MCP 桥 + 模板创建 + SKILL.md | TASK-0011 TASK-0012 TASK-0013 | MS-3 | REG-0005 REG-0006 REG-0010（桥接端到端待编辑器验收） | long | 2026-09-10 | 2026-09-10 | 代码完成 |
+| MS-5 验收与复审 | 端到端验收 + 快速审计 | TASK-0014 | MS-4 | 审计 S0/S1 清零 | long | 2026-09-12 | 2026-09-12 | 进行中 |
 
 ## 原子任务卡
 
