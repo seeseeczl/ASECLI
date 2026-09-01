@@ -35,9 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SOURCE_DATE_EPOCH: "1788220800"
-      ASECLI_BUILD_A: ${{ runner.temp }}/asecli-build-a
-      ASECLI_BUILD_B: ${{ runner.temp }}/asecli-build-b
-      ASECLI_REPRO_REPORT: ${{ runner.temp }}/asecli-reproducibility.json
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
@@ -46,6 +43,11 @@ jobs:
           python-version: "3.12"
           enable-cache: true
           cache-dependency-glob: uv.lock
+      - name: Configure build paths outside the checkout
+        run: |
+          echo "ASECLI_BUILD_A=$RUNNER_TEMP/asecli-build-a" >> "$GITHUB_ENV"
+          echo "ASECLI_BUILD_B=$RUNNER_TEMP/asecli-build-b" >> "$GITHUB_ENV"
+          echo "ASECLI_REPRO_REPORT=$RUNNER_TEMP/asecli-reproducibility.json" >> "$GITHUB_ENV"
       - run: uv sync --frozen --python 3.12
       - name: Report build toolchain
         run: |
