@@ -16,7 +16,7 @@ kickoff_completion: complete
 ## 计划依据与目标
 
 - 上游架构与需求总纲版本/链接：ARCH-REQ-0001 v1.0.0 — docs/01-architecture/project-architecture-and-requirements.md
-- 本计划覆盖的 FR/NFR/CR：FR-0001～FR-0011、NFR-0001～NFR-0004、CR-0001～CR-0008
+- 本计划覆盖的 FR/NFR/CR：FR-0001～FR-0011、NFR-0001～NFR-0004、CR-0001～CR-0009
 - 首个可交付垂直切片：MS-2 结束时——对真实 ASE shader 完成 parse→set-prop→写回→roundtrip 校验（纯文本链路，无 Unity）
 - 交付假设、依赖与不包含范围：D4/D6/D10 已由 TASK-0001 验证；真实桥接依赖隔离 Tuanjie 工程与 MCP 会话；不包含 Hub/PyPI 远程发布与 UI
 
@@ -54,7 +54,7 @@ kickoff_completion: complete
 | TASK-0015 | FR-0008 | 确定性布局且仅修改 x/y | TASK-0004 | core/layout.py；tests/test_layout.py | 改其他字段/连线 | TASK-0010/long/2026-09-06 | REG-0012 | 破坏保真时停止 | REG-0012 | 已验证 |
 | TASK-0016 | BUG-0008 AUD-GOV-001 | REG/TASK/追溯路径可执行 | 2026-09-01 审计 | governance/quality/delivery 文档；tools/check_regression_catalog.py | 删除历史 ID；伪造 Editor/CI 证据 | long/2026-09-01 | REG-0020 | 任一登记命令不可收集时停止 | catalog collect + strict | 已验证 |
 | TASK-0017 | CR-0005 BUG-0009 AUD-ARCH-001 | 公开 core node parser API | TASK-0003 | core/model.py；core/__init__.py；cli/commands.py | 删除兼容 alias | long/2026-09-01 | REG-0019 | 私有跨模块导入仍存在时停止 | REG-0019 + fitness | 已验证 |
-| TASK-0018 | CR-0006 AUD-OPS-001 | 双 Python CI、artifact 与 REL 回滚 | TASK-0016 | .github/workflows/ci.yml；docs/04-delivery/releases/** | push/远程 Release | long/2026-09-01 | REG-0021 + 本地双构建/安装/回滚 | artifact 不可复现时停止 | REL-0001 | 本地已验证/远程待验 |
+| TASK-0018 | CR-0006 AUD-OPS-001 | 双 Python CI、artifact 与 REL 回滚 | TASK-0016 | .github/workflows/ci.yml；docs/04-delivery/releases/** | push/远程 Release | long/2026-09-01 | REG-0021 + 本地双构建/安装/回滚 | artifact 不可复现时停止 | REL-0001 | 本地与 GitHub run 33510909955/artifact 已验证；远程 Release 未创建 |
 | TASK-0019 | CR-0006 AUD-SUPPLY-001 | 内部许可、供应链策略和 SPDX SBOM | TASK-0018 | LICENSE；SECURITY.md；supply-chain-policy.md；tools/*sbom* | 上传源码/secret；新增项目依赖 | long/2026-09-01 | REG-0021 | secret/license/hash 失败时停止 | REL-0001 | 已验证 |
 | TASK-0020 | FR-0009 | CustomEditor 与 MZGUI 分组/提示/帮助框的安全查询、预演和写回 | ASE 1.9.6.2 源码/MZGUI_Test；TASK-0010 | core/custom_gui.py；core/__init__.py；cli/main.py；cli/commands.py；cli/custom_gui_command.py；tests/test_custom_gui.py；README/SKILL/治理增量 | 修改 MZGUI C#；批量改 Pass Master；直接猜写编译 Properties；生产工程；新依赖 | TASK-0010/long/2026-09-01 | REG-0022：`uv run pytest tests/test_custom_gui.py`；双 Python 全量；strict | 无唯一主 Master、未知尾部或真实样本 roundtrip 失败时停止 | 真实 19602 样本 14 Property/13 属性/7 类型可读；隔离副本写入、备份、validate 0 errors | 已验证（真实 UI 待目标工程验收） |
 | TASK-0021 | FR-0009 FR-0010 | 按 ShaderLab 属性名原子应用排序、分组与逐项说明 JSON 规范 | 三张参考图；TASK-0020 | core/material_gui_spec.py；cli/custom_gui_command.py；core/__init__.py；cli/main.py；tests/test_custom_gui.py；README/SKILL/治理增量 | 多次逐项写盘；编造属性语义；修改生产 Shader；新依赖 | TASK-0020/long/2026-09-01 | REG-0023：`uv run pytest tests/test_custom_gui.py`；双 Python 全量；strict | 未列属性丢失、重复 order 或整批失败仍写盘时停止 | Python 3.10/3.12 各 115 passed/1 skipped；strict 通过 | 已验证（真实 UI 待目标工程验收） |
@@ -65,12 +65,12 @@ kickoff_completion: complete
 | TASK-0026 | FR-0011 CR-0008 | `create --backend text|editor|auto --spec` additive CLI 契约 | TASK-0023~0025 | cli/main.py；cli/create_command.py；README/SKILL；tests/test_editor_create_cli.py | 改变现有 text 默认语义 | TASK-0025/long/2026-09-01 | REG-0026 REG-0028 | 旧 create 回归时停止 | text 默认兼容；editor/auto/spec JSON 回归通过 | 已验证 |
 | TASK-0027 | FR-0011 CR-0008 | 隔离团结工程 Caster-like/Receiver-like 真实创建与关闭重载 | TASK-0026；隔离工程/MCP | tests/test_editor_create_e2e.py；系统临时目录证据 | 修改 FlymeAuto3Test 生产文件；用 mock 代替 Editor | TASK-0026/long/2026-09-02 | REG-0029 | 需写生产工程或 Save/Load 不稳定时停止 | 1 passed/39.60s；11/14 nodes；双进程重载；关闭异常回滚；Console 0 error | 已验证（目标画面待验） |
 | TASK-0028 | FR-0011 CR-0008 | 对抗性审计、必要修复、治理与交付回写 | TASK-0027 | tests/**；docs/adversarial-audits/**；治理文档 | push/Release；把未跑目标画面写成通过 | TASK-0027/long/2026-09-02 | 全量/strict/REG catalog | P0/P1 未清零时阻塞 | 2026-09-01-193521 审计 4 项已修；全量/治理/REG/diff 门禁通过 | 已验证 |
-| TASK-0029 | CR-0009 BUG-0010~0014 | 执行第二轮对抗性审计优化计划并恢复发布门禁 | TASK-0028 | CI/build 诊断；custom_gui versions；MCP ID；Editor 后验；GUI provider；tests/docs | 删除一致性门禁；未知版本猜写；按路径清理；把 mock 写成真实 UI | TASK-0028/long/2026-09-01 | REG-0031~0035；全量/strict/远程 CI | 远程 artifact 或未知版本门禁失败时阻塞 | 自动与本地双构建通过；远程 CI/真实 GUI probe 待验 | 进行中 |
+| TASK-0029 | CR-0009 BUG-0010~0014 | 执行第二轮对抗性审计优化计划并恢复发布门禁 | TASK-0028 | CI/build 诊断；custom_gui versions；MCP ID；Editor 后验；GUI provider；tests/docs | 删除一致性门禁；未知版本猜写；按路径清理；把 mock 写成真实 UI | TASK-0028/long/2026-09-01 | REG-0031~0035；全量/strict/远程 CI | 远程 artifact 或未知版本门禁失败时阻塞 | 206 passed/2 skipped；GitHub run 33510909955 与下载 artifact 复验通过；真实 GUI probe/Inspector/渲染待验 | 已验证（目标 GUI 待验） |
 
 ## 验证、风险与回滚
 
 - 本地 / PR / 夜间 / 发布门禁：本地 `uv run pytest -q` 全绿；PR 增加追溯完整性校验；里程碑运行架构校验脚本；发布前全量含 bridge + 快速审计 S0/S1 清零。
-- 回归用例与证据位置：`docs/03-quality/regression-catalog.md`（REG-0001～REG-0029）；pytest 路径由 `tools/check_regression_catalog.py` 自动收集校验。
+- 回归用例与证据位置：`docs/03-quality/regression-catalog.md`（REG-0001～REG-0035）；pytest 路径由 `tools/check_regression_catalog.py` 自动收集校验。
 - 风险、缓解和回滚触发：schema 静态提取遗漏（缓解：REG-0009 样本门禁 + 手工补录）；Codely 调用链不稳定（缓解：batchmode 降级路径，ADR-0002）；回滚触发——roundtrip 基线被破坏即回滚该提交。
 - 发布前 AUD 与下一次复审：MS-5 已于 2026-09-01 完成标准增量复审；下次架构复审保持 2026-09-07 与 2026-09-14。
 

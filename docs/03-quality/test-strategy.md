@@ -38,7 +38,7 @@
 
 - 普通 `pytest` 与 mock 证明纯文本、CLI、MCP 响应解析和安全契约，不替代真实 Tuanjie/MCP。
 - `@pytest.mark.bridge` 只有在隔离工程、真实编辑器和实际 MCP 会话中运行后才能标为目标平台通过；当前证据为 `1 passed, 79 deselected`，测试 shader 前后 SHA-256 不同且最终 validate 0 errors。
-- 本地构建/安装/回滚只证明可复制交付流程；远程 GitHub Actions/Release 在未 push 前保持未验证。
+- 本地构建/安装/回滚只证明可复制交付流程；GitHub Actions run 33510909955 已完成双 Python、可复现构建、SPDX、供应链、隔离安装与下载 artifact 复验，但 GitHub Release/PyPI 仍未执行。
 - REG-0022 的纯文本读写只证明 ASE 元数据与编译指令正确；材质 Inspector 中折叠、悬停和帮助框的真实视觉/交互效果，必须在写回并重编译后的目标 Tuanjie/Unity 工程单独验收。
 - REG-0030 的 Python 测试证明检测、安装和资源契约；隔离 Unity E2E 证明 C# 编译、attribute 实例化和 Shader 默认值读取。BatchMode 没有执行真实 Inspector 的鼠标悬停与折叠点击，因此仍不能宣称目标 GUI 视觉验收通过。
 - REG-0023/0024 自动测试证明规范的原子文本行为和原生 Comment 结构，不证明普通节点默认尺寸估计后的视觉边距；目标 ASE 编辑器仍需检查折叠顺序、说明可读性、框边距和连线可读性。

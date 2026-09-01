@@ -30,3 +30,4 @@
 | 2026-09-01 | 验证 | 隔离团结 2022.3.61t9 + ASE 1.9.6.2 双进程完成 Caster-like/Receiver-like 创建、Save/Load、关闭与重载；Shader 名、模板 GUID、节点/端口/连接 manifest 一致，无编译错误和暂存残留 | TASK-0027 REG-0029 |
 | 2026-09-01 | 功能/验证 | 将 MZGUI 拆为 ASE attribute 协议层与可替换 Inspector 提供者；新增 `gui-support` 和 clean-room 内置 GUI。专项自动回归通过，隔离 Unity 2021.3 实际编译并读取三类 attribute 与 Shader 默认值；目标 Inspector 视觉待验 | FR-0009 ADR-0013 REG-0030 |
 | 2026-09-01 | 审计 | Editor 创建后端对抗性审计发现 P1=2/P2=2；Shader 身份、端口预检、属性唯一性和关闭回滚均已修复，结构能力条件通过；生产工程与目标渲染画面未执行 | TASK-0028 AA-COR-001 AA-COR-002 AA-DATA-001 AA-FAIL-001 |
+| 2026-09-01 | 审计/交付 | 第二轮对抗性审计 AA-OPT-001～005 完成；本地 206 passed/2 skipped，GitHub Actions run 33510909955 的 Python 3.10/3.12/package 全绿，下载 artifact 哈希/SPDX/隔离安装复验通过；目标 GUI probe、Inspector 与渲染仍待验 | CR-0009 TASK-0029 REG-0031~0035 |

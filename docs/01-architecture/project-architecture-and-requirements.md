@@ -118,7 +118,7 @@ kickoff_completion: complete
 - 数据、权限、第三方集成与安全边界：仅读写显式路径；MCP 默认 loopback；远程需 `--allow-remote-mcp`；token 仅从 `ASECLI_MCP_INSTANCE_TOKEN` 读取并脱敏；禁止重定向。`execute_code` 只注入仓库固定 ASE 保存片段，但仍按编辑器内代码执行信任边界管理。
 - UI/设计来源、令牌与无障碍约束：不适用（无 UI）；JSON 输出结构即对外界面，字段变更视为 CR。
 - 质量门禁、回归与发布要求：`uv run pytest -q`、REG catalog collect、strict 架构检查、可复现构建/哈希/隔离安装；目标平台证据与 mock 分层。
-- 关键风险、未决 ADR 与复审日期：真实 Tuanjie/MCP 与 Agent E2E 已在隔离工程验收；远程 CI/Release 未授权 push 时仍不得称为通过；下次复审 2026-09-08。
+- 关键风险、未决 ADR 与复审日期：真实 Tuanjie/MCP 与 Agent E2E 已在隔离工程验收；GitHub Actions run 33510909955 与下载 artifact 已验证，GitHub Release/PyPI 和目标 GUI/渲染仍未验；下次复审 2026-09-08。
 
 ## 追溯与下游计划
 

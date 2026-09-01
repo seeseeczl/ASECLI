@@ -8,7 +8,7 @@
 
 - 审计对象：`main@acb74a0` 的远程交付、ASE/MZGUI 跨版本语义写入、Editor 失败事务、MCP 响应关联与 GUI 提供者检测。
 - Findings 统计：P0=0 P1=2 P2=2 P3=1。
-- 发布建议：阻塞远程 artifact 发布；不得把本地双构建或全量测试通过替代失败的 GitHub package job。已验证的 ASE 1.9.6.2 源码路径可条件使用，未知版本禁止写入。
+- 计划生成时发布建议：阻塞远程 artifact 发布；不得把本地双构建或全量测试通过替代失败的 GitHub package job。已验证的 ASE 1.9.6.2 源码路径可条件使用，未知版本禁止写入。
 - 建议执行顺序：先恢复远端 artifact 门禁并封闭未知版本写入，再修复文件事务与 JSON-RPC 关联，最后补齐 GUI 提供者检测。
 
 ## 2. 修复与加固任务
@@ -42,17 +42,24 @@
 ## 5. 发布门禁
 
 - [x] 所有 P0 任务完成（本轮无 P0）。
-- [ ] 所有 P1 任务完成或由 owner/批准人记录有期限的风险接受。
-- [ ] GitHub package job 双构建、artifact 上传、下载后 hash/SBOM/隔离安装全部通过。
-- [ ] 未知 ASE 版本的 CustomEditor/MZGUI 反例在任何写盘前失败关闭。
-- [ ] SSE 响应关联与 Editor 文件竞态回归通过。
-- [ ] 残留风险与真实 Inspector/目标渲染未验边界继续保留。
+- [x] 所有 P1 任务完成或由 owner/批准人记录有期限的风险接受。
+- [x] GitHub package job 双构建、artifact 上传、下载后 hash/SBOM/隔离安装全部通过。
+- [x] 未知 ASE 版本的 CustomEditor/MZGUI 反例在任何写盘前失败关闭。
+- [x] SSE 响应关联与 Editor 文件竞态回归通过。
+- [x] 残留风险与真实 Inspector/目标渲染未验边界继续保留。
 
 ## 6. 未映射项（如有）
 
 - 无。5 个 Finding 均映射到 AA-OPT；P2/P3 未获风险接受，当前仅按优先级排在两个发布阻塞项之后。
 
-## 7. 本轮执行边界
+## 7. 计划生成时的执行边界
 
 - 本轮只生成审计报告和优化计划，没有修改业务代码，也没有将任何任务标记为已修复。
 - 当前自动回归为 `189 passed, 2 skipped`；GitHub Actions run `33507715846` 仍为 failure，故发布门禁保持未完成。
+
+## 8. 执行结果（2026-09-01）
+
+- AA-OPT-001～005、AA-TEST-001～005 与 AA-OBS-001～003 已实现；本地全量结果为 `206 passed, 2 skipped`，两个 skip 均为既有外部 Editor bridge 条件用例。
+- GitHub Actions run [33510909955](https://github.com/seeseeczl/ASECLI/actions/runs/33510909955) 在 `a3e6fcda5751576a4a5ed5a8096adf67d7a2015c` 上通过 Python 3.10、Python 3.12 与 package 三个 jobs；双 wheel/sdist 构建逐字节一致，随后完成 SHA256SUMS、SPDX、离线供应链检查、隔离安装、CLI smoke 与 artifact 上传。
+- 下载 artifact `asecli-0.1.0-python-X64`（artifact ID `9801594662`）后复算：wheel `6b92cfb4287c5d46a288966ca11fb92d52bf706201a1615a8cc413f158cb6446`，sdist `cb0318dd2ec275088f38d767f82a473b312982912464bad24b2c3f60a0a85558`，与 `SHA256SUMS` 和 SPDX annotation 一致；下载 wheel 在全新 Python 3.12.11 环境安装并成功执行 `asecli parse`。
+- 发布门禁已恢复，但这不是 GitHub Release/PyPI 发布。`gui-support --runtime-probe` 的固定反射实现与契约测试已完成，尚未连接用户目标 Editor 执行；真实材质 Inspector 交互、ASE 画布精排感和目标渲染仍未验。
