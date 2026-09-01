@@ -65,6 +65,7 @@ kickoff_completion: complete
 | TASK-0026 | FR-0011 CR-0008 | `create --backend text|editor|auto --spec` additive CLI 契约 | TASK-0023~0025 | cli/main.py；cli/create_command.py；README/SKILL；tests/test_editor_create_cli.py | 改变现有 text 默认语义 | TASK-0025/long/2026-09-01 | REG-0026 REG-0028 | 旧 create 回归时停止 | text 默认兼容；editor/auto/spec JSON 回归通过 | 已验证 |
 | TASK-0027 | FR-0011 CR-0008 | 隔离团结工程 Caster-like/Receiver-like 真实创建与关闭重载 | TASK-0026；隔离工程/MCP | tests/test_editor_create_e2e.py；系统临时目录证据 | 修改 FlymeAuto3Test 生产文件；用 mock 代替 Editor | TASK-0026/long/2026-09-02 | REG-0029 | 需写生产工程或 Save/Load 不稳定时停止 | 1 passed/39.60s；11/14 nodes；双进程重载；关闭异常回滚；Console 0 error | 已验证（目标画面待验） |
 | TASK-0028 | FR-0011 CR-0008 | 对抗性审计、必要修复、治理与交付回写 | TASK-0027 | tests/**；docs/adversarial-audits/**；治理文档 | push/Release；把未跑目标画面写成通过 | TASK-0027/long/2026-09-02 | 全量/strict/REG catalog | P0/P1 未清零时阻塞 | 2026-09-01-193521 审计 4 项已修；全量/治理/REG/diff 门禁通过 | 已验证 |
+| TASK-0029 | CR-0009 BUG-0010~0014 | 执行第二轮对抗性审计优化计划并恢复发布门禁 | TASK-0028 | CI/build 诊断；custom_gui versions；MCP ID；Editor 后验；GUI provider；tests/docs | 删除一致性门禁；未知版本猜写；按路径清理；把 mock 写成真实 UI | TASK-0028/long/2026-09-01 | REG-0031~0035；全量/strict/远程 CI | 远程 artifact 或未知版本门禁失败时阻塞 | 自动与本地双构建通过；远程 CI/真实 GUI probe 待验 | 进行中 |
 
 ## 验证、风险与回滚
 
@@ -76,6 +77,6 @@ kickoff_completion: complete
 ## 启动完成确认
 
 - [x] 上游架构文档已确认且本计划仅从其派生
-- [x] 28 张原子任务卡全部可执行且追溯双向链接
+- [x] 29 张原子任务卡全部可执行且追溯双向链接
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立

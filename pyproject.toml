@@ -7,13 +7,13 @@ dependencies = []
 license = "LicenseRef-ASECLI-Proprietary"
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = ["hatchling==1.32.0", "pytest>=8.0"]
 
 [project.scripts]
 asecli = "asecli.cli.main:app"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

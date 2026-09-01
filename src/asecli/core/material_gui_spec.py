@@ -11,6 +11,7 @@ from .custom_gui import (
     set_custom_editor,
     set_mzgui_attribute,
 )
+from .custom_gui_versions import require_mzgui_tail_version
 from .model import AseFile, AseGraph, NodeLine
 
 
@@ -105,6 +106,7 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
     if reorder and not resolved:
         raise ValueError("reorder=true requires at least one property entry")
     if reorder:
+        require_mzgui_tail_version(ase_file.graph)
         changes.extend(_reorder_properties(ase_file.graph, [node for node, _ in resolved]))
 
     for node, entry in resolved:

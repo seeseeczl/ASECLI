@@ -106,26 +106,33 @@ def _cmd_create_editor(args, spec) -> dict:
         created = AseFile.from_path(args.out)
         errors = [issue for issue in validate_file(created) if issue["severity"] == "error"]
     except (OSError, UnicodeError, ValueError) as exc:
-        _cleanup_failed_editor_create(args.out)
-        raise CliError("BRIDGE_ERROR", f"Editor-created shader is not parseable: {exc}") from exc
-    if errors:
-        _cleanup_failed_editor_create(args.out)
         raise CliError(
             "BRIDGE_ERROR",
-            f"Editor-created shader contains {len(errors)} structural error(s)",
-            {"issues": errors, "error_count": len(errors)},
+            f"Editor-created shader is not parseable and was preserved for diagnosis: {exc}",
+            _preserved_editor_asset_details(args.out, result),
+        ) from exc
+    if errors:
+        raise CliError(
+            "BRIDGE_ERROR",
+            f"Editor-created shader contains {len(errors)} structural error(s) and was preserved for diagnosis",
+            {
+                "issues": errors,
+                "error_count": len(errors),
+                **_preserved_editor_asset_details(args.out, result),
+            },
         )
     return {"created": args.out, "backend": "editor", **result}
 
 
-def _cleanup_failed_editor_create(path: str) -> None:
-    """Remove only the absent-before-call asset produced by this failed transaction."""
-    target = Path(path)
-    for candidate in (target, target.with_suffix(target.suffix + ".meta")):
-        try:
-            candidate.unlink()
-        except FileNotFoundError:
-            pass
+def _preserved_editor_asset_details(path: str, result: dict) -> dict:
+    """Describe a post-commit failure without deleting an identity that may have changed."""
+    return {
+        "preserved_path": str(Path(path).resolve()),
+        "cleanup": "skipped_untrusted_post_commit_asset",
+        "transaction_nonce": result.get("transaction_nonce"),
+        "shader_sha256": result.get("shader_sha256"),
+        "meta_sha256": result.get("meta_sha256"),
+    }
 
 
 def _set_shader_name(ase_file: AseFile, name: str) -> None:

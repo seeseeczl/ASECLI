@@ -23,3 +23,8 @@ evidence: [tests, docs/03-quality/regression-catalog.md]
 | BUG-0007 | AUD-PERF-001 | 性能测试仅 200 个附加节点且含恒真断言 | REG-0011 | 1000 个附加节点、1007 精确数量、5 轮 roundtrip | 自动已验证 |
 | BUG-0008 | AUD-GOV-001 | REG/TASK 指向不存在测试和过期模块 | REG-0020 | catalog collect 检查 + 当前事实源校准 | 自动已验证 |
 | BUG-0009 | AUD-ARCH-001 | CLI 跨模块导入 core 私有解析符号 | REG-0019 | 公开 API + 兼容 alias | 自动已验证 |
+| BUG-0010 | AA-REL-001 | 第二次仓库内构建把第一次 `build-a` 产物重新装入 sdist，远端可复现性门禁失败 | REG-0031 | 构建输出移出 checkout；锁定 build backend；失败时保留结构化差异证据 | 本地已修复，远程待验 |
+| BUG-0011 | AA-DATA-001 | 未知 ASE 数值版本沿用已知 CustomEditor/MZGUI 字段并发生猜写 | REG-0032 | 分离真实 CustomEditor/MZGUI 版本矩阵；未知版本写入失败关闭 | 自动已验证 |
+| BUG-0012 | AA-PROTO-001 | SSE/JSON 响应未与当前 JSON-RPC ID 精确关联 | REG-0033 | 所有请求响应强制 ID 一一匹配 | 自动已验证 |
+| BUG-0013 | AA-FAIL-001 | Editor 后验失败按路径删除目标，可误删并发替换的用户文件 | REG-0034 | Python 保留无法证明身份的失败产物并输出事务诊断 | 自动已验证 |
+| BUG-0014 | AA-COMPAT-001 | 全限定基类或预编译程序集中的原生 MZGUI 被静态漏检 | REG-0035 | 扩展源码检测；二进制不确定时阻止写入并支持 Editor 反射确认 | 自动已验证；真实反射待目标 Editor |

@@ -125,6 +125,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("gui-support", help="detect or install Foldout/Tooltip/HelpBox material GUI support")
     s.add_argument("project", help="Unity/Tuanjie project root containing Assets and ProjectSettings")
+    s.add_argument("--runtime-probe", action="store_true", help="confirm MZGUI.MZGUI by reflection in the connected Editor")
+    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    s.add_argument("--allow-remote-mcp", action="store_true")
+    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
     s.add_argument("--write", action="store_true", help="install the built-in compatibility layer when needed")
     s.set_defaults(func=cmd_gui_support)
 

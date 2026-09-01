@@ -90,9 +90,9 @@ kickoff_completion: complete
 ### FR-0009 影响分析与兼容边界
 
 - 受影响模块：新增 MOD-CUSTOM-GUI 与 MOD-GUI-SUPPORT；MOD-CLI 增加 additive `custom-gui`、`gui-support` 命令；MOD-SKILL 增加提供者选择和分组/提示路径；MOD-CHECK 复用现有结构与 CHKSM 门禁，不改变其契约。
-- 数据/格式：Unity Inspector 层只解释编译后的 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`，不依赖 ASE API；ASE 元数据写入仍以动态识别合法 `<count>;<attributes...>` 尾部为门禁。当前真实写入样本为图版本 `19602`，`19109` CustomEditor 可读/同步；其他版本无法识别尾部时失败关闭而非按版本号猜兼容。
+- 数据/格式：Unity Inspector 层只解释编译后的 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`，不依赖 ASE API。版本矩阵精确限定：`19109/19602` 可读写 CustomEditor，只有真实 `19602` 可读写 `<count>;<attributes...>` 尾部；其他版本只保留通用解析能力，custom-gui 写入失败关闭。
 - 安全：自定义类名仅接受命名空间限定的 C# 标识符；禁止分号、引号、换行注入；MZGUI 只允许导出的 `Property` 节点；无法确定唯一主 Master 或尾部时失败关闭。
-- 兼容/迁移：原生 `MZGUI.MZGUI` 存在时不安装兼容层；缺失时只创建固定 `Assets/Editor/ASECLI/ASECLIMaterialGUI.cs`，内容冲突拒绝覆盖。新增命令不改变既有命令；零 Python 依赖、零批量迁移。
+- 兼容/迁移：原生 `MZGUI.MZGUI` 存在时不安装兼容层；静态 DLL/源码不确定时返回 `unknown` 并阻止写入，可由同一目标 Editor 反射确认；确认缺失才创建固定资源，内容冲突拒绝覆盖。新增命令不改变既有默认语义；零运行时 Python 依赖、零批量迁移。
 - 运行边界：CLI 同步 ShaderLab `CustomEditor`，但不直接猜写编译区 Properties 属性；MZGUI 元数据写入后必须经 `recompile` 由真实 ASE 生成。内置 C# 的编译和属性读取可在隔离 Editor 自动验证，真实 Foldout/悬停/HelpBox 外观仍需目标平台 UI 验收。
 - 呈现规范：中文 `display_name` 属于 PropertyNode/Editor 创建职责；`custom-gui` 负责可选 Tooltip、HelpBox、Foldout 和排序。原生/内置 GUI 在显示时追加变量名与默认基线；内置层从默认 `Material(shader)` 读取，不把技术信息硬编码进节点尾部。
 

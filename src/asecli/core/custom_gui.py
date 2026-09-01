@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 from .model import AseFile, AseGraph, NodeLine
-TARGET_ASE_VERSION = "1.9.6.2"
-TARGET_GRAPH_VERSION = "19602"
+from .custom_gui_versions import CUSTOM_EDITOR_GRAPH_VERSIONS, MZGUI_TAIL_GRAPH_VERSIONS, TARGET_ASE_VERSION, TARGET_GRAPH_VERSION, require_custom_editor_version, require_mzgui_tail_version
 MZGUI_EDITOR = "MZGUI.MZGUI"
 ASECLI_GUI_EDITOR = "ASECLI.MaterialGUI.ASECLIMaterialGUI"
 SUPPORTED_GUI_EDITORS = frozenset((MZGUI_EDITOR, ASECLI_GUI_EDITOR))
@@ -32,11 +31,6 @@ _GROUP_INVALID = frozenset("\r\n\\><'\";:[]{}=+`~/?!@#$%^&*")
 class MzguiTail:
     count_index: int
     attributes: tuple[str, ...]
-def _numeric_version(graph: AseGraph) -> int:
-    try:
-        return int(graph.version)
-    except ValueError as exc:
-        raise ValueError(f"unsupported non-numeric ASE graph version: {graph.version!r}") from exc
 def validate_editor_class(name: str) -> str:
     if len(name) > 255 or not _EDITOR_CLASS_RE.fullmatch(name):
         raise ValueError(
@@ -44,8 +38,7 @@ def validate_editor_class(name: str) -> str:
         )
     return name
 def main_master_node(graph: AseGraph) -> NodeLine:
-    if _numeric_version(graph) <= 2404:
-        raise ValueError(f"graph version {graph.version} predates serialized CustomEditor support")
+    require_custom_editor_version(graph)
     candidates = [
         node
         for node in graph.nodes
@@ -138,8 +131,7 @@ def parse_mzgui_attribute(raw: str) -> dict:
         result["text"] = decode_foldout_title(args)
     return result
 def read_mzgui_tail(graph: AseGraph, node: NodeLine) -> MzguiTail:
-    if _numeric_version(graph) <= 4102:
-        raise ValueError(f"graph version {graph.version} predates MZGUI tail serialization")
+    require_mzgui_tail_version(graph)
     if not is_material_property_node(node):
         raise ValueError(f"node {node.node_id} is not an exported PropertyNode")
     fields = node.raw_fields
@@ -213,21 +205,27 @@ def inspect_custom_gui(ase_file: AseFile) -> dict:
     graph_editor = main.raw_fields[9] or None
     compiled_editor = compiled_custom_editor(ase_file)
     properties = []
-    for node in ase_file.graph.nodes:
-        if not is_material_property_node(node):
-            continue
-        tail = read_mzgui_tail(ase_file.graph, node)
-        properties.append(
-            {
-                "node_id": node.node_id,
-                "node_type": node.type_name,
-                "property_name": node.raw_fields[7] if len(node.raw_fields) > 7 else None, "order_index": int(node.raw_fields[9]),
-                "display_name": node.raw_fields[8] if len(node.raw_fields) > 8 else None,
-                "attributes": [parse_mzgui_attribute(raw) for raw in tail.attributes],
-            }
-        )
+    mzgui_tail_supported = ase_file.graph.version in MZGUI_TAIL_GRAPH_VERSIONS
+    if mzgui_tail_supported:
+        for node in ase_file.graph.nodes:
+            if not is_material_property_node(node):
+                continue
+            tail = read_mzgui_tail(ase_file.graph, node)
+            properties.append(
+                {
+                    "node_id": node.node_id,
+                    "node_type": node.type_name,
+                    "property_name": node.raw_fields[7] if len(node.raw_fields) > 7 else None, "order_index": int(node.raw_fields[9]),
+                    "display_name": node.raw_fields[8] if len(node.raw_fields) > 8 else None,
+                    "attributes": [parse_mzgui_attribute(raw) for raw in tail.attributes],
+                }
+            )
     return {
         "ase_profile": TARGET_ASE_VERSION,
+        "version_capabilities": {
+            "custom_editor": ase_file.graph.version in CUSTOM_EDITOR_GRAPH_VERSIONS,
+            "mzgui_tail": mzgui_tail_supported,
+        },
         "profile_graph_version": TARGET_GRAPH_VERSION,
         "graph_version": ase_file.graph.version,
         "editor": {

@@ -142,11 +142,8 @@ Node;AmplifyShaderEditor.IntNode;122;992,-32;Inherit;False;Property;_Int0;整数
     assert decode_foldout_title("Foldout #6298#53e0#9875 01") == "Foldout 折叠页 01"
 
 
-@pytest.mark.parametrize("graph_version", ["19109", "19602", "25000"])
-def test_mzgui_tail_is_capability_probed_instead_of_locked_to_one_ase_version(graph_version):
-    shader = AseFile.from_text(
-        sample_shader("MZGUI.MZGUI").replace("Version=19602", f"Version={graph_version}")
-    )
+def test_mzgui_tail_roundtrips_on_verified_19602_layout():
+    shader = AseFile.from_text(sample_shader("MZGUI.MZGUI"))
     set_mzgui_attribute(
         shader.graph,
         "10",
@@ -157,6 +154,57 @@ def test_mzgui_tail_is_capability_probed_instead_of_locked_to_one_ase_version(gr
     assert parse_graph_text(shader.graph.serialize()).node_by_id("10").raw_fields == (
         shader.graph.node_by_id("10").raw_fields
     )
+
+
+def test_unknown_future_version_rejects_custom_editor_and_tail_without_mutation():
+    shader = AseFile.from_text(
+        sample_shader("MZGUI.MZGUI").replace("Version=19602", "Version=25000")
+    )
+    master = shader.graph.node_by_id("1")
+    master.raw_fields[9] = "UNRELATED_FIELD_9"
+    shader.graph.replace_node(master)
+    node = shader.graph.node_by_id("10")
+    node.raw_fields[-2:] = ["FUTURE_SEMANTIC_FLAG", "0"]
+    shader.graph.replace_node(node)
+    before = shader.serialize()
+    with pytest.raises(ValueError, match="unsupported ASE graph version"):
+        set_custom_editor(shader, "MZGUI.MZGUI")
+    assert shader.serialize() == before
+    with pytest.raises(ValueError, match="unsupported ASE graph version"):
+        set_mzgui_attribute(
+            shader.graph,
+            "10",
+            semantic_attribute("HelpBoxMzgui", "不得猜写"),
+        )
+    assert shader.serialize() == before
+
+
+def test_real_19109_hlit_exposes_only_verified_custom_editor_capability():
+    state = inspect_custom_gui(AseFile.from_path(HLIT))
+    assert state["version_capabilities"] == {"custom_editor": True, "mzgui_tail": False}
+    assert state["properties"] == []
+
+
+def test_cli_unknown_future_version_fails_before_backup_or_write(tmp_path):
+    path = tmp_path / "future.shader"
+    original = sample_shader("MZGUI.MZGUI").replace("Version=19602", "Version=25000")
+    path.write_text(original, encoding="utf-8")
+    code, payload = run_cli(
+        "custom-gui",
+        str(path),
+        "--editor",
+        "MZGUI.MZGUI",
+        "--property",
+        "_BaseColor",
+        "--help-box",
+        "不得猜写",
+        "--write",
+    )
+    assert code == 2
+    assert payload["error"]["code"] == "CUSTOM_GUI_ERROR"
+    assert "unsupported ASE graph version" in payload["error"]["message"]
+    assert path.read_text(encoding="utf-8") == original
+    assert not path.with_suffix(".shader.bak").exists()
 
 
 def test_unknown_property_tail_fails_closed_instead_of_guessing_an_index():

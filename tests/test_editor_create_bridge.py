@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 
 import pytest
@@ -117,6 +118,12 @@ def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):
     assert result["saved"] is True
     assert result["reloaded"] is True
     assert result["changed"] is True
+    assert len(result["transaction_nonce"]) == 32
+    assert result["transaction_nonce"] in json.loads(
+        base64.b64decode(seen["code"].split('FromBase64String("', 1)[1].split('")', 1)[0]).decode("utf-8")
+    )["temporary_asset_path"]
+    assert result["shader_sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()
+    assert result["meta_sha256"] is None
 
 
 @pytest.mark.parametrize(

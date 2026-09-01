@@ -7,14 +7,15 @@
 3. **契约测试**：CLI 每个子命令 stdout 必须为合法 JSON 且含 `ok` 字段；错误码枚举固定。
 4. **桥接集成测试**（需 Unity/Tuanjie 开启）：标记 `@pytest.mark.bridge`，验证 recompile 后 HLSL 变更与 CHKSM 更新；2026-09-01 已在 Tuanjie 2022.3.62t2 隔离工程通过。
 5. **Agent 端到端**：SKILL.md 指引下完成 create→add-node→validate→recompile；2026-09-01 已在隔离工程完成并保留脱敏日志、前后哈希和 JSON 结果。
-6. **安全契约**：MCP URL、token、重定向、tool error 与脱敏使用纯本地 mock；真实 loopback 另行验收。
+6. **安全契约**：MCP URL、token、重定向、tool error、SSE/JSON 请求 ID 一一关联与脱敏使用纯本地 mock；真实 loopback 另行验收。
 7. **性能**：1000 个附加节点、精确 1007 节点、5 轮 parse+layout+serialize+roundtrip；每轮 <1s。
 8. **节点精排**：同阶段 x 严格一致、相邻阶段间距等于 `gap_x`、同列行距等于 `gap_y`、DAG 数据边向右推进、重复分支共用列/行模板、Master 最右；同时保持确定性、连线和非位置字段不变。
-9. **自定义 GUI**：HLIT 验证主 Master/编译 Inspector 读取；ASE 1.9.6.2 `MZGUI_Test.shader` 验证七类 PropertyNode 尾部；中文显示名读取、常驻 HelpBox、中文分组、非法输入、dry-run、备份与 CHKSM 自动回归。`gui-support` 另覆盖原生 MZGUI 检测、内置层 dry-run/安装/幂等、固定路径冲突拒绝、资源哈希和双 CustomEditor 契约。
+9. **自定义 GUI**：真实 `19109` 仅验证 CustomEditor；ASE 1.9.6.2 图版本 `19602` 验证七类 PropertyNode 尾部；未知未来版本/尾随数字歧义写前拒绝。`gui-support` 覆盖全限定/global/alias 源码、DLL unknown、目标 Editor 反射、内置层安装/幂等/冲突和资源哈希。
 10. **批量材质规范**：属性名/节点 ID 唯一定位；字段 9 排序；未列属性稳定追加；中文 `inspector_name` 可经 EditorGraphSpec 保存；JSON 重复、未知键、错误类型和非 MZGUI 全量失败且零写盘。
 11. **Comment 分组**：真实 CommentaryNode 行解码；自动边界、嵌套成员树、无关组重叠拒绝与检查、父子完整包含、非法标题/重复归属/缺失节点、dry-run、备份、CHKSM、roundtrip 与 CLI 单行 JSON。
 12. **Local Var 图治理**：Agent 设计审查检查“多处/跨区复用才注册、一个语义 Register/多个就近 Get、同组一次性链路直连、命名唯一明确”；当前以真实参考静态证据与 Skill 契约为准，下一个目标 Shader 任务补实际图验收。
-13. **Editor API 创建**：纯 Python 覆盖 `EditorGraphSpec v1` 白名单、端口方向/类型、属性唯一性、后端路由、参数编码、Shader/模板身份、MCP 结果与失败事务；隔离团结工程分别创建 Caster-like 和 Receiver-like 图，关闭后由第二进程重载并比较节点、端口、属性、连接 manifest。
+13. **Editor API 创建**：纯 Python 覆盖 `EditorGraphSpec v1` 白名单、端口方向/类型、属性唯一性、后端路由、参数编码、Shader/模板身份、MCP 结果与失败事务；提交后后验失败及路径替换必须保留目标并返回 nonce/hash。隔离团结工程分别创建 Caster-like 和 Receiver-like 图，关闭后由第二进程重载 manifest。
+14. **可复现交付**：锁定 build backend，双构建输出位于 checkout 外；比较 wheel/sdist hash，失败报告 gzip header、tar 成员元数据和内容差异，正式 artifact 继续阻塞。
 
 ## 门禁
 

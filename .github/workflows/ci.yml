@@ -35,6 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SOURCE_DATE_EPOCH: "1788220800"
+      ASECLI_BUILD_A: ${{ runner.temp }}/asecli-build-a
+      ASECLI_BUILD_B: ${{ runner.temp }}/asecli-build-b
+      ASECLI_REPRO_REPORT: ${{ runner.temp }}/asecli-reproducibility.json
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
@@ -44,11 +47,31 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --frozen --python 3.12
-      - run: uv build --out-dir build-a
-      - run: uv build --out-dir build-b
-      - run: cmp build-a/asecli-0.1.0-py3-none-any.whl build-b/asecli-0.1.0-py3-none-any.whl
-      - run: cmp build-a/asecli-0.1.0.tar.gz build-b/asecli-0.1.0.tar.gz
-      - run: mkdir dist && cp build-a/* dist/
+      - name: Report build toolchain
+        run: |
+          uv --version
+          uv run --frozen python --version
+          uv run --frozen python -c "from importlib.metadata import version; print('hatchling', version('hatchling'))"
+      - run: uv build --no-build-isolation --out-dir "$ASECLI_BUILD_A"
+      - run: uv build --no-build-isolation --out-dir "$ASECLI_BUILD_B"
+      - name: Compare reproducible artifacts
+        id: reproducibility
+        run: >-
+          uv run --frozen python tools/compare_build_artifacts.py
+          --left "$ASECLI_BUILD_A"
+          --right "$ASECLI_BUILD_B"
+          --output "$ASECLI_REPRO_REPORT"
+      - name: Upload reproducibility diagnostics on failure
+        if: ${{ always() && steps.reproducibility.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: asecli-reproducibility-diagnostics-${{ runner.arch }}
+          path: |
+            ${{ env.ASECLI_BUILD_A }}/
+            ${{ env.ASECLI_BUILD_B }}/
+            ${{ env.ASECLI_REPRO_REPORT }}
+          if-no-files-found: error
+      - run: mkdir dist && cp "$ASECLI_BUILD_A"/* dist/
       - run: shasum -a 256 dist/*.whl dist/*.tar.gz > dist/SHA256SUMS
       - run: uv run --frozen python tools/generate_sbom.py --dist dist --output dist/asecli-0.1.0.spdx.json
       - run: uv run --frozen python tools/supply_chain_check.py --output dist/supply-chain-check.json

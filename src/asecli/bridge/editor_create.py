@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from importlib import resources
 import json
 from pathlib import Path
@@ -34,7 +35,8 @@ def create_shader_via_mcp(
     if target.exists() or target.is_symlink():
         raise FileExistsError(f"Editor create target already exists: {target}")
     project_root, asset_path = _project_asset_path(target)
-    temporary_asset_path = _temporary_asset_path(asset_path)
+    transaction_nonce = secrets.token_hex(16)
+    temporary_asset_path = _temporary_asset_path(asset_path, transaction_nonce)
     payload = spec.editor_payload(asset_path, temporary_asset_path)
     encoded = base64.b64encode(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -50,6 +52,7 @@ def create_shader_via_mcp(
     temporary_file = project_root / temporary_asset_path
     if temporary_file.exists() or temporary_file.with_suffix(temporary_file.suffix + ".meta").exists():
         raise McpError("Editor create left a temporary asset after commit")
+    meta_file = target.with_suffix(target.suffix + ".meta")
     return {
         "transport": "mcp",
         "server": mcp_url,
@@ -62,6 +65,9 @@ def create_shader_via_mcp(
         "committed": True,
         "changed": True,
         "manifest": response["manifest"],
+        "transaction_nonce": transaction_nonce,
+        "shader_sha256": _sha256(target),
+        "meta_sha256": _sha256(meta_file) if meta_file.is_file() else None,
     }
 
 
@@ -80,10 +86,17 @@ def _project_asset_path(target: Path) -> tuple[Path, str]:
     raise ValueError("cannot locate Unity project root; target must be inside Assets")
 
 
-def _temporary_asset_path(asset_path: str) -> str:
+def _temporary_asset_path(asset_path: str, transaction_nonce: str) -> str:
     target = Path(asset_path)
-    token = secrets.token_hex(8)
-    return (target.parent / f"ASECLI-Temp-{token}-{target.name}").as_posix()
+    return (target.parent / f"ASECLI-Temp-{transaction_nonce}-{target.name}").as_posix()
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _parse_result(text: str) -> dict:

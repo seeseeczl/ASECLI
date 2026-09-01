@@ -111,3 +111,72 @@ def test_http_error_body_redacts_instance_token(monkeypatch):
         client._post({"jsonrpc": "2.0", "id": 1, "method": "test"})
     assert secret not in str(exc.value)
     assert "<redacted>" in str(exc.value)
+
+
+class _Headers:
+    def __init__(self, content_type):
+        self.content_type = content_type
+
+    def get(self, name, default=None):
+        return self.content_type if name == "Content-Type" else default
+
+
+class _Response:
+    def __init__(self, content_type, body):
+        self.headers = _Headers(content_type)
+        self.body = body.encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def _rpc_response(monkeypatch, content_type, body):
+    client = McpClient("http://127.0.0.1:8080/mcp")
+    monkeypatch.setattr(client._opener, "open", lambda *args, **kwargs: _Response(content_type, body))
+    return client
+
+
+def test_sse_selects_current_id_instead_of_later_stale_frame(monkeypatch):
+    body = (
+        'data: {"jsonrpc":"2.0","id":1,"result":{"value":"current"}}\n\n'
+        'data: {"jsonrpc":"2.0","id":999,"result":{"value":"stale"}}\n\n'
+        "data: [DONE]\n"
+    )
+    client = _rpc_response(monkeypatch, "text/event-stream", body)
+    response = client._rpc("demo")
+    assert response["id"] == 1
+    assert response["result"]["value"] == "current"
+
+
+@pytest.mark.parametrize(
+    "body, match",
+    [
+        ('data: {"jsonrpc":"2.0","id":999,"result":{}}\n', "id mismatch"),
+        ('data: {"jsonrpc":"2.0","method":"notice"}\n', "id mismatch"),
+        (
+            'data: {"jsonrpc":"2.0","id":1,"result":{}}\n'
+            'data: {"jsonrpc":"2.0","id":1,"result":{}}\n',
+            "duplicate",
+        ),
+    ],
+)
+def test_sse_rejects_missing_wrong_or_duplicate_current_id(monkeypatch, body, match):
+    client = _rpc_response(monkeypatch, "text/event-stream", body)
+    with pytest.raises(McpError, match=match):
+        client._rpc("demo")
+
+
+def test_plain_json_rejects_wrong_response_id(monkeypatch):
+    client = _rpc_response(
+        monkeypatch,
+        "application/json",
+        '{"jsonrpc":"2.0","id":999,"result":{"value":"stale"}}',
+    )
+    with pytest.raises(McpError, match="id mismatch"):
+        client._rpc("demo")

@@ -79,6 +79,7 @@ class McpClient:
         self._opener = urllib.request.build_opener(NoRedirectHandler())
 
     def _post(self, payload: dict) -> dict | None:
+        expected_id = payload.get("id")
         body = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
         if self.session_id:
@@ -105,15 +106,28 @@ class McpClient:
                 if line.startswith("data:"):
                     chunk = line[5:].strip()
                     if chunk and chunk != "[DONE]":
-                        collected.append(json.loads(chunk))
+                        try:
+                            frame = json.loads(chunk)
+                        except json.JSONDecodeError as exc:
+                            raise McpError("MCP SSE response contained malformed JSON") from exc
+                        if isinstance(frame, dict):
+                            collected.append(frame)
             if not collected:
                 return None
-            # prefer the JSON-RPC response matching our latest request id, else last frame
-            for frame in reversed(collected):
-                if "id" in frame:
-                    return frame
-            return collected[-1]
-        return json.loads(raw) if raw.strip() else None
+            if expected_id is None:
+                return None
+            return _matching_response(collected, expected_id)
+        if not raw.strip():
+            return None
+        try:
+            response = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise McpError("MCP response contained malformed JSON") from exc
+        if not isinstance(response, dict):
+            raise McpError("MCP JSON-RPC response must be an object")
+        if expected_id is None:
+            return response
+        return _matching_response([response], expected_id)
 
     def _rpc(self, method: str, params: dict | None = None, notify: bool = False) -> dict | None:
         self._next_id += 1
@@ -149,3 +163,13 @@ class McpClient:
         result = resp.get("result", {})
         tool_text(result, self.instance_token)
         return result
+
+
+def _matching_response(frames: list[dict], expected_id: object) -> dict:
+    matches = [frame for frame in frames if frame.get("id") == expected_id]
+    if not matches:
+        observed = [frame.get("id") for frame in frames if "id" in frame]
+        raise McpError(f"JSON-RPC response id mismatch: expected {expected_id!r}, observed {observed!r}")
+    if len(matches) > 1:
+        raise McpError(f"duplicate JSON-RPC responses for request id {expected_id!r}")
+    return matches[0]

@@ -62,6 +62,8 @@ asecli fix-checksum MyShader.shader --write
 
 # 8. 先检测目标工程的 GUI 提供者；默认 dry-run，缺失时才显式安装
 asecli gui-support /path/to/UnityProject
+# 若静态扫描返回 provider=unknown，在已连接目标 Editor 时用反射确认
+asecli gui-support /path/to/UnityProject --runtime-probe
 asecli gui-support /path/to/UnityProject --write
 
 # 使用上一步 JSON 返回的 recommended_editor；也可直接用 ShaderLab 属性名定位
@@ -100,7 +102,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `remove-node <file> --node N` | 删节点；外部源码仍引用的 Property 默认拒删 | 否 |
 | `graph-audit <file>` | 查找不通向输出的节点，区分真正候选与 Custom GUI/HLSL 外部消费者 | 否 |
 | `layout <file> [--gap-x] [--gap-y]` | 自动整理节点布局 | 否 |
-| `gui-support <project> [--write]` | 检测原生 MZGUI；缺失时安全安装内置 Foldout/Tooltip/HelpBox 支持 | 不需运行；安装后需 Editor 重编译 |
+| `gui-support <project> [--runtime-probe] [--write]` | 检测原生 MZGUI；DLL/源码不确定时用目标 Editor 反射确认；确认缺失后安全安装内置支持 | 反射确认/安装后重编译需要 |
 | `custom-gui <file> [--spec JSON] [--property P --group/--tooltip/--help-box T]` | 查询、批量排序或修改 CustomEditor/MZGUI | 写元数据否；生效需重编译 |
 | `comment-group <file> [--nodes IDS --title T]` | 查询、创建或用 `--check-bounds`/`--fit` 校正 ASE 原生 Comment 框 | 精确边界检查/校正需要 |
 | `fix-checksum <file> [--write]` | 重算 `//CHKSM`（默认预览；写入保留 `.bak`） | 否 |
@@ -139,7 +141,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 
 - 首期绑定 ASE `1.9.6.2`；Master 端口契约只开放已实测的 URP Unlit 模板 GUID。未知版本、模板 Master 端口、节点、字段、端口或类型在写入前失败。
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
-- 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标重载一致；失败回滚明确的目标与暂存资产并恢复原 ASE 窗口状态。
+- 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标重载一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
 - MCP 客户端超时代表完成状态未知，不等同于 Editor 已停止或已回滚。重试前先检查目标文件及同目录 `ASECLI-Temp-*`，避免把迟到成功误判为失败。
 - 隔离团结 E2E 已证明 Caster-like/Receiver-like 图可创建、保存、关闭并由新进程重载；这不证明目标工程的运行时矩阵注入、材质绑定或最终渲染画面正确。
 
@@ -161,7 +163,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 2. `WireConnection;<入节点>;<入端口>;<出节点>;<出端口>` —— **目的地在前，来源在后**
 3. `//CHKSM=` = 整个文件（`//CHKSM=` 之前部分）的 SHA1 大写 hex；校验失败**不阻断** ASE 加载
 4. Master 节点（TemplateMultiPassMasterNode 等）序列化布局为 opaque：用 `--line` 整行替换或 `layout` 移动
-5. 主 Master 节点字段 9 保存 `CustomEditor`；已验证的 ASE 1.9.6.2 PropertyNode 尾部保存 MZGUI 数量与属性。请用 `custom-gui`，不要用通用 `set-field` 猜这些结构；未知 ASE 版本无法识别合法尾部时会失败关闭
+5. 当前真实版本矩阵仅允许图版本 `19109` 读取/同步主 Master `CustomEditor`，图版本 `19602` 读写 MZGUI PropertyNode 尾部。请用 `custom-gui`，不要用通用 `set-field` 猜这些结构；任何未登记版本即使字段数量相似或以数字 `0` 结尾，也会在备份/写盘前失败关闭
 
 ### 自定义 GUI 分组规则
 
@@ -170,7 +172,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 - `--property _PaintColor` 可替代节点 ID；批量整理使用 `--spec`。`reorder=true` 按 `properties` 数组重写 PropertyNode 的 `m_orderIndex`，未列属性保持原相对顺序并追加。
 - 原生 MZGUI 和 ASECLI 内置 GUI 都会在 Tooltip 中自动追加准确变量名与默认基线；内置 GUI 通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值。`--tooltip` 只写可选的额外悬浮说明，不再人工复制变量名和默认值。
 - `--help-box` 是属性下方的常驻中文说明，应写清用途、通道/单位和“调大/调小”的结果，不重复变量名和默认值。中文、换行和 emoji 会按 MZGUI 的 UTF-16 `#XXXX` 规则编码。
-- 先运行 `gui-support <project>`：原生 MZGUI 存在时使用返回的 `MZGUI.MZGUI`；缺失时用 `--write` 安装固定资源，再使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。命令不会悄悄替换 Shader 的 CustomEditor。若返回 `provider=multiple`，必须先人工移除固定内置资源 `Assets/Editor/ASECLI/ASECLIMaterialGUI.cs`，等待 Editor 重编译后再选择原生 MZGUI；工具会失败关闭，不会猜选提供者。
+- 先运行 `gui-support <project>`：原生 MZGUI 存在时使用返回的 `MZGUI.MZGUI`；确认缺失时用 `--write` 安装固定资源，再使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。若返回 `provider=unknown`，必须连接同一目标工程并执行 `--runtime-probe`；若返回 `multiple`，人工移除固定内置资源并等待重编译。工具不会把“静态未发现”冒充“已证明不存在”，也不会猜选提供者。
 - `custom-gui --write` 会同步图内主 Master 与编译区 `CustomEditor`、重算 `CHKSM` 并保留 `.bak`；Property 属性声明由 ASE 生成，因此随后必须执行 `validate` 和 `recompile`。
 
 批量规范示例（`editor` 必须使用 `gui-support` 返回的 `recommended_editor`）：

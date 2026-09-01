@@ -70,6 +70,7 @@
 
 - 状态：已确认（2026-09-01，CR-0006）
 - 决策：内部专有许可；Python 3.10/3.12 矩阵；uv/lock frozen；固定 commit 的 Actions；固定 epoch 双构建；wheel/sdist SHA-256；SPDX 2.3；隔离安装/卸载/恢复。
+- 可复现实现：Hatchling 版本进入 dev lock，CI 使用 `--no-build-isolation`；两次构建输出写入 runner 临时目录，禁止第一次产物进入第二个 sdist。比较失败时保存 hash、gzip header 与 tar 成员元数据/内容差异，但正式 dist 仍阻塞。
 - 安全：离线高置信 secret、Action pin、lock hash 门禁；生产依赖为 0。在线漏洞数据库必须用真实 CI/Dependabot 证据单独解除“未验证”。
 - 发布：本地 REL draft 不等于远程 Release；没有 push/run/artifact 链接时不得标 released。
 
@@ -78,7 +79,7 @@
 - 状态：已确认（2026-09-01，FR-0009）
 - 背景：ASE 1.9.6.2 的自定义 GUI 同时存在于主 Master 的 `customInspectorName`、编译 ShaderLab `CustomEditor` 和 PropertyNode MZGUI 尾部；通用字段写入无法安全表达中文提示、分组边界和属性数量。
 - 决策：新增 `custom-gui` 语义命令。CustomEditor 写入时同步唯一主 Master 字段 9 与编译指令；Tooltip/HelpBox 复刻 C# UTF-16 `#XXXX` 编码，Foldout 复刻非 ASCII 编码；PropertyNode 尾部按 `<count>;<attributes...>` 最小写回。
-- 安全：类名不是 hard allowlist，但必须满足 C# 命名空间标识符格式；新增 MZGUI-compatible 属性要求显式使用已检测的 `MZGUI.MZGUI` 或 `ASECLI.MaterialGUI.ASECLIMaterialGUI`；非 Property 节点、未知尾部、非唯一主 Master 和注入字符失败关闭。
+- 安全：类名不是 hard allowlist，但必须满足 C# 命名空间标识符格式；CustomEditor 只开放真实采证的 `19109/19602`，MZGUI 尾部只开放 `19602`。新增属性要求显式使用已检测的提供者；非 Property、未知版本/尾部、非唯一主 Master 和注入字符失败关闭。
 - 生成边界：编译 Properties 由 ASE 负责，CLI 不做脆弱的 ShaderLab 行映射；写元数据后返回 `requires_recompile=true`，Agent 必须执行 validate→recompile。
 - 回滚：每次显式写入保留 `.bak`；恢复备份后重编译。禁用 `custom-gui` 不影响其他命令。
 
@@ -103,7 +104,7 @@
 - 状态：已确认（2026-09-01，FR-0011/CR-0008）
 - 背景：一次性编辑器内 C# 已证明 `CreateNewTemplateShader`、`CreateNode`、`CreateConnection`、`SaveToDisk`、`LoadFromDisk` 可创建可编辑图；当前 `SamplerNode`/`CustomExpressionNode` 为 `layout_ok=false`，离线 schema 不足以安全猜造动态端口和私有字段。
 - 决策：保留离线文本链路为默认；新增受限 `EditorGraphSpec v1` 和 `create --backend editor|auto`。固定 C# 执行器只允许模板、Sampler、CustomExpression、白名单普通节点、连接、保存/重载与 manifest 回读；反射字段白名单并先做能力探测。
-- 安全与事务：禁止任意 C#/任意反射；参数安全编码；默认 loopback；不支持版本、成员缺失、Save/Load/manifest 不一致均零成功。首期只创建不存在的目标，失败删除明确暂存资产；已有文件仍走现有文本创建/备份链路。
+- 安全与事务：禁止任意 C#/任意反射；参数安全编码；默认 loopback；JSON-RPC 响应 ID 必须与当前请求一致。不支持版本、成员缺失、Save/Load/manifest 不一致均零成功。Editor 提交前失败删除明确事务资产；提交后 Python 后验失败保留目标并返回 nonce/hash，避免 TOCTOU 误删；已有文件仍走文本创建/备份链路。
 - 取舍：不把全部修改搬回 Editor；不手写动态节点序列化；不把运行时矩阵/CommandBuffer 状态塞进静态图。可编辑性和渲染等价性分别验收。
 - 回滚：关闭 Editor/auto 后端并保留 `create --backend text`；现有文件格式、schema 和命令不迁移。
 
@@ -111,7 +112,7 @@
 
 - 状态：已确认（2026-09-01，FR-0009）
 - 背景：MZGUI 的 PropertyNode 尾部只负责让 ASE 生成 ShaderLab attribute；Foldout、Tooltip 和 HelpBox 的实际显示发生在 Unity `ShaderGUI` / `MaterialPropertyDrawer`。目标工程不一定安装同一套 MZGUI，且本地参考源码未发现允许再分发的许可证。
-- 决策：保留 `[FoldoutMzgui]`、`[TooltipMzgui]`、`[HelpBoxMzgui]` 作为兼容协议。`gui-support` 先检测原生 `MZGUI.MZGUI`；缺失时仅安装 clean-room 固定资源 `ASECLI.MaterialGUI.ASECLIMaterialGUI`，使用 Unity API/反射读取已经编译的 attribute，不依赖 ASE 类型。
+- 决策：保留 `[FoldoutMzgui]`、`[TooltipMzgui]`、`[HelpBoxMzgui]` 作为兼容协议。`gui-support` 识别裸/全限定/global/alias 源码；预编译 DLL 只能静态定为 `unknown`，连接同一工程后由 Editor 反射 `MZGUI.MZGUI : ShaderGUI`。只有确认缺失才安装 clean-room 固定资源。
 - 默认值：内置 GUI 从新建的默认 `Material(shader)` 读取每个属性的真实 Shader 默认值，并在显示时与变量名一起追加到 Tooltip；不把当前材质值或人工抄写的默认值当作事实源。
 - 兼容：ASE 版本差异只存在于 PropertyNode 元数据写入端；无法动态识别合法尾部时失败关闭。Inspector 层对 ASE 版本无感。Unity 2021.3 已验证 `MaterialPropertyHandler` 路径；新版 `ShaderUtil.GetShaderPropertyAttributes` 作为后备。
 - 安全与许可：不复制或打包 MZGUI 专有源码；只实现 Foldout/Tooltip/HelpBox 与技术 Tooltip。原生提供者存在时不安装；固定路径存在不同内容时拒绝覆盖；不实现 Ramp、搜索、还原按钮和关键字面板。

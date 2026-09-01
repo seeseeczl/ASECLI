@@ -54,8 +54,9 @@ asecli fix-checksum <file> --write
 
 ```bash
 # 先检测目标工程。provider=native_mzgui 时沿用 MZGUI.MZGUI；provider=missing 时安装内置层
-# provider=multiple 时停止，人工移除固定内置资源并等待 Editor 重编译，不得继续写 Shader
+# provider=unknown 时连接同一目标 Editor 并执行 --runtime-probe；provider=multiple 时停止
 asecli gui-support /path/to/UnityProject
+asecli gui-support /path/to/UnityProject --runtime-probe
 asecli gui-support /path/to/UnityProject --write
 
 # 先查询，返回主 Master/编译区 Inspector 是否一致，以及可操作的 PropertyNode id
@@ -84,7 +85,7 @@ asecli recompile <file>
 - Property 的公开显示名以中文为主；创建新节点时用 EditorGraphSpec 的 `inspector_name`，已有节点先通过 `custom-gui` 查询 `display_name`，再走 ASE Editor 或该节点类型确认过的固定字段修改。不要只改编译区 `Properties` 行。
 - 原生 MZGUI 和内置 GUI 会自动在 Tooltip 末尾追加变量名与默认基线。内置 GUI 从默认 `Material(shader)` 读取真实 Shader 默认值；`--tooltip` 只用于可选的额外悬浮说明，不手工抄写技术信息。
 - `--help-box` 写属性下方的常驻说明，是规范的主说明方式：说明用途、调节方向、通道、单位或限制，不重复变量名和默认值。工具会按 MZGUI 原生 UTF-16 `#XXXX` 规则编码中文、换行和 emoji。
-- 新增属性前必须运行 `gui-support`。原生 MZGUI 存在时使用 `MZGUI.MZGUI`；否则先安装再使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。若 `provider=multiple`，停止后续修改，人工移除固定内置资源 `Assets/Editor/ASECLI/ASECLIMaterialGUI.cs` 并等待重编译，再重新检测；不得猜选提供者。`custom-gui` 只接受这两个提供者承载新增 Foldout/Tooltip/HelpBox，不隐式覆盖其他 ShaderGUI。
+- 新增属性前必须运行 `gui-support`。原生 MZGUI 存在时使用 `MZGUI.MZGUI`；确认缺失后才安装 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。`provider=unknown` 表示源码/DLL 候选无法静态定型，必须连接同一目标工程用 `--runtime-probe`；`provider=multiple` 时停止并人工移除固定内置资源。不得把 unknown 当 missing，也不得猜选提供者。
 - `--add-attribute '[RampMzgui(...)]'` / `--remove-attribute RampMzgui` 是专家入口，只用于 ASE 1.9.6.2 已注册的 MZGUI 类型。
 - `--write` 同步图内主 Master 与编译区 `CustomEditor`、重算 CHKSM 并生成 `.bak`；Property 声明仍必须经 `recompile` 由 ASE 正式生成。
 
@@ -229,14 +230,15 @@ Editor 创建规则：
 5. token 只从 `ASECLI_MCP_INSTANCE_TOKEN` 读取；不要把 token 写进 argv、文档或日志。客户端不跟随重定向。
 6. MCP 工具使用 `execute_code`，会在编辑器内执行受控 ASE 保存片段；连接错误会话等同于扩大代码执行信任边界。
 7. Editor 创建当前只支持 ASE 1.9.6.2 和有端口契约的模板；不支持版本、模板或反射成员缺失必须失败关闭，不能退化为 raw Shader 文本。
+8. Editor 事务内部失败会回滚目标/暂存资产；若提交后 Python parse/validate 失败，目标与 `.meta` 会保留并返回事务 nonce/hash，禁止按路径自动删除，人工核对身份后再处理。
 
 ## 错误处理约定
 
 - 修改前先 `validate`；发现 `DANGLING_WIRE`/`DUPLICATE_NODE_ID` 先修复再继续。
 - `SCHEMA_UNAVAILABLE` 时：用 `parse` 拿节点行原文，改用 `--line` 整行插入或整行替换。
-- `GUI_SUPPORT_ERROR` 时：检查目标是否为 Unity/Tuanjie 工程根目录；固定安装路径若已有不同内容，停止并人工辨认，不得覆盖。
+- `GUI_SUPPORT_ERROR` 时：检查目标是否为 Unity/Tuanjie 工程根目录；固定安装路径若已有不同内容，停止并人工辨认。`provider=unknown` 时连接同一工程执行 `--runtime-probe`，不得直接安装或覆盖。
 - `CUSTOM_GUI_ERROR` 时：检查目标是否为 `Property` 节点、当前图尾部是否可识别，以及 `CustomEditor` 是否为 `gui-support` 返回的原生或内置提供者；不要改用 `set-field` 绕过。
 - `COMMENT_GROUP_ERROR` 时：检查成员是否重复/已属于其他 Comment、是否同时选择了内层框与其子节点，以及标题是否包含分号或换行；不要用 raw `--line` 绕过树形归属检查。
 - `WRITE_CONFLICT` 时：文件已被另一个 Agent 或编辑器修改；重新加载、比较差异后再执行，不得直接覆盖。`UNSAFE_PATH` 时检查目标、备份或旧 `.tmp` 是否为符号链接。
-- Editor 创建返回 `BRIDGE_ERROR` 时：检查 ASE 版本、模板 GUID、目标是否已存在、同目录 `ASECLI-Temp-*` 和 Editor 日志。若发生 MCP 超时，按未知完成状态处理，不要立刻重试。
+- Editor 创建返回 `BRIDGE_ERROR` 时：检查 ASE 版本、模板 GUID、目标、同目录 `ASECLI-Temp-*` 和 Editor 日志。若响应含 `cleanup=skipped_untrusted_post_commit_asset`，目标是为防误删而保留的后验失败现场，先核对 nonce/hash；若 MCP 超时，按未知完成状态处理，不要立刻重试。
 - 所有写操作用 `validate` + `parse` 复核后再向用户报告。

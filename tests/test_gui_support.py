@@ -13,11 +13,13 @@ import pytest
 from asecli.bridge.gui_support import (
     ASECLI_GUI_EDITOR,
     GUI_SUPPORT_ASSET_PATH,
+    GUI_SUPPORT_PROBE_SNIPPET,
     GUI_SUPPORT_SHA256,
     GUI_SUPPORT_SOURCE,
     MZGUI_EDITOR,
     inspect_gui_support,
     install_gui_support,
+    probe_native_mzgui_via_mcp,
 )
 
 
@@ -108,6 +110,132 @@ def test_native_mzgui_is_preferred_and_not_shadowed(tmp_path):
         "Assets/AmplifyShaderEditor/MZGUI/Editor/MZGUI.cs"
     ]
     assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+@pytest.mark.parametrize(
+    "base",
+    ["UnityEditor.ShaderGUI", "global::UnityEditor.ShaderGUI"],
+)
+def test_fully_qualified_native_mzgui_is_detected(tmp_path, base):
+    project = unity_project(tmp_path)
+    native = project / "Assets" / "NativeMZGUI.cs"
+    native.write_text(f"namespace MZGUI {{ public class MZGUI : {base} {{ }} }}", encoding="utf-8")
+    state = install_gui_support(project, write=True)
+    assert state["provider"] == "native_mzgui"
+    assert state["native_mzgui"]["status"] == "detected"
+    assert state["written"] is False
+    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+def test_shader_gui_alias_native_mzgui_is_detected(tmp_path):
+    project = unity_project(tmp_path)
+    native = project / "Assets" / "AliasMZGUI.cs"
+    native.write_text(
+        "using InspectorBase = global::UnityEditor.ShaderGUI; namespace MZGUI { class MZGUI : InspectorBase {} }",
+        encoding="utf-8",
+    )
+    state = inspect_gui_support(project)
+    assert state["provider"] == "native_mzgui"
+    assert state["recommended_editor"] == MZGUI_EDITOR
+
+
+def test_arbitrary_dll_candidate_is_unknown_and_blocks_install(tmp_path):
+    project = unity_project(tmp_path)
+    assembly = project / "Assets" / "Plugins" / "Graphics.Editor.dll"
+    assembly.parent.mkdir(parents=True)
+    assembly.write_bytes(b"binary-prefix\x00MZGUI\x00ShaderGUI\x00binary-suffix")
+    state = inspect_gui_support(project)
+    assert state["provider"] == "unknown"
+    assert state["recommended_editor"] is None
+    assert state["would_write"] is False
+    assert state["native_mzgui"]["candidates"] == ["Assets/Plugins/Graphics.Editor.dll"]
+    with pytest.raises(RuntimeError, match="--runtime-probe"):
+        install_gui_support(project, write=True)
+    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+def test_runtime_probe_reflects_target_project_and_prevents_install(tmp_path, monkeypatch):
+    project = unity_project(tmp_path)
+    payload = {
+        "protocol": "ASECLI_GUI_SUPPORT_PROBE_V1",
+        "assets_path": str((project / "Assets").resolve()),
+        "type_found": True,
+        "detected": True,
+        "assembly": "MZGUI.Editor, Version=1.0.0.0",
+    }
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            assert name == "execute_code"
+            assert arguments["code"] == GUI_SUPPORT_PROBE_SNIPPET
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "ASECLI_GUI_SUPPORT_PROBE_V1:" + json.dumps(payload),
+                    }
+                ]
+            }
+
+    monkeypatch.setattr("asecli.bridge.gui_provider_detection.McpClient", Client)
+    probe = probe_native_mzgui_via_mcp(project)
+    state = install_gui_support(project, write=True, runtime_probe=probe)
+    assert state["provider"] == "native_mzgui"
+    assert state["native_mzgui"]["runtime_probe"] == payload
+    assert state["written"] is False
+    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+def test_runtime_probe_rejects_a_different_connected_project(tmp_path, monkeypatch):
+    project = unity_project(tmp_path)
+    other = tmp_path / "Other" / "Assets"
+    other.mkdir(parents=True)
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            payload = {
+                "protocol": "ASECLI_GUI_SUPPORT_PROBE_V1",
+                "assets_path": str(other.resolve()),
+                "type_found": False,
+                "detected": False,
+                "assembly": None,
+            }
+            return {"content": [{"type": "text", "text": "ASECLI_GUI_SUPPORT_PROBE_V1:" + json.dumps(payload)}]}
+
+    monkeypatch.setattr("asecli.bridge.gui_provider_detection.McpClient", Client)
+    with pytest.raises(ValueError, match="does not match"):
+        probe_native_mzgui_via_mcp(project)
+
+
+def test_runtime_probe_disagreement_with_source_stays_unknown(tmp_path):
+    project = unity_project(tmp_path)
+    source = project / "Assets" / "NativeMZGUI.cs"
+    source.write_text(
+        "namespace MZGUI { public class MZGUI : UnityEditor.ShaderGUI {} }",
+        encoding="utf-8",
+    )
+    probe = {
+        "protocol": "ASECLI_GUI_SUPPORT_PROBE_V1",
+        "assets_path": str((project / "Assets").resolve()),
+        "type_found": False,
+        "detected": False,
+        "assembly": None,
+    }
+    state = inspect_gui_support(project, runtime_probe=probe)
+    assert state["provider"] == "unknown"
+    assert state["native_mzgui"]["candidates"] == ["Assets/NativeMZGUI.cs"]
 
 
 def test_native_and_asecli_providers_fail_closed(tmp_path):

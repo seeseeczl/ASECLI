@@ -120,14 +120,21 @@ def test_auto_without_spec_uses_legacy_text_path(tmp_path):
     assert AseFile.from_path(target).graph.nodes
 
 
-def test_editor_post_validation_failure_removes_new_shader_and_meta(tmp_path, monkeypatch, capsys):
+def test_editor_post_validation_failure_preserves_shader_and_meta_for_diagnosis(tmp_path, monkeypatch, capsys):
     target = _project_target(tmp_path)
     spec_path = _write_spec(tmp_path)
 
     def fake_invalid_create(path, spec, **kwargs):
         Path(path).write_text("not an ASE shader", encoding="utf-8")
         Path(str(path) + ".meta").write_text("temporary meta", encoding="utf-8")
-        return {"saved": True, "reloaded": True, "committed": True}
+        return {
+            "saved": True,
+            "reloaded": True,
+            "committed": True,
+            "transaction_nonce": "a" * 32,
+            "shader_sha256": "b" * 64,
+            "meta_sha256": "c" * 64,
+        }
 
     monkeypatch.setattr("asecli.cli.create_command.create_shader_via_mcp", fake_invalid_create)
     rc = app(["create", str(target), "--backend", "editor", "--spec", str(spec_path)])
@@ -135,5 +142,32 @@ def test_editor_post_validation_failure_removes_new_shader_and_meta(tmp_path, mo
 
     assert rc == 3
     assert payload["error"]["code"] == "BRIDGE_ERROR"
-    assert not target.exists()
-    assert not Path(str(target) + ".meta").exists()
+    assert target.read_text(encoding="utf-8") == "not an ASE shader"
+    assert Path(str(target) + ".meta").read_text(encoding="utf-8") == "temporary meta"
+    assert payload["data"]["cleanup"] == "skipped_untrusted_post_commit_asset"
+    assert payload["data"]["transaction_nonce"] == "a" * 32
+
+
+def test_editor_post_validation_race_never_deletes_replacement(tmp_path, monkeypatch, capsys):
+    target = _project_target(tmp_path)
+    meta = Path(str(target) + ".meta")
+    spec_path = _write_spec(tmp_path)
+
+    def fake_create(path, spec, **kwargs):
+        Path(path).write_bytes(SHADER.read_bytes())
+        meta.write_text("editor meta", encoding="utf-8")
+        return {"transaction_nonce": "d" * 32, "shader_sha256": "e" * 64, "meta_sha256": "f" * 64}
+
+    def replace_then_fail(path):
+        Path(path).write_text("replacement from another process", encoding="utf-8")
+        meta.write_text("replacement meta", encoding="utf-8")
+        raise ValueError("injected post-commit race")
+
+    monkeypatch.setattr("asecli.cli.create_command.create_shader_via_mcp", fake_create)
+    monkeypatch.setattr("asecli.cli.create_command.AseFile.from_path", replace_then_fail)
+    rc = app(["create", str(target), "--backend", "editor", "--spec", str(spec_path)])
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 3
+    assert target.read_text(encoding="utf-8") == "replacement from another process"
+    assert meta.read_text(encoding="utf-8") == "replacement meta"
+    assert payload["data"]["cleanup"] == "skipped_untrusted_post_commit_asset"
