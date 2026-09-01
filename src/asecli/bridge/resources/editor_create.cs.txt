@@ -1,0 +1,416 @@
+var payloadJson = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String("{payload_base64}"));
+var payload = Newtonsoft.Json.Linq.JObject.Parse(payloadJson);
+var assetPath = (string)payload["asset_path"];
+var temporaryAssetPath = (string)payload["temporary_asset_path"];
+var template = (Newtonsoft.Json.Linq.JObject)payload["template"];
+var nodes = (Newtonsoft.Json.Linq.JArray)payload["nodes"];
+var connections = (Newtonsoft.Json.Linq.JArray)payload["connections"];
+var previousWindow = AmplifyShaderEditor.UIUtils.CurrentWindow;
+var previousSelection = UnityEditor.Selection.activeObject;
+AmplifyShaderEditor.AmplifyShaderEditorWindow win = null;
+bool committed = false;
+bool success = false;
+bool stateRestored = false;
+System.Exception failure = null;
+try
+{
+    if ((int)payload["version"] != 1)
+        throw new System.Exception("unsupported EditorGraphSpec version");
+    string aseVersion = AmplifyShaderEditor.VersionInfo.StaticToString();
+    if (aseVersion != "1.9.6.2")
+        throw new System.Exception("unsupported ASE version: " + aseVersion);
+    if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/") ||
+        !assetPath.EndsWith(".shader") || assetPath.Contains("..") || assetPath.Contains("\\"))
+        throw new System.Exception("unsafe target asset path");
+    if (string.IsNullOrEmpty(temporaryAssetPath) || !temporaryAssetPath.StartsWith("Assets/") ||
+        !temporaryAssetPath.EndsWith(".shader") || temporaryAssetPath.Contains("..") ||
+        temporaryAssetPath.Contains("\\") || temporaryAssetPath == assetPath)
+        throw new System.Exception("unsafe temporary asset path");
+    string targetDirectory = System.IO.Path.GetDirectoryName(assetPath).Replace("\\", "/");
+    string temporaryDirectory = System.IO.Path.GetDirectoryName(temporaryAssetPath).Replace("\\", "/");
+    if (targetDirectory != temporaryDirectory ||
+        !System.IO.Path.GetFileName(temporaryAssetPath).StartsWith("ASECLI-Temp-"))
+        throw new System.Exception("temporary asset must be a controlled sibling of the target");
+    if (UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) != null ||
+        System.IO.File.Exists(System.IO.Path.GetFullPath(assetPath)))
+        throw new System.Exception("target asset already exists");
+    if (UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(temporaryAssetPath) != null ||
+        System.IO.File.Exists(System.IO.Path.GetFullPath(temporaryAssetPath)))
+        throw new System.Exception("temporary asset already exists");
+
+    var publicInstance = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+    var publicStatic = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+    var privateInstance = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+    var createTemplateMethod = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetMethod(
+        "CreateNewTemplateShader", publicStatic, null,
+        new System.Type[] { typeof(string), typeof(string), typeof(string) }, null);
+    var createNodeMethod = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetMethod(
+        "CreateNode", publicInstance, null,
+        new System.Type[] { typeof(System.Type), typeof(UnityEngine.Vector2), typeof(AmplifyShaderFunction), typeof(bool) }, null);
+    var createConnectionMethod = typeof(AmplifyShaderEditor.ParentGraph).GetMethod(
+        "CreateConnection", publicInstance, null,
+        new System.Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool) }, null);
+    var saveMethod = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetMethod(
+        "SaveToDisk", publicInstance, null, new System.Type[] { typeof(bool) }, null);
+    var loadMethod = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetMethod(
+        "LoadFromDisk", publicInstance, null,
+        new System.Type[] { typeof(string), typeof(AmplifyShaderFunction) }, null);
+    var expressionNameField = typeof(AmplifyShaderEditor.CustomExpressionNode).GetField("m_customExpressionName", privateInstance);
+    var expressionItemsField = typeof(AmplifyShaderEditor.CustomExpressionNode).GetField("m_items", privateInstance);
+    var expressionCodeField = typeof(AmplifyShaderEditor.CustomExpressionNode).GetField("m_code", privateInstance);
+    var expressionOutputField = typeof(AmplifyShaderEditor.CustomExpressionNode).GetField("m_outputTypeIdx", privateInstance);
+    var expressionFunctionField = typeof(AmplifyShaderEditor.CustomExpressionNode).GetField("m_functionMode", privateInstance);
+    var rawPropertyNameMethod = typeof(AmplifyShaderEditor.PropertyNode).GetMethod(
+        "SetRawPropertyName", publicInstance, null, new System.Type[] { typeof(string) }, null);
+    var propertyInspectorProperty = typeof(AmplifyShaderEditor.PropertyNode).GetProperty(
+        "PropertyInspectorName", publicInstance);
+    if (createTemplateMethod == null || createNodeMethod == null || createConnectionMethod == null ||
+        saveMethod == null || loadMethod == null || expressionNameField == null ||
+        expressionItemsField == null || expressionCodeField == null ||
+        expressionOutputField == null || expressionFunctionField == null ||
+        rawPropertyNameMethod == null || propertyInspectorProperty == null ||
+        propertyInspectorProperty.GetSetMethod() == null)
+        throw new System.Exception("required ASE API member is missing");
+
+    string templateGuid = (string)template["guid"];
+    string shaderName = (string)template["shader_name"];
+    var shader = AmplifyShaderEditor.AmplifyShaderEditorWindow.CreateNewTemplateShader(
+        templateGuid, temporaryAssetPath, shaderName + ".shader");
+    win = AmplifyShaderEditor.UIUtils.CurrentWindow as AmplifyShaderEditor.AmplifyShaderEditorWindow;
+    if (shader == null || win == null || win.CurrentGraph == null || win.CurrentGraph.CurrentMasterNode == null)
+        throw new System.Exception("ASE template graph was not created");
+    win.Show();
+    var layoutEvent = new UnityEngine.Event();
+    layoutEvent.type = UnityEngine.EventType.Layout;
+    win.SendEvent(layoutEvent);
+    var repaintEvent = new UnityEngine.Event();
+    repaintEvent.type = UnityEngine.EventType.Repaint;
+    win.SendEvent(repaintEvent);
+
+    var graph = win.CurrentGraph;
+    var aliasIds = new System.Collections.Generic.Dictionary<string, int>();
+    int masterId = graph.CurrentMasterNode.UniqueId;
+    foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)
+    {
+        string alias = (string)nodeSpec["alias"];
+        string kind = (string)nodeSpec["kind"];
+        var position = (Newtonsoft.Json.Linq.JArray)nodeSpec["position"];
+        System.Type nodeType = null;
+        if (kind == "sampler") nodeType = typeof(AmplifyShaderEditor.SamplerNode);
+        else if (kind == "custom_expression") nodeType = typeof(AmplifyShaderEditor.CustomExpressionNode);
+        else
+        {
+            string typeName = (string)nodeSpec["type"];
+            if (typeName == "WorldPosInputsNode") nodeType = typeof(AmplifyShaderEditor.WorldPosInputsNode);
+            else if (typeName == "TextureCoordinatesNode") nodeType = typeof(AmplifyShaderEditor.TextureCoordinatesNode);
+            else if (typeName == "BreakToComponentsNode") nodeType = typeof(AmplifyShaderEditor.BreakToComponentsNode);
+            else if (typeName == "TexturePropertyNode") nodeType = typeof(AmplifyShaderEditor.TexturePropertyNode);
+            else if (typeName == "RangedFloatNode") nodeType = typeof(AmplifyShaderEditor.RangedFloatNode);
+            else if (typeName == "Matrix4X4Node") nodeType = typeof(AmplifyShaderEditor.Matrix4X4Node);
+            else if (typeName == "Vector4Node") nodeType = typeof(AmplifyShaderEditor.Vector4Node);
+            else throw new System.Exception("node type escaped allowlist: " + typeName);
+        }
+        var created = win.CreateNode(
+            nodeType,
+            new UnityEngine.Vector2((float)position[0], (float)position[1]),
+            null,
+            false);
+        if (created == null || created.GetType() != nodeType)
+            throw new System.Exception("ASE failed to create node: " + alias);
+        aliasIds.Add(alias, created.UniqueId);
+
+        if (kind == "sampler")
+        {
+            var sampler = created as AmplifyShaderEditor.SamplerNode;
+            sampler.CurrentParameterType = (AmplifyShaderEditor.PropertyType)System.Enum.Parse(
+                typeof(AmplifyShaderEditor.PropertyType), (string)nodeSpec["parameter_type"]);
+            sampler.SetPropertyName((string)nodeSpec["property_name"]);
+            sampler.SetInspectorName((string)nodeSpec["inspector_name"]);
+            sampler.OnPropertyNameChanged();
+        }
+        else if (kind == "property")
+        {
+            var property = created as AmplifyShaderEditor.PropertyNode;
+            if (property == null) throw new System.Exception("property-node cast failed: " + alias);
+            property.CurrentParameterType = (AmplifyShaderEditor.PropertyType)System.Enum.Parse(
+                typeof(AmplifyShaderEditor.PropertyType), (string)nodeSpec["parameter_type"]);
+            property.SetRawPropertyName((string)nodeSpec["property_name"]);
+            propertyInspectorProperty.SetValue(property, (string)nodeSpec["inspector_name"], null);
+            property.OnPropertyNameChanged();
+        }
+        else if (kind == "custom_expression")
+        {
+            var expression = created as AmplifyShaderEditor.CustomExpressionNode;
+            string expressionCode = (string)nodeSpec["code"];
+            var inputSpecs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
+            var items = new System.Collections.Generic.List<AmplifyShaderEditor.CustomExpressionInputItem>();
+            for (int inputIndex = 0; inputIndex < inputSpecs.Count; inputIndex++)
+            {
+                var inputSpec = (Newtonsoft.Json.Linq.JObject)inputSpecs[inputIndex];
+                string inputName = (string)inputSpec["name"];
+                var inputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
+                    typeof(AmplifyShaderEditor.WirePortDataType), (string)inputSpec["type"]);
+                var item = new AmplifyShaderEditor.CustomExpressionInputItem(
+                    AmplifyShaderEditor.PrecisionType.Inherit,
+                    AmplifyShaderEditor.VariableQualifiers.In,
+                    string.Empty,
+                    false,
+                    true,
+                    string.Empty);
+                item.Type = inputType;
+                items.Add(item);
+                if (inputIndex == 0)
+                    expression.InputPorts[0].ChangeProperties(inputName, inputType, false);
+                else
+                    expression.AddInputPort(inputType, false, inputName);
+            }
+            string outputTypeName = (string)nodeSpec["output_type"];
+            var outputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
+                typeof(AmplifyShaderEditor.WirePortDataType), outputTypeName);
+            int outputTypeIndex = outputTypeName == "INT" ? 0 :
+                outputTypeName == "FLOAT" ? 1 :
+                outputTypeName == "FLOAT2" ? 2 :
+                outputTypeName == "FLOAT3" ? 3 :
+                outputTypeName == "FLOAT4" ? 4 :
+                outputTypeName == "FLOAT3x3" ? 5 : 6;
+            expression.OutputPorts[0].ChangeType(outputType, false);
+            expressionNameField.SetValue(expression, (string)nodeSpec["name"]);
+            expressionItemsField.SetValue(expression, items);
+            expressionCodeField.SetValue(expression, expressionCode);
+            expressionOutputField.SetValue(expression, outputTypeIndex);
+            expressionFunctionField.SetValue(expression, expressionCode.Contains("return"));
+        }
+    }
+
+    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
+    {
+        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
+        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
+        string sourceAlias = (string)sourceSpec["node"];
+        string destinationAlias = (string)destinationSpec["node"];
+        int sourceNodeId = aliasIds[sourceAlias];
+        int destinationNodeId = destinationAlias == "master" ? masterId : aliasIds[destinationAlias];
+        int sourcePortId = (int)sourceSpec["port"];
+        int destinationPortId = (int)destinationSpec["port"];
+        var sourceNode = graph.GetNode(sourceNodeId);
+        var destinationNode = graph.GetNode(destinationNodeId);
+        if (sourceNode == null || destinationNode == null ||
+            sourceNode.GetOutputPortByUniqueId(sourcePortId) == null ||
+            destinationNode.GetInputPortByUniqueId(destinationPortId) == null)
+            throw new System.Exception("connection endpoint not found");
+        graph.CreateConnection(destinationNodeId, destinationPortId, sourceNodeId, sourcePortId, false);
+        if (!destinationNode.GetInputPortByUniqueId(destinationPortId).IsConnectedTo(sourceNodeId, sourcePortId))
+            throw new System.Exception("ASE rejected connection");
+    }
+
+    bool saved = win.SaveToDisk(false);
+    if (!saved) throw new System.Exception("ASE SaveToDisk returned false");
+    var loadResult = win.LoadFromDisk(temporaryAssetPath, null);
+    bool reloaded = loadResult == AmplifyShaderEditor.ShaderLoadResult.LOADED ||
+        loadResult == AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED;
+    if (!reloaded) throw new System.Exception("ASE temporary LoadFromDisk failed: " + loadResult);
+
+    graph = win.CurrentGraph;
+    var reloadedMaster = graph.CurrentMasterNode as AmplifyShaderEditor.TemplateMultiPassMasterNode;
+    var reloadedShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(temporaryAssetPath);
+    if (reloadedMaster == null || reloadedMaster.CurrentTemplate == null || reloadedShader == null ||
+        reloadedMaster.CurrentTemplate.GUID != templateGuid ||
+        reloadedMaster.ShaderName != shaderName || reloadedShader.name != shaderName)
+        throw new System.Exception("template or shader identity changed after temporary reload");
+    var manifestNodes = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)
+    {
+        string alias = (string)nodeSpec["alias"];
+        string kind = (string)nodeSpec["kind"];
+        var actualNode = graph.GetNode(aliasIds[alias]);
+        if (actualNode == null) throw new System.Exception("node missing after reload: " + alias);
+        string expectedType = kind == "sampler" ? "SamplerNode" :
+            kind == "custom_expression" ? "CustomExpressionNode" : (string)nodeSpec["type"];
+        if (actualNode.GetType().Name != expectedType)
+            throw new System.Exception("node type changed after reload: " + alias);
+        var manifestNode = new Newtonsoft.Json.Linq.JObject();
+        manifestNode["alias"] = alias;
+        manifestNode["kind"] = kind;
+        manifestNode["type"] = actualNode.GetType().Name;
+        if (kind == "sampler" || kind == "property")
+        {
+            var property = actualNode as AmplifyShaderEditor.PropertyNode;
+            if (property.PropertyName != (string)nodeSpec["property_name"] ||
+                property.PropertyInspectorName != (string)nodeSpec["inspector_name"] ||
+                property.CurrentParameterType.ToString() != (string)nodeSpec["parameter_type"])
+                throw new System.Exception("property changed after reload: " + alias);
+            manifestNode["property_name"] = property.PropertyName;
+            manifestNode["inspector_name"] = property.PropertyInspectorName;
+            manifestNode["parameter_type"] = property.CurrentParameterType.ToString();
+        }
+        else if (kind == "custom_expression")
+        {
+            var expression = actualNode as AmplifyShaderEditor.CustomExpressionNode;
+            string actualName = (string)expressionNameField.GetValue(expression);
+            string actualCode = (string)expressionCodeField.GetValue(expression);
+            string actualOutputType = expression.OutputPorts[0].DataType.ToString();
+            if (actualName != (string)nodeSpec["name"] || actualCode != (string)nodeSpec["code"] ||
+                actualOutputType != (string)nodeSpec["output_type"])
+                throw new System.Exception("custom expression changed after reload: " + alias);
+            manifestNode["name"] = actualName;
+            manifestNode["code"] = actualCode;
+            manifestNode["output_type"] = actualOutputType;
+            var manifestInputs = new Newtonsoft.Json.Linq.JArray();
+            var expectedInputs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
+            if (expression.InputPorts.Count != expectedInputs.Count)
+                throw new System.Exception("custom expression input count changed after reload: " + alias);
+            for (int inputIndex = 0; inputIndex < expectedInputs.Count; inputIndex++)
+            {
+                var expectedInput = (Newtonsoft.Json.Linq.JObject)expectedInputs[inputIndex];
+                var actualInput = expression.InputPorts[inputIndex];
+                if (actualInput.Name != (string)expectedInput["name"] ||
+                    actualInput.DataType.ToString() != (string)expectedInput["type"])
+                    throw new System.Exception("custom expression input changed after reload: " + alias);
+                var manifestInput = new Newtonsoft.Json.Linq.JObject();
+                manifestInput["name"] = actualInput.Name;
+                manifestInput["type"] = actualInput.DataType.ToString();
+                manifestInputs.Add(manifestInput);
+            }
+            manifestNode["inputs"] = manifestInputs;
+        }
+        manifestNodes.Add(manifestNode);
+    }
+
+    var manifestConnections = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
+    {
+        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
+        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
+        string sourceAlias = (string)sourceSpec["node"];
+        string destinationAlias = (string)destinationSpec["node"];
+        int sourceNodeId = aliasIds[sourceAlias];
+        int destinationNodeId = destinationAlias == "master" ? masterId : aliasIds[destinationAlias];
+        int sourcePortId = (int)sourceSpec["port"];
+        int destinationPortId = (int)destinationSpec["port"];
+        var destinationPort = graph.GetNode(destinationNodeId).GetInputPortByUniqueId(destinationPortId);
+        if (destinationPort == null || !destinationPort.IsConnectedTo(sourceNodeId, sourcePortId))
+            throw new System.Exception("connection missing after reload");
+        manifestConnections.Add(connectionSpec.DeepClone());
+    }
+
+    string moveError = UnityEditor.AssetDatabase.MoveAsset(temporaryAssetPath, assetPath);
+    if (!string.IsNullOrEmpty(moveError)) throw new System.Exception("asset commit failed: " + moveError);
+    committed = true;
+    UnityEditor.AssetDatabase.Refresh();
+    var targetLoadResult = win.LoadFromDisk(assetPath, null);
+    if (targetLoadResult != AmplifyShaderEditor.ShaderLoadResult.LOADED &&
+        targetLoadResult != AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED)
+        throw new System.Exception("ASE target LoadFromDisk failed: " + targetLoadResult);
+    var targetMaster = win.CurrentGraph.CurrentMasterNode as AmplifyShaderEditor.TemplateMultiPassMasterNode;
+    var targetShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(assetPath);
+    if (targetMaster == null || targetMaster.CurrentTemplate == null || targetShader == null ||
+        targetMaster.CurrentTemplate.GUID != templateGuid ||
+        targetMaster.ShaderName != shaderName || targetShader.name != shaderName)
+        throw new System.Exception("template or shader identity changed after target reload");
+
+    var result = new Newtonsoft.Json.Linq.JObject();
+    result["protocol"] = "ASECLI_EDITOR_CREATE_V1";
+    result["ase_version"] = aseVersion;
+    result["asset_path"] = assetPath;
+    result["template_guid"] = targetMaster.CurrentTemplate.GUID;
+    result["shader_name"] = targetShader.name;
+    result["saved"] = saved;
+    result["reloaded"] = reloaded;
+    result["committed"] = committed;
+    var manifest = new Newtonsoft.Json.Linq.JObject();
+    var manifestTemplate = new Newtonsoft.Json.Linq.JObject();
+    manifestTemplate["guid"] = targetMaster.CurrentTemplate.GUID;
+    manifestTemplate["shader_name"] = targetShader.name;
+    manifest["template"] = manifestTemplate;
+    manifest["nodes"] = manifestNodes;
+    manifest["connections"] = manifestConnections;
+    result["manifest"] = manifest;
+
+    UnityEditor.Selection.activeObject = previousSelection;
+    AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+    stateRestored = true;
+    if (win != null && win != previousWindow)
+    {
+        var createdWindow = win;
+        createdWindow.Close();
+        UnityEngine.Object.DestroyImmediate(createdWindow);
+        win = null;
+    }
+    success = true;
+    return "ASECLI_EDITOR_CREATE_V1:" + result.ToString(Newtonsoft.Json.Formatting.None);
+}
+catch (System.Exception ex)
+{
+    failure = ex;
+    throw;
+}
+finally
+{
+    var cleanupErrors = new System.Collections.Generic.List<string>();
+    if (win == null && AmplifyShaderEditor.UIUtils.CurrentWindow != previousWindow)
+        win = AmplifyShaderEditor.UIUtils.CurrentWindow as AmplifyShaderEditor.AmplifyShaderEditorWindow;
+    if (!success)
+    {
+        try
+        {
+            if (committed && !UnityEditor.AssetDatabase.DeleteAsset(assetPath) &&
+                System.IO.File.Exists(System.IO.Path.GetFullPath(assetPath)))
+                cleanupErrors.Add("failed to roll back committed target asset");
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("target rollback threw: " + cleanupEx.Message);
+        }
+        try
+        {
+            if (!UnityEditor.AssetDatabase.DeleteAsset(temporaryAssetPath) &&
+                System.IO.File.Exists(System.IO.Path.GetFullPath(temporaryAssetPath)))
+                cleanupErrors.Add("failed to delete temporary asset");
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("temporary cleanup threw: " + cleanupEx.Message);
+        }
+        try { UnityEditor.AssetDatabase.Refresh(); }
+        catch (System.Exception cleanupEx) { cleanupErrors.Add("AssetDatabase.Refresh threw: " + cleanupEx.Message); }
+    }
+    if (!stateRestored)
+    {
+        try
+        {
+            UnityEditor.Selection.activeObject = previousSelection;
+            AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+            stateRestored = true;
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("Editor state restore threw: " + cleanupEx.Message);
+        }
+    }
+    if (win != null && win != previousWindow)
+    {
+        try
+        {
+            win.Close();
+            UnityEngine.Object.DestroyImmediate(win);
+            win = null;
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("window cleanup threw: " + cleanupEx.Message);
+        }
+    }
+    if (cleanupErrors.Count > 0)
+    {
+        string cleanupMessage = string.Join(" | ", cleanupErrors.ToArray());
+        if (failure != null)
+        {
+            failure.Data["ASECLI cleanup failures"] = cleanupMessage;
+            UnityEngine.Debug.LogError("ASECLI Editor create cleanup failures: " + cleanupMessage);
+        }
+        else
+        {
+            throw new System.Exception("ASECLI Editor create cleanup failed: " + cleanupMessage);
+        }
+    }
+}

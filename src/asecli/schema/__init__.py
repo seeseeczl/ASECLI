@@ -27,4 +27,23 @@ def is_known(node_type: str) -> bool:
 def allows_mutation(node_type: str) -> bool:
     """Runtime types: full structured mutation. Observed types: full-line replace only."""
     s = schema_for(node_type)
-    return s is not None and s.get("source") == "runtime"
+    return (
+        s is not None
+        and s.get("source") == "runtime"
+        and s.get("layout_ok") is True
+    )
+
+
+def schema_version(node_type: str) -> str | None:
+    """Return the normalized ASE version for a runtime schema."""
+    schema = schema_for(node_type)
+    value = schema.get("ase_version") if schema else None
+    if not isinstance(value, str) or not value:
+        return None
+    return value.removeprefix("Version=")
+
+
+def is_version_compatible(node_type: str, graph_version: str) -> bool:
+    """Only exact runtime schema versions are proven safe for structured writes."""
+    version = schema_version(node_type)
+    return version is not None and version == graph_version.removeprefix("Version=")

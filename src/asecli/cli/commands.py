@@ -2,25 +2,33 @@
 
 from __future__ import annotations
 
-import json
-import re
-from pathlib import Path
+import os
 
 from ..bridge import McpError
 from ..bridge import recompile_via_mcp
-from ..checks import compute_checksum, fix_checksum, validate_file, verify_checksum
+from ..checks import (
+    ChecksumFormatError,
+    fix_checksum,
+    validate_file,
+    verify_checksum,
+)
 from ..core import (
     AseFile,
     NodeLine,
-    _parse_node_line,
     connect,
     disconnect,
     node_from_schema,
-    remove_node,
+    parse_node_line,
     set_node_field,
     tidy,
 )
-from ..schema import allows_mutation, schema_for
+from ..schema import allows_mutation, is_version_compatible, schema_for, schema_version
+from .io import (
+    UnsafeWritePathError,
+    WriteConflictError,
+    atomic_write,
+    read_text_snapshot,
+)
 
 EXIT_OK = 0
 EXIT_ERROR = 2
@@ -28,9 +36,10 @@ EXIT_BRIDGE = 3
 
 
 class CliError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, data: dict | None = None):
         super().__init__(message)
         self.code = code
+        self.data = data
 
 
 def _load(path: str) -> AseFile:
@@ -43,23 +52,37 @@ def _load(path: str) -> AseFile:
 
 
 def _save(ase_file: AseFile, path: str, write: bool) -> dict:
+    issues = validate_file(ase_file)
+    errors = [issue for issue in issues if issue["severity"] == "error"]
+    if errors:
+        raise CliError(
+            "VALIDATION_ERROR",
+            f"mutation would leave {len(errors)} structural error(s)",
+            {"issues": issues, "error_count": len(errors)},
+        )
     if not write:
         return {"written": False, "preview_bytes": len(ase_file.serialize())}
-    atomic_write(path, ase_file.serialize())
+    _commit_text(path, ase_file.serialize(), ase_file.source_digest)
     return {"written": True, "path": str(path)}
 
 
-def atomic_write(path: str, text: str) -> None:
-    """Atomic write with .bak backup of previous content (AA-OPS-004)."""
-    import os
-
-    target = Path(path)
-    if target.exists():
-        backup = target.with_suffix(target.suffix + ".bak")
-        backup.write_bytes(target.read_bytes())
-    tmp = target.with_suffix(target.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8", newline="")
-    os.replace(tmp, target)
+def _commit_text(path: str, text: str, expected_digest: str | None) -> None:
+    try:
+        atomic_write(path, text, expected_digest=expected_digest)
+    except WriteConflictError as exc:
+        raise CliError(
+            "WRITE_CONFLICT",
+            str(exc),
+            {
+                "path": str(exc.path),
+                "expected": exc.expected[:12] if exc.expected else None,
+                "actual": exc.actual[:12] if exc.actual else None,
+            },
+        ) from exc
+    except UnsafeWritePathError as exc:
+        raise CliError("UNSAFE_PATH", str(exc)) from exc
+    except OSError as exc:
+        raise CliError("WRITE_ERROR", str(exc)) from exc
 
 
 def _parse_endpoint(ep: str) -> tuple[str, str]:
@@ -87,6 +110,8 @@ def cmd_set_field(args) -> dict:
         node = set_node_field(f.graph, args.node, args.field, args.value)
     except (KeyError, IndexError) as e:
         raise CliError("NOT_FOUND", str(e))
+    except ValueError as e:
+        raise CliError("USAGE_ERROR", str(e))
     saved = _save(f, args.file, args.write)
     return {"node": node.node_id, "field": args.field, "value": args.value, **saved}
 
@@ -94,7 +119,7 @@ def cmd_set_field(args) -> dict:
 def cmd_add_node(args) -> dict:
     f = _load(args.file)
     if args.line is not None:
-        _parse_node_line(args.line)
+        parse_node_line(args.line)
         fields = args.line.split(";")
         node = NodeLine(type_name=fields[1], node_id=fields[2], raw_fields=fields)
     else:
@@ -105,8 +130,16 @@ def cmd_add_node(args) -> dict:
             raise CliError("SCHEMA_UNAVAILABLE", f"unknown node type: {args.type} (use --line to insert raw)")
         if not allows_mutation(args.type):
             raise CliError("SCHEMA_UNAVAILABLE", f"{args.type} has opaque layout; use --line with a real serialized line")
+        if not is_version_compatible(args.type, f.graph.version):
+            raise CliError(
+                "SCHEMA_VERSION_MISMATCH",
+                f"node schema version {schema_version(args.type)} is not compatible with graph version {f.graph.version}",
+            )
         node = node_from_schema(f.graph, s, args.id, args.pos, args.type)
-    f.graph.add_node(node)
+    try:
+        f.graph.add_node(node)
+    except ValueError as e:
+        raise CliError("VALIDATION_ERROR", str(e))
     saved = _save(f, args.file, args.write)
     import re as _re
 
@@ -127,6 +160,8 @@ def cmd_connect(args) -> dict:
         wire = connect(f.graph, src, sport, dst, dport)
     except KeyError as e:
         raise CliError("NOT_FOUND", str(e))
+    except ValueError as e:
+        raise CliError("USAGE_ERROR", str(e))
     saved = _save(f, args.file, args.write)
     return {"from": args.src, "to": args.dst, "line": wire.to_line(), **saved}
 
@@ -141,76 +176,61 @@ def cmd_disconnect(args) -> dict:
     return {"removed": True, **saved}
 
 
-def cmd_remove_node(args) -> dict:
-    f = _load(args.file)
-    try:
-        wires = remove_node(f.graph, args.node)
-    except KeyError as e:
-        raise CliError("NOT_FOUND", str(e))
-    saved = _save(f, args.file, args.write)
-    return {"removed_node": args.node, "removed_wires": wires, **saved}
-
-
 def cmd_validate(args) -> dict:
     f = _load(args.file)
     issues = validate_file(f)
-    return {
+    data = {
         "file": args.file,
         "issues": issues,
         "error_count": sum(1 for i in issues if i["severity"] == "error"),
     }
+    if data["error_count"]:
+        raise CliError(
+            "VALIDATION_ERROR",
+            f"graph contains {data['error_count']} structural error(s)",
+            data,
+        )
+    return data
 
 
 def cmd_fix_checksum(args) -> dict:
-    path = Path(args.file)
     try:
-        text = path.read_text(encoding="utf-8")
+        text, source_digest = read_text_snapshot(args.file)
     except FileNotFoundError:
         raise CliError("NOT_FOUND", f"file not found: {args.file}")
-    ok, stored, actual = verify_checksum(text)
-    fixed = fix_checksum(text)
-    atomic_write(args.file, fixed)
-    return {"was_valid": ok, "stored": stored, "fixed_to": actual, "written": True}
+    except UnsafeWritePathError as exc:
+        raise CliError("UNSAFE_PATH", str(exc)) from exc
+    try:
+        ok, stored, actual = verify_checksum(text)
+        fixed = fix_checksum(text)
+    except ChecksumFormatError as exc:
+        raise CliError("CHECKSUM_FORMAT_ERROR", str(exc)) from exc
+    if args.write:
+        _commit_text(args.file, fixed, source_digest)
+    return {"was_valid": ok, "stored": stored, "fixed_to": actual, "written": bool(args.write)}
 
 
 def cmd_layout(args) -> dict:
     f = _load(args.file)
-    moved = tidy(f.graph, gap_x=args.gap_x, gap_y=args.gap_y)
+    try:
+        moved = tidy(f.graph, gap_x=args.gap_x, gap_y=args.gap_y)
+    except ValueError as exc:
+        raise CliError("LAYOUT_ERROR", str(exc)) from exc
     saved = _save(f, args.file, args.write)
     return {"moved": moved, **saved}
 
 
-def cmd_create(args) -> dict:
-    f = _load(args.from_template)
-    text = f.serialize()
-    if args.name:
-        m = re.search(r'Shader "([^"]+)"', text)
-        if not m:
-            raise CliError("USAGE_ERROR", 'template has no Shader "..." declaration to rename')
-        if ";" in args.name:
-            raise CliError("USAGE_ERROR", "shader name must not contain ';'")
-        text = text.replace(f'Shader "{m.group(1)}"', f'Shader "{args.name}"', 1)
-        old = m.group(1)
-        if old != args.name:
-            # AA-COR-003: also rename delimited occurrences inside the graph data
-            text = text.replace(f";{old};", f";{args.name};")
-    if args.graph_from:
-        donor = _load(args.graph_from)
-        begin = text.index("/*ASEBEGIN")
-        end = text.index("ASEEND*/", begin)
-        text = text[:begin] + donor.prefix.lstrip("\n") + donor.graph.serialize() + text[end:]
-    chk = text.find("//CHKSM=")
-    if chk >= 0:
-        text = text[:chk] + "//CHKSM=" + compute_checksum(text[:chk])
-    if Path(args.out).exists() and not args.force:
-        raise CliError("USAGE_ERROR", f"{args.out} exists (use --force)")
-    atomic_write(args.out, text)
-    return {"created": args.out, "name": args.name, "graph_from": args.graph_from}
-
-
 def cmd_recompile(args) -> dict:
+    if args.instance_token_argv is not None:
+        raise CliError("USAGE_ERROR", "do not pass MCP tokens via argv; use ASECLI_MCP_INSTANCE_TOKEN")
+    instance_token = os.environ.get("ASECLI_MCP_INSTANCE_TOKEN")
     try:
-        return recompile_via_mcp(args.file, mcp_url=args.mcp_url, instance_token=args.instance_token)
+        return recompile_via_mcp(
+            args.file,
+            mcp_url=args.mcp_url,
+            instance_token=instance_token,
+            allow_remote_mcp=args.allow_remote_mcp,
+        )
     except McpError as e:
         raise CliError("BRIDGE_ERROR", str(e))
     except FileNotFoundError as e:

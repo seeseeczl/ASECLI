@@ -11,6 +11,8 @@
 2. 缺陷修复先在回归目录登记会失败的 REG-*，再最小修复。
 3. 公开 CLI 契约（命令名、JSON 输出结构、错误码）变更必须走 CR 并更新 MOD-CLI 契约段。
 4. 每次提交前本地门禁：`uv run pytest -q` 必须全绿。
+5. CI 运行 Python 3.10/3.12、frozen lock、pytest、治理检查与 REG collect；第三方 Actions 必须固定到 40 位 commit SHA。
+6. artifact job 两次构建并 `cmp`，上传 wheel/sdist/SHA256SUMS/SPDX/供应链结果；禁止自动发布。
 
 ## 完成定义
 
@@ -22,3 +24,4 @@
 
 - 里程碑完成时运行架构校验脚本与快速审计。
 - 发布前必须有一次 AUD 报告（S0/S1 清零）。
+- 本地 REL draft 不能替代真实 CI/Release。只有 push 后的 run、可下载 artifact/hash 与回滚观察完成，才允许进入 released。

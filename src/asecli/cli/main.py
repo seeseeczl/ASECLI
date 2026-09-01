@@ -4,26 +4,38 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .commands import EXIT_BRIDGE, EXIT_ERROR, EXIT_OK, CliError
 from .commands import (
     cmd_add_node,
     cmd_connect,
-    cmd_create,
     cmd_disconnect,
     cmd_fix_checksum,
     cmd_layout,
     cmd_parse,
     cmd_recompile,
-    cmd_remove_node,
     cmd_set_field,
     cmd_validate,
 )
+from .create_command import cmd_create
+from .custom_gui_command import cmd_custom_gui
+from .gui_support_command import cmd_gui_support
+from .commentary_command import cmd_comment_group
+from .usage_command import cmd_graph_audit, cmd_remove_node
+
+
+class JsonArgumentParser(argparse.ArgumentParser):
+    """Keep argparse diagnostics on stderr while routing failures through JSON."""
+
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        raise CliError("USAGE_ERROR", message)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="asecli", description="Agent-native CLI for Amplify Shader Editor assets")
+    p = JsonArgumentParser(prog="asecli", description="Agent-native CLI for Amplify Shader Editor assets")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("parse", help="parse ASE file and print graph summary")
@@ -64,8 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("remove-node", help="remove node and attached wires")
     s.add_argument("file")
     s.add_argument("--node", required=True)
+    s.add_argument("--force-external", action="store_true", help="allow removal despite external source references")
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_remove_node)
+
+    s = sub.add_parser("graph-audit", help="find output-dead nodes and distinguish external property consumers")
+    s.add_argument("file")
+    s.set_defaults(func=cmd_graph_audit)
 
     s = sub.add_parser("validate", help="validate graph structure")
     s.add_argument("file")
@@ -73,6 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("fix-checksum", help="recompute //CHKSM")
     s.add_argument("file")
+    s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_fix_checksum)
 
     s = sub.add_parser("layout", help="auto-arrange node positions (tidy)")
@@ -82,33 +100,98 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_layout)
 
+    s = sub.add_parser("custom-gui", help="inspect or edit CustomEditor and MZGUI property metadata")
+    s.add_argument("file")
+    target = s.add_mutually_exclusive_group()
+    target.add_argument("--node", help="PropertyNode id for tooltip/group/help-box operations")
+    target.add_argument("--property", help="exact ShaderLab property name, for example _PaintColor")
+    s.add_argument("--spec", help="JSON file for atomic property ordering/group/help operations")
+    editor = s.add_mutually_exclusive_group()
+    editor.add_argument("--editor", help="namespace-qualified ShaderGUI class")
+    editor.add_argument("--clear-editor", action="store_true")
+    group = s.add_mutually_exclusive_group()
+    group.add_argument("--group", help="set FoldoutMzgui group title")
+    group.add_argument("--clear-group", action="store_true")
+    tooltip = s.add_mutually_exclusive_group()
+    tooltip.add_argument("--tooltip", help="set TooltipMzgui text")
+    tooltip.add_argument("--clear-tooltip", action="store_true")
+    help_box = s.add_mutually_exclusive_group()
+    help_box.add_argument("--help-box", help="set HelpBoxMzgui message")
+    help_box.add_argument("--clear-help-box", action="store_true")
+    s.add_argument("--add-attribute", action="append", help="expert: add/replace a native [*Mzgui(...)] value")
+    s.add_argument("--remove-attribute", action="append", help="expert: remove a native MZGUI attribute type")
+    s.add_argument("--write", action="store_true")
+    s.set_defaults(func=cmd_custom_gui)
+
+    s = sub.add_parser("gui-support", help="detect or install Foldout/Tooltip/HelpBox material GUI support")
+    s.add_argument("project", help="Unity/Tuanjie project root containing Assets and ProjectSettings")
+    s.add_argument("--write", action="store_true", help="install the built-in compatibility layer when needed")
+    s.set_defaults(func=cmd_gui_support)
+
+    s = sub.add_parser("comment-group", help="inspect or create native ASE Comment frames")
+    s.add_argument("file")
+    s.add_argument("--fit", action="store_true", help="resize all existing frames using live ASE node bounds")
+    s.add_argument(
+        "--check-bounds",
+        action="store_true",
+        help="report members outside frames and unrelated Comment-frame overlaps",
+    )
+    s.add_argument("--editor-bounds", action="store_true", help="use live ASE bounds when creating a frame")
+    s.add_argument("--nodes", help="comma-separated member node ids; Comment ids enable nesting")
+    s.add_argument("--title", help="large functional or causal heading above the frame")
+    s.add_argument("--note", help="small text in the Comment header; defaults to Comment")
+    s.add_argument("--padding", type=float, help="frame padding in canvas units; defaults to 50")
+    s.add_argument("--id", type=int, help="explicit Comment node id; defaults to the next free id")
+    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    s.add_argument("--allow-remote-mcp", action="store_true")
+    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    s.add_argument("--write", action="store_true")
+    s.set_defaults(func=cmd_comment_group)
+
     s = sub.add_parser("create", help="create new shader from a compiled template shell")
     s.add_argument("out")
-    s.add_argument("--from", dest="from_template", required=True)
+    s.add_argument("--from", dest="from_template")
     s.add_argument("--name")
     s.add_argument("--graph-from", help="donor ASE file whose graph is injected")
+    s.add_argument("--backend", choices=("text", "editor", "auto"), default="text")
+    s.add_argument("--spec", help="strict EditorGraphSpec v1 JSON (editor/auto backend)")
+    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    s.add_argument("--allow-remote-mcp", action="store_true")
+    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
     s.add_argument("--force", action="store_true")
     s.set_defaults(func=cmd_create)
 
     s = sub.add_parser("recompile", help="trigger ASE regeneration inside running editor (MCP)")
     s.add_argument("file")
     s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument("--instance-token", default=None)
+    s.add_argument("--allow-remote-mcp", action="store_true")
+    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
     s.set_defaults(func=cmd_recompile)
     return p
 
 
 def app(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
     try:
+        args = parser.parse_args(argv)
         data = args.func(args)
     except CliError as e:
-        json.dump({"ok": False, "error": {"code": e.code, "message": str(e)}}, sys.stdout, ensure_ascii=False)
+        message = str(e)
+        token = os.environ.get("ASECLI_MCP_INSTANCE_TOKEN")
+        if token:
+            message = message.replace(token, "<redacted>")
+        payload = {"ok": False, "error": {"code": e.code, "message": message}}
+        if e.data is not None:
+            payload["data"] = e.data
+        json.dump(payload, sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")
         return EXIT_BRIDGE if e.code == "BRIDGE_ERROR" else EXIT_ERROR
     except Exception as e:  # noqa: BLE001
-        json.dump({"ok": False, "error": {"code": "INTERNAL", "message": f"{type(e).__name__}: {e}"}}, sys.stdout, ensure_ascii=False)
+        message = f"{type(e).__name__}: {e}"
+        token = os.environ.get("ASECLI_MCP_INSTANCE_TOKEN")
+        if token:
+            message = message.replace(token, "<redacted>")
+        json.dump({"ok": False, "error": {"code": "INTERNAL", "message": message}}, sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")
         return EXIT_ERROR
     json.dump({"ok": True, "data": data}, sys.stdout, ensure_ascii=False)

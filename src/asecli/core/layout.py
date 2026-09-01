@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from .commentary import COMMENTARY_TYPE, inspect_comment_groups
+from .local_vars import local_var_edges
 from .model import AseGraph, NodeLine
 
 MASTER_TYPES = {
@@ -25,18 +27,33 @@ def layout_positions(
 ) -> dict[str, tuple[float, float]]:
     """Compute tidy left-to-right positions. Deterministic for a given graph."""
     nodes = graph.nodes
-    ids = [n.node_id for n in nodes]
+    frozen = _commentary_composite_nodes(graph)
+    movable_nodes = [node for node in nodes if node.node_id not in frozen]
+    ids = [n.node_id for n in movable_nodes]
     id_set = set(ids)
+
+    if frozen and movable_nodes:
+        max_right = max(_node_right_edge(node, graph) for node in nodes if node.node_id in frozen)
+        origin_x = max(origin_x, max_right + gap_x)
 
     # edges: out node feeds in node
     out_edges: dict[str, list[str]] = defaultdict(list)
     in_degree: dict[str, int] = {i: 0 for i in ids}
-    for w in graph.wires:
-        if w.out_node in id_set and w.in_node in id_set and w.out_node != w.in_node:
-            out_edges[w.out_node].append(w.in_node)
-            in_degree[w.in_node] += 1
+    edge_pairs = {
+        (w.out_node, w.in_node)
+        for w in graph.wires
+        if w.out_node in id_set and w.in_node in id_set and w.out_node != w.in_node
+    }
+    edge_pairs.update(
+        (source, target)
+        for source, target in local_var_edges(graph)
+        if source in id_set and target in id_set and source != target
+    )
+    for source, target in sorted(edge_pairs):
+        out_edges[source].append(target)
+        in_degree[target] += 1
 
-    masters = {n.node_id for n in nodes if n.type_name in MASTER_TYPES}
+    masters = {n.node_id for n in movable_nodes if n.type_name in MASTER_TYPES}
     non_master = [i for i in ids if i not in masters]
 
     # Kahn topological order with cycle tolerance
@@ -76,7 +93,7 @@ def layout_positions(
 
     # barycenter ordering within layers (two passes), deterministic
     by_layer: dict[int, list[str]] = defaultdict(list)
-    for n in nodes:  # instruction order = stable initial order
+    for n in movable_nodes:  # instruction order = stable initial order
         by_layer[layer[n.node_id]].append(n.node_id)
     preds_of: dict[str, list[str]] = defaultdict(list)
     for src, outs in out_edges.items():
@@ -105,6 +122,9 @@ def layout_positions(
             x = origin_x + l * gap_x
             y = origin_y + (row - (rows - 1) / 2.0) * gap_y
             positions[nid] = (round(x, 1), round(y, 1))
+    for node in nodes:
+        if node.node_id in frozen:
+            positions[node.node_id] = _position(node)
     return positions
 
 
@@ -114,6 +134,8 @@ def apply_positions(graph: AseGraph, positions: dict[str, tuple[float, float]]) 
     for n in graph.nodes:
         pos = positions.get(n.node_id)
         if pos is None:
+            continue
+        if _position(n) == pos:
             continue
         new_xy = f"{pos[0]},{pos[1]}"
         if n.raw_fields[3] != new_xy:
@@ -125,3 +147,28 @@ def apply_positions(graph: AseGraph, positions: dict[str, tuple[float, float]]) 
 
 def tidy(graph: AseGraph, gap_x: float = 280.0, gap_y: float = 120.0) -> int:
     return apply_positions(graph, layout_positions(graph, gap_x, gap_y))
+
+
+def _commentary_composite_nodes(graph: AseGraph) -> set[str]:
+    """Keep curated Comment frames and every member as fixed composite units."""
+    frozen = set()
+    for group in inspect_comment_groups(graph):
+        frozen.add(group["node_id"])
+        frozen.update(group["members"])
+    return frozen
+
+
+def _position(node: NodeLine) -> tuple[float, float]:
+    try:
+        x, y = node.raw_fields[3].split(",")
+        return float(x), float(y)
+    except (IndexError, ValueError) as exc:
+        raise ValueError(f"node {node.node_id} has invalid x,y position") from exc
+
+
+def _node_right_edge(node: NodeLine, graph: AseGraph) -> float:
+    x, _ = _position(node)
+    if node.type_name == COMMENTARY_TYPE:
+        group = next(item for item in inspect_comment_groups(graph) if item["node_id"] == node.node_id)
+        return x + group["width"]
+    return x + 200.0

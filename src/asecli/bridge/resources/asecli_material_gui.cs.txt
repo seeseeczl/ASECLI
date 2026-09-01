@@ -1,0 +1,370 @@
+// ASECLI clean-room material GUI compatibility layer.
+// Implements only the public FoldoutMzgui, TooltipMzgui, and HelpBoxMzgui
+// attribute behavior needed by ASECLI-generated shaders. It contains no MZGUI source.
+
+#if UNITY_EDITOR
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEngine;
+
+namespace ASECLI.MaterialGUI
+{
+    internal interface IASECLIMetadataDecorator
+    {
+        string MetadataType { get; }
+        string MetadataValue { get; }
+    }
+
+    // These zero-height decorators let Unity retain its normal property/drawer path
+    // while ASECLIMaterialGUI interprets their metadata at the ShaderGUI layer.
+    public sealed class FoldoutMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "FoldoutMzgui"; } }
+        public string MetadataValue { get; private set; }
+        public FoldoutMzguiDecorator() : this(String.Empty) { }
+        public FoldoutMzguiDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class TooltipMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "TooltipMzgui"; } }
+        public string MetadataValue { get; private set; }
+        public TooltipMzguiDecorator() : this(String.Empty) { }
+        public TooltipMzguiDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class HelpBoxMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "HelpBoxMzgui"; } }
+        public string MetadataValue { get; private set; }
+        public HelpBoxMzguiDecorator() : this(String.Empty) { }
+        public HelpBoxMzguiDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class ASECLIMaterialGUI : ShaderGUI
+    {
+        private sealed class PropertyMetadata
+        {
+            public string Foldout = String.Empty;
+            public string Tooltip = String.Empty;
+            public string Help = String.Empty;
+        }
+
+        private static readonly Regex CustomUnicodePattern =
+            new Regex("#([0-9A-Fa-f]{4})", RegexOptions.Compiled);
+        private static bool metadataWarningLogged;
+
+        private readonly Dictionary<string, bool> foldoutStates =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
+        private Shader cachedShader;
+        private Hash128 cachedDependencyHash;
+        private bool hasCachedDependencyHash;
+        private Dictionary<string, PropertyMetadata> cachedMetadata;
+        private Dictionary<string, string> cachedDefaultValues;
+
+        public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
+        {
+            Material material = materialEditor != null ? materialEditor.target as Material : null;
+            Shader shader = material != null ? material.shader : null;
+            if (materialEditor == null || shader == null || properties == null)
+            {
+                base.OnGUI(materialEditor, properties);
+                return;
+            }
+
+            EnsureCache(shader);
+            bool insideFoldout = false;
+            bool currentFoldoutOpen = true;
+
+            foreach (MaterialProperty property in properties)
+            {
+                PropertyMetadata metadata;
+                if (!cachedMetadata.TryGetValue(property.name, out metadata))
+                    metadata = new PropertyMetadata();
+
+                if (!String.IsNullOrEmpty(metadata.Foldout))
+                {
+                    insideFoldout = true;
+                    currentFoldoutOpen = DrawFoldout(shader, property, metadata.Foldout);
+                }
+
+                if (insideFoldout && !currentFoldoutOpen)
+                    continue;
+                if ((property.flags & MaterialProperty.PropFlags.HideInInspector) != 0)
+                    continue;
+
+                string defaultValue;
+                if (!cachedDefaultValues.TryGetValue(property.name, out defaultValue))
+                    defaultValue = "Unknown";
+                GUIContent label = new GUIContent(
+                    property.displayName,
+                    BuildTooltip(metadata.Tooltip, property.name, defaultValue)
+                );
+                float height = materialEditor.GetPropertyHeight(property, label.text);
+                Rect position = EditorGUILayout.GetControlRect(true, height);
+                materialEditor.ShaderProperty(position, property, label);
+
+                if (!String.IsNullOrEmpty(metadata.Help))
+                    EditorGUILayout.HelpBox(metadata.Help, MessageType.Info);
+            }
+
+            EditorGUILayout.Space();
+            materialEditor.RenderQueueField();
+            materialEditor.EnableInstancingField();
+            materialEditor.DoubleSidedGIField();
+        }
+
+        private bool DrawFoldout(Shader shader, MaterialProperty property, string title)
+        {
+            string key = shader.name + "\n" + property.name;
+            bool state;
+            if (!foldoutStates.TryGetValue(key, out state))
+                state = true;
+#if UNITY_2019_3_OR_NEWER
+            state = EditorGUILayout.Foldout(state, title, true, EditorStyles.foldoutHeader);
+#else
+            state = EditorGUILayout.Foldout(state, title, true);
+#endif
+            foldoutStates[key] = state;
+            return state;
+        }
+
+        private void EnsureCache(Shader shader)
+        {
+            string assetPath = AssetDatabase.GetAssetPath(shader);
+            bool hasDependencyHash = !String.IsNullOrEmpty(assetPath);
+            Hash128 dependencyHash = hasDependencyHash
+                ? AssetDatabase.GetAssetDependencyHash(assetPath)
+                : default(Hash128);
+            bool cacheIsCurrent = cachedShader == shader &&
+                cachedMetadata != null && cachedDefaultValues != null &&
+                (!hasDependencyHash || (hasCachedDependencyHash && dependencyHash == cachedDependencyHash));
+            if (cacheIsCurrent)
+                return;
+            cachedShader = shader;
+            cachedDependencyHash = dependencyHash;
+            hasCachedDependencyHash = hasDependencyHash;
+            cachedMetadata = ReadMetadata(shader);
+            cachedDefaultValues = ReadDefaultValues(shader);
+        }
+
+        private static Dictionary<string, PropertyMetadata> ReadMetadata(Shader shader)
+        {
+            Dictionary<string, PropertyMetadata> result =
+                new Dictionary<string, PropertyMetadata>(StringComparer.Ordinal);
+            try
+            {
+                MethodInfo countMethod = FindShaderUtilMethod("GetPropertyCount", typeof(Shader));
+                if (countMethod == null)
+                    countMethod = FindShaderUtilMethod("GetShaderPropertyCount", typeof(Shader));
+                MethodInfo nameMethod = FindShaderUtilMethod("GetPropertyName", typeof(Shader), typeof(int));
+                MethodInfo attributesMethod = FindShaderUtilMethod(
+                    "GetShaderPropertyAttributes", typeof(Shader), typeof(int));
+                Type handlerType = typeof(MaterialEditor).Assembly.GetType("UnityEditor.MaterialPropertyHandler");
+                MethodInfo handlerMethod = handlerType != null
+                    ? handlerType.GetMethod(
+                        "GetHandler",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                        null,
+                        new[] { typeof(Shader), typeof(string) },
+                        null
+                    )
+                    : null;
+                FieldInfo decoratorsField = handlerType != null
+                    ? handlerType.GetField(
+                        "m_DecoratorDrawers",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+                    )
+                    : null;
+                if (countMethod == null || nameMethod == null ||
+                    (attributesMethod == null && (handlerMethod == null || decoratorsField == null)))
+                    throw new MissingMethodException("ShaderUtil property metadata API is unavailable");
+
+                int count = Convert.ToInt32(countMethod.Invoke(null, new object[] { shader }));
+                for (int index = 0; index < count; index++)
+                {
+                    string name = nameMethod.Invoke(null, new object[] { shader, index }) as string;
+                    if (String.IsNullOrEmpty(name))
+                        continue;
+                    PropertyMetadata metadata = new PropertyMetadata();
+                    if (attributesMethod != null)
+                    {
+                        string[] attributes = attributesMethod.Invoke(
+                            null, new object[] { shader, index }) as string[];
+                        if (attributes != null)
+                        {
+                            foreach (string attribute in attributes)
+                                ApplyAttribute(metadata, attribute);
+                        }
+                    }
+                    else
+                    {
+                        object handler = handlerMethod.Invoke(null, new object[] { shader, name });
+                        IEnumerable decorators = handler != null
+                            ? decoratorsField.GetValue(handler) as IEnumerable
+                            : null;
+                        if (decorators != null)
+                        {
+                            foreach (object drawer in decorators)
+                            {
+                                IASECLIMetadataDecorator decorator = drawer as IASECLIMetadataDecorator;
+                                if (decorator != null)
+                                    ApplyMetadata(metadata, decorator.MetadataType, decorator.MetadataValue);
+                            }
+                        }
+                    }
+                    result[name] = metadata;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (!metadataWarningLogged)
+                {
+                    metadataWarningLogged = true;
+                    Debug.LogWarning("ASECLI Material GUI could not read shader attributes: " + exception.Message);
+                }
+            }
+            return result;
+        }
+
+        private static MethodInfo FindShaderUtilMethod(string name, params Type[] parameterTypes)
+        {
+            return typeof(ShaderUtil).GetMethod(
+                name,
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                null,
+                parameterTypes,
+                null
+            );
+        }
+
+        private static void ApplyAttribute(PropertyMetadata metadata, string rawAttribute)
+        {
+            if (String.IsNullOrEmpty(rawAttribute))
+                return;
+            string value = rawAttribute.Trim();
+            if (value.StartsWith("[", StringComparison.Ordinal) &&
+                value.EndsWith("]", StringComparison.Ordinal))
+                value = value.Substring(1, value.Length - 2).Trim();
+
+            int open = value.IndexOf('(');
+            string typeName = open >= 0 ? value.Substring(0, open).Trim() : value;
+            string arguments = String.Empty;
+            if (open >= 0 && value.EndsWith(")", StringComparison.Ordinal))
+                arguments = value.Substring(open + 1, value.Length - open - 2);
+
+            ApplyMetadata(metadata, typeName, arguments);
+        }
+
+        private static void ApplyMetadata(PropertyMetadata metadata, string typeName, string arguments)
+        {
+            if (String.Equals(typeName, "FoldoutMzgui", StringComparison.OrdinalIgnoreCase))
+                metadata.Foldout = DecodeFoldout(arguments);
+            else if (String.Equals(typeName, "TooltipMzgui", StringComparison.OrdinalIgnoreCase))
+                metadata.Tooltip = AppendLine(metadata.Tooltip, DecodeCustomUnicode(arguments));
+            else if (String.Equals(typeName, "HelpBoxMzgui", StringComparison.OrdinalIgnoreCase))
+                metadata.Help = AppendLine(metadata.Help, DecodeCustomUnicode(arguments));
+        }
+
+        private static string DecodeFoldout(string value)
+        {
+            return CustomUnicodePattern.Replace(
+                value,
+                match => ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString()
+            );
+        }
+
+        private static string DecodeCustomUnicode(string value)
+        {
+            MatchCollection matches = CustomUnicodePattern.Matches(value);
+            if (matches.Count == 0)
+                return value;
+            char[] decoded = new char[matches.Count];
+            for (int index = 0; index < matches.Count; index++)
+                decoded[index] = (char)Convert.ToInt32(matches[index].Groups[1].Value, 16);
+            return new string(decoded);
+        }
+
+        private static string AppendLine(string current, string addition)
+        {
+            if (String.IsNullOrEmpty(addition))
+                return current;
+            return String.IsNullOrEmpty(current) ? addition : current + "\n" + addition;
+        }
+
+        private static Dictionary<string, string> ReadDefaultValues(Shader shader)
+        {
+            Dictionary<string, string> result =
+                new Dictionary<string, string>(StringComparer.Ordinal);
+            Material defaultMaterial = new Material(shader);
+            defaultMaterial.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                MaterialProperty[] defaultProperties = MaterialEditor.GetMaterialProperties(
+                    new UnityEngine.Object[] { defaultMaterial }
+                );
+                foreach (MaterialProperty property in defaultProperties)
+                    result[property.name] = FormatDefaultValue(property);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(defaultMaterial);
+            }
+            return result;
+        }
+
+        private static string FormatDefaultValue(MaterialProperty property)
+        {
+            if (property.type == MaterialProperty.PropType.Color)
+            {
+                Color value = property.colorValue;
+                return Tuple(value.r, value.g, value.b, value.a);
+            }
+            if (property.type == MaterialProperty.PropType.Vector)
+            {
+                Vector4 value = property.vectorValue;
+                return Tuple(value.x, value.y, value.z, value.w);
+            }
+            if (property.type == MaterialProperty.PropType.Texture)
+                return property.textureValue != null ? property.textureValue.name : "None";
+            if (String.Equals(property.type.ToString(), "Int", StringComparison.Ordinal))
+            {
+                PropertyInfo intValueProperty = typeof(MaterialProperty).GetProperty(
+                    "intValue", BindingFlags.Public | BindingFlags.Instance);
+                if (intValueProperty != null)
+                    return Convert.ToInt32(intValueProperty.GetValue(property, null))
+                        .ToString(CultureInfo.InvariantCulture);
+                return Math.Round(property.floatValue).ToString(CultureInfo.InvariantCulture);
+            }
+            return property.floatValue.ToString("G9", CultureInfo.InvariantCulture);
+        }
+
+        private static string Tuple(float x, float y, float z, float w)
+        {
+            return "(" + Number(x) + ", " + Number(y) + ", " + Number(z) + ", " + Number(w) + ")";
+        }
+
+        private static string Number(float value)
+        {
+            return value.ToString("G9", CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildTooltip(string customText, string propertyName, string defaultValue)
+        {
+            string technical = "变量名: " + propertyName + "\n默认值: " + defaultValue;
+            return String.IsNullOrEmpty(customText) ? technical : customText + "\n\n" + technical;
+        }
+    }
+}
+#endif

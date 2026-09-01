@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -16,13 +17,66 @@ class McpError(RuntimeError):
     pass
 
 
+def redact(text: str, *secrets: str | None) -> str:
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "<redacted>")
+    return text
+
+
+def validate_mcp_url(url: str, allow_remote: bool = False) -> str:
+    """Validate the MCP endpoint without resolving or contacting it."""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        host = parsed.hostname
+        parsed.port
+    except ValueError as exc:
+        raise McpError("invalid MCP URL") from exc
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise McpError("MCP URL must use http or https")
+    if parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
+        raise McpError("MCP URL must not contain credentials, query parameters, or fragments")
+    if host.lower() not in {"127.0.0.1", "localhost", "::1"} and not allow_remote:
+        raise McpError("remote MCP URL requires --allow-remote-mcp")
+    return url
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Never forward MCP headers or tokens to a redirect target."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def tool_text(result: dict, *secrets: str | None) -> str:
+    """Return textual MCP tool output, rejecting tool-level error envelopes."""
+    content = result.get("content")
+    texts = []
+    if isinstance(content, list):
+        texts = [item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"]
+    summary = "\n".join(text for text in texts if text).strip()
+    if result.get("isError"):
+        detail = redact(summary[:300] or "no error details", *secrets)
+        raise McpError(f"MCP tool failed: {detail}")
+    if not summary:
+        raise McpError("MCP tool returned no textual result")
+    return summary
+
+
 class McpClient:
-    def __init__(self, url: str, instance_token: str | None = None, timeout: float = 120.0):
-        self.url = url
+    def __init__(
+        self,
+        url: str,
+        instance_token: str | None = None,
+        timeout: float = 120.0,
+        allow_remote: bool = False,
+    ):
+        self.url = validate_mcp_url(url, allow_remote=allow_remote)
         self.instance_token = instance_token
         self.timeout = timeout
         self.session_id: str | None = None
         self._next_id = 0
+        self._opener = urllib.request.build_opener(NoRedirectHandler())
 
     def _post(self, payload: dict) -> dict | None:
         body = json.dumps(payload).encode("utf-8")
@@ -33,16 +87,18 @@ class McpClient:
             headers["X-Unity-Instance-Token"] = self.instance_token
         req = urllib.request.Request(self.url, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with self._opener.open(req, timeout=self.timeout) as resp:
                 sid = resp.headers.get("Mcp-Session-Id")
                 if sid:
                     self.session_id = sid
                 ctype = resp.headers.get("Content-Type", "")
                 raw = resp.read().decode("utf-8")
         except urllib.error.HTTPError as e:
-            raise McpError(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from e
+            detail = redact(e.read().decode("utf-8", "replace")[:300], self.instance_token)
+            raise McpError(f"HTTP {e.code}: {detail}") from e
         except urllib.error.URLError as e:
-            raise McpError(f"cannot reach MCP server at {self.url}: {e.reason}") from e
+            detail = redact(str(e.reason), self.instance_token)
+            raise McpError(f"cannot reach MCP server: {detail}") from e
         if "text/event-stream" in ctype:
             collected: list[dict] = []
             for line in raw.splitlines():
@@ -72,7 +128,8 @@ class McpClient:
         if resp is None:
             raise McpError(f"empty response for {method}")
         if "error" in resp:
-            raise McpError(f"{method}: {resp['error']}")
+            detail = redact(str(resp["error"]), self.instance_token)
+            raise McpError(f"{method}: {detail}")
         return resp
 
     def connect(self) -> dict:
@@ -89,4 +146,6 @@ class McpClient:
 
     def call_tool(self, name: str, arguments: dict) -> dict:
         resp = self._rpc("tools/call", {"name": name, "arguments": arguments})
-        return resp.get("result", {})
+        result = resp.get("result", {})
+        tool_text(result, self.instance_token)
+        return result
