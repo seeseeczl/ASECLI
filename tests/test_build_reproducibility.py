@@ -72,8 +72,9 @@ def test_mismatched_sdist_fails_and_persists_first_member_difference(tmp_path):
 def test_ci_build_outputs_live_outside_checkout_and_backend_is_locked():
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "${{ runner.temp }}/asecli-build-a" in workflow
-    assert "${{ runner.temp }}/asecli-build-b" in workflow
+    assert "ASECLI_BUILD_A=$RUNNER_TEMP/asecli-build-a" in workflow
+    assert "ASECLI_BUILD_B=$RUNNER_TEMP/asecli-build-b" in workflow
+    assert '>> "$GITHUB_ENV"' in workflow
     assert "compare_build_artifacts.py" in workflow
     assert "--no-build-isolation" in workflow
     assert 'requires = ["hatchling==1.32.0"]' in project
