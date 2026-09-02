@@ -2,7 +2,7 @@
 
 ## 目标
 
-每个公开材质属性都应同时服务两类读者：美术人员能直接理解和调节，技术人员能快速确认 Shader 变量与默认状态。Inspector 中从上到下形成清晰的四层信息：语义分组、中文显示名、悬浮技术信息、属性下方帮助说明。
+每个导出材质属性都必须同时服务两类读者：美术人员能直接理解和调节，技术人员能快速确认 Shader 变量与默认状态。前三层由 CLI 的 `asecli.property-presentation.v1` 强制：中文显示名、悬浮技术信息、属性下方中文帮助说明；语义分组按实际需要使用。
 
 ## 四层结构
 
@@ -13,7 +13,7 @@
 - 显示名只承担“这是什么”的职责，不在主标签中堆叠变量名、默认值、单位和长说明。
 - 同类属性使用一致词序和术语，例如统一使用“清漆强度”，不要在同一面板中混用“强度-清漆”“Coat Power”等表达。
 
-创建新 Property 时，通过 EditorGraphSpec 的 `inspector_name` 写入中文显示名。整理已有 Property 时，先用 `asecli custom-gui <file>` 查询 `display_name`；需要修改时使用 ASE Editor 或经过该节点类型 schema 验证的固定字段，不得只改编译后的 ShaderLab `Properties` 文本，否则下次 ASE 重编译会被覆盖。
+创建新 Property 时，通过 EditorGraphSpec v2 的 `inspector_name` 写入中文显示名。整理已有 Property 时，用 `asecli custom-gui <file>` 查询契约，再通过完整 `custom-gui --spec` 的 `display_name` 同步图字段和编译 ShaderLab 标签。
 
 ### 2. 悬浮提示
 
@@ -39,7 +39,7 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
 
 ### 3. 属性下方帮助说明
 
-- 每个需要解释的公开属性使用 `ASECLIHelpBox` 在控件下方提供常驻中文说明。
+- 每个导出属性都使用 `ASECLIHelpBox` 在控件下方提供常驻中文说明。
 - 说明优先回答：控制什么；数值调大/调小时发生什么；贴图各通道表达什么；必要的单位、范围、依赖或性能影响。
 - 颜色、贴图、开关等不适合“调大/调小”的类型，改写为对选择结果、通道或启用条件的说明。
 - 一到两句即可，不复述中文显示名，也不重复 Tooltip 中的变量名和默认值。
@@ -54,7 +54,7 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
 
 ## 批量规范示例
 
-`material-gui.json` 负责顺序、分组、可选 Tooltip 和 HelpBox；当前不负责修改 PropertyNode 的中文显示名或真实默认值。变量名与默认值由 GUI 自动显示，不应在 JSON 中重复：
+`material-gui.json` 负责中文显示名、顺序、分组、可选 Tooltip 和 HelpBox；变量名与默认值由 GUI 自动显示，不应在 JSON 中重复：
 
 ```json
 {
@@ -63,12 +63,14 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
   "properties": [
     {
       "name": "_PaintColor",
+      "display_name": "车漆颜色",
       "group": "固有色",
       "tooltip": "车身基础漆色。",
       "help": "控制车辆基础漆面颜色。Alpha 当前不参与透明度计算。"
     },
     {
       "name": "_CoatStrength",
+      "display_name": "清漆强度",
       "group": "清漆层",
       "help": "控制清漆反射强度；数值越大，表面高光与环境反射越明显。"
     }
@@ -81,7 +83,7 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
 写入后执行：
 
 1. `asecli gui-support <project-root>`：确认 `provider`、`recommended_editor` 与 Shader 的 `CustomEditor` 一致；内置层安装后等待 Editor 脚本重编译。
-2. `asecli custom-gui <file>`：确认每个公开属性的 `display_name`、`property_name`、顺序及三类 ASECLI 属性正确；旧三标记只作为兼容读取信息。
+2. `asecli custom-gui <file>`：确认 `property_presentation.contract=asecli.property-presentation.v1`、`valid=true`、`violations=[]`，并核对每个导出属性；旧三标记只作为兼容读取信息。
 3. `asecli validate <file>`：确认图结构、属性和 CHKSM 无错误。
 4. `asecli recompile <file>`：让 ASE 正式生成 ShaderLab 属性声明。
 5. 在真实材质 Inspector 中检查：中文显示名可读；悬浮时同时看到准确变量名与默认值；帮助说明显示在对应控件下方；Foldout 分组与排序符合调节流程。

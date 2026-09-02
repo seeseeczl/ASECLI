@@ -10,11 +10,11 @@
 6. **安全契约**：MCP URL、token、重定向、tool error、SSE/JSON 请求 ID 一一关联与脱敏使用纯本地 mock；真实 loopback 另行验收。
 7. **性能**：1000 个附加节点、精确 1007 节点、5 轮 parse+layout+serialize+roundtrip；每轮 <1s。
 8. **节点精排**：同阶段 x 严格一致、相邻阶段间距等于 `gap_x`、同列行距等于 `gap_y`、DAG 数据边向右推进、重复分支共用列/行模板、Master 最右；同时保持确定性、连线和非位置字段不变。
-9. **自定义 GUI**：真实 `19109` 仅验证 CustomEditor；ASE 1.9.6.2 图版本 `19602` 验证 ASECLI 三标记、旧三标记读取兼容、触碰迁移与未知未来版本/尾随数字歧义写前拒绝。`gui-support` 覆盖唯一资源的 dry-run、安装/幂等、冲突、符号链接、并发竞争、资源哈希和已存在原生 MZGUI 文件不阻断安装；当团结缺少 `GetShaderPropertyAttributes` 且项目已有同名旧 drawer 时，fallback 必须从 `Assets/` Shader 源文件只读补齐旧标记元数据。真实编译和 Inspector 只使用团结引擎，不以 Unity 2021 结果作为 CR-0010 验收。
-10. **批量材质规范**：属性名/节点 ID 唯一定位；字段 9 排序；未列属性稳定追加；中文 `inspector_name` 可经 EditorGraphSpec 保存；JSON 重复、未知键、错误类型和非 ASECLI 元数据全量失败且零写盘。
+9. **自定义 GUI**：真实 `19109` 仅验证 CustomEditor；ASE 1.9.6.2 图版本 `19602` 验证 ASECLI 三标记、旧三标记读取兼容、触碰迁移与未知未来版本/尾随数字歧义写前拒绝。`gui-support` 覆盖唯一资源的安装安全和 `asecli.inline-help.v1`；`custom-gui` 输出 `asecli.property-presentation.v1` 的逐属性状态。任何已声明 ASECLI GUI 的文件若缺中文显示名、中文说明或一致 Editor，相关写入必须失败，且不能通过清空 Editor 绕过。真实编译和 Inspector 只使用团结引擎，不以 Unity 2021 结果作为当前验收。
+10. **批量材质规范**：属性名/节点 ID 唯一定位；字段 9 排序；未列属性稳定追加；`display_name` 同步已确认的 PropertyNode 字段和编译 Properties；中文显示名与中文 `ASECLIHelpBox` 可在单份 JSON 内原子修复；JSON 重复、未知键、错误类型和非 ASECLI 元数据全量失败且零写盘。
 11. **Comment 分组**：真实 CommentaryNode 行解码；自动边界、嵌套成员树、无关组重叠拒绝与检查、父子完整包含、非法标题/重复归属/缺失节点、dry-run、备份、CHKSM、roundtrip 与 CLI 单行 JSON。
 12. **Local Var 图治理**：Agent 设计审查检查“多处/跨区复用才注册、一个语义 Register/多个就近 Get、同组一次性链路直连、命名唯一明确”；当前以真实参考静态证据与 Skill 契约为准，下一个目标 Shader 任务补实际图验收。
-13. **Editor API 创建**：纯 Python 覆盖 `EditorGraphSpec v1` 白名单、端口方向/类型、属性唯一性、后端路由、参数编码、Shader/模板身份、MCP 结果与失败事务；提交后后验失败及路径替换必须保留目标并返回 nonce/hash。隔离团结工程分别创建 Caster-like 和 Receiver-like 图，关闭后由第二进程重载 manifest。
+13. **Editor API 创建**：底层 v1 继续覆盖白名单、端口、参数编码和已验证的隔离团结结构 E2E；正式 CLI 只接受 EditorGraphSpec v2，并在 MCP 前强制每个 Property/Sampler 的中文 `inspector_name/help`。ASE 暂存 Save/Load 与 manifest 对账后提交，CLI 写入 ASECLI GUI 与说明并执行文件级契约复验；目标图由独立 `recompile` 重载，避免 MCP 插件重连吞掉创建回执。覆盖 MCP 3.4.7 裸文本/`data.result`、`success=false`、固定事务 `safety_checks=false` 和零暂存残留；后验失败保留目标和 `.meta`。真实 Inspector 与新进程重开必须单独记录，不能复用结构 E2E 结论。
 14. **可复现交付**：锁定 build backend，双构建输出位于 checkout 外；比较 wheel/sdist hash，失败报告 gzip header、tar 成员元数据和内容差异，正式 artifact 继续阻塞。
 
 ## 门禁
@@ -41,7 +41,9 @@
 - 本地构建/安装/回滚只证明可复制交付流程；`v0.1.0@fbd9941` 的 GitHub Actions run 33594698477 已完成双 Python、可复现构建、SPDX、供应链与隔离安装。私有正式 Release 的六项资产已下载复验，最终 wheel 的在线依赖漏洞扫描未发现依赖漏洞；PyPI/CLI Hub/公开分发仍未执行。
 - REG-0022 的纯文本读写只证明 ASE 元数据与编译指令正确；材质 Inspector 中折叠、悬停和帮助框的真实视觉/交互效果，必须在写回并重编译后的目标 Tuanjie/Unity 工程单独验收。
 - REG-0030 的 Python 测试证明 ASECLI 安装、冲突保护和资源契约；隔离团结 `2022.3.61t9` 已通过当前 C# 资源编译、三种 ASECLI attribute 实例化、旧标记读取和 Shader 默认值读取（`1 passed`）。同版本当前运行实例还确认了原生同名旧 drawer 冲突、fallback 源读取、新/旧 HelpBox 与标题点击的展开/收起。用户提供的实机截图还确认实际悬停浮层显示变量名 `_BaseColor` 和默认值 `RGBA(1.000, 1.000, 1.000, 1.000)`；桌面自动化不具备独立鼠标停留 API，但不再将 Tooltip 视觉列为未验收。
+- REG-0036 的自动门禁证明固定说明条结构和 CLI 写前失败关闭；最终视觉仍以真实 Inspector 为准。2026-09-02 当前团结 `2022.3.61t9` 已确认 Receiver 材质说明无图标、无原生外框，具备弱背景、左侧强调线和弱化斜体，Console 0 error。
+- REG-0037 的自动门禁证明属性呈现契约可查询、可原子治理且所有 CLI `create` 结果失败关闭；当前 Receiver/Caster 的文件级只读合规可作为现有资产证据。当前团结 `2022.3.61t9` 已完成 EditorGraphSpec v2 创建、独立 recompile 和临时材质 Inspector 验收：中文显示名/说明可见，运行时反射得到 `_AuditMask`/`None` 与 `_AuditStrength`/`0`，用户现场确认两项 Tooltip 气泡正常；随后恢复原选择并精确清理验证资产。新进程重开按用户“仅使用当前实例”的约束未执行，不复用当前实例证据。
 - REG-0023/0024 自动测试证明规范的原子文本行为和原生 Comment 结构，不证明普通节点默认尺寸估计后的视觉边距；目标 ASE 编辑器仍需检查折叠顺序、说明可读性、框边距和连线可读性。
 - REG-0012 自动测试证明精确网格、左到右递进和重复分支模板，不证明真实节点宽高、端口锚点、贝塞尔曲线路径或整体“精排感”；线与线少量交叉是否简洁仍需在真实 ASE 画布验收。
 - CR-0007 当前只证明真实参考中 Register/Get 序列化与复用模式存在，以及 Agent Skill 已固化规则；尚未在用户指定的新目标 Shader 上执行 Local Var 改造，因此不宣称目标图已消除蜘蛛网。
-- REG-0026～0028 的 pytest/mock 不证明 ASE 私有字段或 GUI 生命周期在目标版本可用；REG-0029 已在隔离团结 2022.3.61t9 + ASE 1.9.6.2 完成创建与新进程回读，证明当前白名单结构可编辑。目标工程运行时矩阵、材质绑定、平台编译和画面仍需独立验收。
+- REG-0026～0028 的 pytest/mock 不证明 ASE 私有字段或 GUI 生命周期在目标版本可用；REG-0029 已在隔离团结 2022.3.61t9 + ASE 1.9.6.2 完成 v1 创建与新进程回读，证明当前白名单结构可编辑。它不等于 v2 属性呈现后处理已做真实 Editor 验收；目标工程运行时矩阵、材质绑定、平台编译和画面仍需独立验收。

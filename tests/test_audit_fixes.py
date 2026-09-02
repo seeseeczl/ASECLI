@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from asecli.core import AseFile
-from asecli.checks import verify_checksum
+from asecli.checks import fix_checksum, verify_checksum
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -43,12 +43,15 @@ def test_crlf_parses_without_error():
     assert len(f.graph.nodes) == 10
 
 
-def test_create_renames_graph_data(tmp_path):
+def test_create_renames_graph_data(tmp_path, compliant_shader_path):
     """AA-OPT-003: shader name must not remain in node lines after rename."""
     from asecli.cli.main import app
 
+    source = AseFile.from_path(compliant_shader_path)
+    source_path = tmp_path / "source.shader"
+    source_path.write_text(fix_checksum(source.serialize()), encoding="utf-8")
     out = tmp_path / "renamed.shader"
-    rc = app(["create", str(out), "--from", str(FIXTURES / "HLIT.shader"), "--name", "BrandNew", "--force"])
+    rc = app(["create", str(out), "--from", str(source_path), "--name", "BrandNew", "--force"])
     assert rc == 0
     text = out.read_text(encoding="utf-8")
     assert 'Shader "BrandNew"' in text

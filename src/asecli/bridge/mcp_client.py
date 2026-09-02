@@ -12,6 +12,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from .. import __version__
+
 
 class McpError(RuntimeError):
     pass
@@ -152,7 +154,7 @@ class McpClient:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "asecli", "version": "0.1.0"},
+                "clientInfo": {"name": "asecli", "version": __version__},
             },
         )
         self._rpc("notifications/initialized", {}, notify=True)

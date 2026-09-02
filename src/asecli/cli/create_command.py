@@ -8,7 +8,14 @@ import re
 
 from ..bridge import McpError, SpecError, create_shader_via_mcp, load_editor_graph_spec, route_create_backend
 from ..checks import ChecksumFormatError, fix_checksum, validate_file
-from ..core import AseFile, main_master_node
+from ..core import (
+    ASECLI_GUI_EDITOR,
+    AseFile,
+    apply_material_gui_spec,
+    main_master_node,
+    require_property_presentation,
+    sync_compiled_property_metadata,
+)
 from .commands import CliError, _commit_text, _load
 from .io import UnsafeWritePathError, file_digest
 
@@ -65,6 +72,10 @@ def _cmd_create_text(args, spec) -> dict:
             {"issues": errors, "error_count": len(errors)},
         )
     try:
+        presentation = require_property_presentation(created)
+    except ValueError as exc:
+        raise CliError("PROPERTY_PRESENTATION_ERROR", str(exc)) from exc
+    try:
         output_digest = file_digest(args.out)
     except FileNotFoundError:
         output_digest = None
@@ -73,12 +84,23 @@ def _cmd_create_text(args, spec) -> dict:
     if output_digest is not None and not args.force:
         raise CliError("USAGE_ERROR", f"{args.out} exists (use --force)")
     _commit_text(args.out, text, output_digest)
-    return {"created": args.out, "name": args.name, "graph_from": args.graph_from, "backend": "text"}
+    return {
+        "created": args.out,
+        "name": args.name,
+        "graph_from": args.graph_from,
+        "backend": "text",
+        "property_presentation": presentation,
+    }
 
 
 def _cmd_create_editor(args, spec) -> dict:
     if spec is None:
         raise CliError("USAGE_ERROR", "--spec is required for the editor create backend")
+    if spec.version != 2:
+        raise CliError(
+            "USAGE_ERROR",
+            "CLI Editor creation requires EditorGraphSpec v2 with Chinese inspector_name and help for every property",
+        )
     if args.from_template or args.graph_from or args.name:
         raise CliError("USAGE_ERROR", "--from, --graph-from and --name are text-backend options")
     if args.force:
@@ -121,7 +143,37 @@ def _cmd_create_editor(args, spec) -> dict:
                 **_preserved_editor_asset_details(args.out, result),
             },
         )
-    return {"created": args.out, "backend": "editor", **result}
+    try:
+        presentation_spec = {
+            "editor": ASECLI_GUI_EDITOR,
+            "properties": [
+                {
+                    "name": node.property_name,
+                    "display_name": node.inspector_name,
+                    "help": node.help,
+                }
+                for node in spec.nodes
+                if node.property_name is not None
+            ],
+        }
+        apply_material_gui_spec(created, presentation_spec)
+        sync_compiled_property_metadata(created)
+        presentation = require_property_presentation(created)
+        output = fix_checksum(created.serialize())
+        _commit_text(args.out, output, created.source_digest)
+        result["shader_sha256"] = file_digest(args.out)
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise CliError(
+            "BRIDGE_ERROR",
+            f"Editor-created shader failed property-presentation finalization and was preserved for diagnosis: {exc}",
+            _preserved_editor_asset_details(args.out, result),
+        ) from exc
+    return {
+        "created": args.out,
+        "backend": "editor",
+        "property_presentation": presentation,
+        **result,
+    }
 
 
 def _preserved_editor_asset_details(path: str, result: dict) -> dict:

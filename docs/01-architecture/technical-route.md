@@ -104,7 +104,8 @@
 - 状态：已确认（2026-09-01，FR-0011/CR-0008）
 - 背景：一次性编辑器内 C# 已证明 `CreateNewTemplateShader`、`CreateNode`、`CreateConnection`、`SaveToDisk`、`LoadFromDisk` 可创建可编辑图；当前 `SamplerNode`/`CustomExpressionNode` 为 `layout_ok=false`，离线 schema 不足以安全猜造动态端口和私有字段。
 - 决策：保留离线文本链路为默认；新增受限 `EditorGraphSpec v1` 和 `create --backend editor|auto`。固定 C# 执行器只允许模板、Sampler、CustomExpression、白名单普通节点、连接、保存/重载与 manifest 回读；反射字段白名单并先做能力探测。
-- 安全与事务：禁止任意 C#/任意反射；参数安全编码；默认 loopback；JSON-RPC 响应 ID 必须与当前请求一致。不支持版本、成员缺失、Save/Load/manifest 不一致均零成功。Editor 提交前失败删除明确事务资产；提交后 Python 后验失败保留目标并返回 nonce/hash，避免 TOCTOU 误删；已有文件仍走文本创建/备份链路。
+- 安全与事务：禁止任意 C#/任意反射；参数安全编码；默认 loopback；JSON-RPC 响应 ID 必须与当前请求一致。不支持版本、成员缺失、Save/Load/manifest 不一致均零成功。MCP 3.4.7 会把返回值包装到 `data.result` 并默认按字符串拦截 `DeleteAsset`；桥接兼容裸文本/JSON envelope，`success=false` 失败关闭，仅对包内固定 nonce 事务执行器设置 `safety_checks=false`。Editor 提交前失败删除明确事务资产；提交后 Python 后验失败保留目标并返回 nonce/hash，避免 TOCTOU 误删；已有文件仍走文本创建/备份链路。
+- 回执时序：暂存资产完成 Save/Load 与 manifest 对账后移动提交，只同步读取目标 Shader 身份并立即返回协议；不在同一次 MCP 调用中第二次加载目标图，避免插件重连吞掉成功回执。CLI 属性收尾后由独立 `recompile` 重新加载目标并复验图/编译区一致性。
 - 取舍：不把全部修改搬回 Editor；不手写动态节点序列化；不把运行时矩阵/CommandBuffer 状态塞进静态图。可编辑性和渲染等价性分别验收。
 - 回滚：关闭 Editor/auto 后端并保留 `create --backend text`；现有文件格式、schema 和命令不迁移。
 
@@ -126,3 +127,11 @@
 - 兼容与迁移：不批量修改用户 Shader，不写入或选择 `MZGUI.MZGUI`。含旧属性的 Shader 可查询和由内置 GUI 读取；要开始新写入，用户必须显式把主 Master/编译指令改为 ASECLI Editor。原始专家入口仅接受三种 ASECLI 类型。
 - 安全与回滚：固定目标路径的内容冲突和符号链接仍拒绝覆盖；安装使用创建时排他写入。回滚本变更仅恢复上一版 CLI/资源，不自动更改用户 Shader 或删除内置安装资源。
 - 验收边界：Python 回归证明协议写入、旧属性读取、触碰迁移、安装、冲突与 CLI 契约；新的 C# 资源尚需隔离 Unity/Tuanjie 编译和目标 Inspector 的视觉/交互验收。
+
+### ADR-0015 ASECLI 创建采用强制属性呈现契约
+
+- 状态：已确认（2026-09-02，CR-0012 / FR-0010 / FR-0011）
+- 背景：FR-0010 已描述中文显示名、技术 Tooltip 和逐项中文说明，但旧 `create` 可以克隆不合规模板，EditorGraphSpec v1 也允许英文 `inspector_name` 且无法携带说明，因此规范仍依赖调用者自觉。
+- 决策：新增 `asecli.property-presentation.v1` 文件级契约。每个导出 Property 必须使用含中文的显示名、合法英文 Shader 属性标识符，并具有恰好一条含中文的 `ASECLIHelpBox`；ASECLI GUI 继续从默认 `Material(shader)` 自动生成属性名和 Shader 默认值 Tooltip。`custom-gui` 公开逐属性检查结果，已声明 ASECLI GUI 的文件在任何相关写入后必须继续合规。
+- 创建与兼容：文本 `create` 对模板壳与 donor 图组合后的最终文件执行写前门禁。正式 Editor CLI 创建要求 EditorGraphSpec v2，每个 Property/Sampler 必填中文 `inspector_name` 和中文 `help`；固定 ASE Editor 执行协议仍为 v1，v2 的说明在 ASE Save/Load 成功后由 CLI 原子写入并再次验收。EditorGraphSpec v1 保留底层解析/桥接兼容，但 CLI 不再接受它创建新文件。
+- 修复与回滚：既有文件可通过 `custom-gui --spec` 的 `display_name`/`help` 一次性治理；显示名同时写入图字段和编译 Properties，说明同步至图尾部和编译属性。写入前保留原始文件，失败不落盘；Editor 已提交后的后验失败仍保留目标与 `.meta` 供诊断。回滚 CLI 不自动迁移或删除已生成文件。

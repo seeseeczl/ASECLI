@@ -149,9 +149,11 @@ def test_mixed_eol_roundtrip_is_byte_identical_from_text_and_path(tmp_path):
     assert AseFile.from_path(target).serialize().encode("utf-8") == target.read_bytes()
 
 
-def test_create_rejects_name_injection_and_preserves_same_named_comment(tmp_path, capsys):
+def test_create_rejects_name_injection_and_preserves_same_named_comment(
+    tmp_path, capsys, compliant_shader_path
+):
     template = tmp_path / "template.shader"
-    source = AseFile.from_path(SHADER)
+    source = AseFile.from_path(compliant_shader_path)
     create_comment_group(source.graph, ["1"], "HLIT", note="unrelated help text")
     template.write_text(fix_checksum(source.serialize()), encoding="utf-8", newline="")
 

@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 from asecli.cli.main import app
-from asecli.core import AseFile
+from asecli.checks import fix_checksum
+from asecli.core import ASECLI_GUI_EDITOR, AseFile, semantic_attribute
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -16,15 +17,16 @@ TEMPLATE_GUID = "2992e84f91cbeb14eab234972e07ea9d"
 
 def caster_spec() -> dict:
     return {
-        "version": 1,
+        "version": 2,
         "template": {"guid": TEMPLATE_GUID, "shader_name": "Tests/EditorCaster"},
         "nodes": [
             {
                 "alias": "mask",
                 "kind": "sampler",
                 "position": [-520, 20],
-                "property_name": "_CasterMask",
-                "inspector_name": "Caster Mask",
+                "property_name": "_BaseColor",
+                "inspector_name": "基础颜色",
+                "help": "控制材质的基础颜色。",
                 "parameter_type": "Property",
             }
         ],
@@ -47,13 +49,35 @@ def _write_spec(tmp_path):
     return path
 
 
-def test_legacy_default_and_explicit_text_backend_are_byte_compatible(tmp_path):
+def _editor_created_shader() -> str:
+    help_attribute = semantic_attribute("ASECLIHelpBox", "控制材质的基础颜色。")
+    return fix_checksum(f'''Shader "Tests/EditorCaster"
+{{
+\tProperties
+\t{{
+\t\t_BaseColor("基础颜色", Color) = (1,1,1,1)
+\t}}
+\tSubShader {{}}
+\tCustomEditor "UnityEditor.ShaderGraphLitGUI"
+\tFallback Off
+}}
+/*ASEBEGIN
+Version=19602
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;0;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphLitGUI;0;1
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;1;0,0;Float;False;True;-1;2;UnityEditor.ShaderGraphLitGUI;0;1
+Node;AmplifyShaderEditor.ColorNode;10;100,100;Inherit;False;Property;_BaseColor;基础颜色;0;0;Create;False;1;{help_attribute}
+ASEEND*/
+//CHKSM=PLACEHOLDER''')
+
+
+def test_noncompliant_text_creation_is_rejected_before_write(tmp_path):
     default_out = tmp_path / "default.shader"
     text_out = tmp_path / "text.shader"
 
-    assert app(["create", str(default_out), "--from", str(SHADER), "--name", "Same"]) == 0
-    assert app(["create", str(text_out), "--backend", "text", "--from", str(SHADER), "--name", "Same"]) == 0
-    assert default_out.read_bytes() == text_out.read_bytes()
+    assert app(["create", str(default_out), "--from", str(SHADER), "--name", "Same"]) == 2
+    assert app(["create", str(text_out), "--backend", "text", "--from", str(SHADER), "--name", "Same"]) == 2
+    assert not default_out.exists()
+    assert not text_out.exists()
 
 
 def test_editor_backend_requires_spec_and_rejects_text_options(tmp_path, capsys):
@@ -87,12 +111,35 @@ def test_editor_existing_target_is_rejected_even_with_force_before_mcp(tmp_path,
     assert target.read_text(encoding="utf-8") == "sentinel"
 
 
+def test_cli_rejects_legacy_v1_spec_before_mcp(tmp_path, monkeypatch, capsys):
+    target = _project_target(tmp_path)
+    raw = caster_spec()
+    raw["version"] = 1
+    raw["nodes"][0].pop("help")
+    spec_path = tmp_path / "legacy-v1.json"
+    spec_path.write_text(json.dumps(raw), encoding="utf-8")
+    called = False
+
+    def should_not_call(*args, **kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("asecli.cli.create_command.create_shader_via_mcp", should_not_call)
+    rc = app(["create", str(target), "--backend", "editor", "--spec", str(spec_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert rc == 2
+    assert payload["error"]["code"] == "USAGE_ERROR"
+    assert called is False
+    assert not target.exists()
+
+
 def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, monkeypatch, capsys):
     target = _project_target(tmp_path)
     spec_path = _write_spec(tmp_path)
 
     def fake_create(path, spec, **kwargs):
-        Path(path).write_bytes(SHADER.read_bytes())
+        Path(path).write_text(_editor_created_shader(), encoding="utf-8")
         return {
             "transport": "mcp",
             "asset_path": "Assets/Generated/Caster.shader",
@@ -111,13 +158,14 @@ def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, m
     assert rc == 0
     assert payload["data"]["backend"] == "editor"
     assert payload["data"]["saved"] is True
+    assert payload["data"]["property_presentation"]["valid"] is True
     assert AseFile.from_path(target).graph.nodes
 
 
 def test_auto_without_spec_uses_legacy_text_path(tmp_path):
     target = tmp_path / "auto.shader"
-    assert app(["create", str(target), "--backend", "auto", "--from", str(SHADER)]) == 0
-    assert AseFile.from_path(target).graph.nodes
+    assert app(["create", str(target), "--backend", "auto", "--from", str(SHADER)]) == 2
+    assert not target.exists()
 
 
 def test_editor_post_validation_failure_preserves_shader_and_meta_for_diagnosis(tmp_path, monkeypatch, capsys):

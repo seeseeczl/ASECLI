@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import re
 from .model import AseFile, AseGraph, NodeLine
 from .custom_gui_versions import CUSTOM_EDITOR_GRAPH_VERSIONS, PROPERTY_METADATA_TAIL_GRAPH_VERSIONS, TARGET_ASE_VERSION, TARGET_GRAPH_VERSION, require_custom_editor_version, require_property_metadata_tail_version
+from .property_presentation import inspect_property_presentation
 
 ASECLI_GUI_EDITOR = "ASECLI.MaterialGUI.ASECLIMaterialGUI"
 SUPPORTED_GUI_EDITORS = frozenset((ASECLI_GUI_EDITOR,))
@@ -222,6 +223,8 @@ def inspect_custom_gui(ase_file: AseFile) -> dict:
                     "attributes": [parse_property_metadata_attribute(raw) for raw in tail.attributes],
                 }
             )
+    editor = {"main_node_id": main.node_id, "graph": graph_editor,
+              "compiled": compiled_editor, "consistent": graph_editor == compiled_editor}
     return {
         "ase_profile": TARGET_ASE_VERSION,
         "version_capabilities": {
@@ -230,13 +233,11 @@ def inspect_custom_gui(ase_file: AseFile) -> dict:
         },
         "profile_graph_version": TARGET_GRAPH_VERSION,
         "graph_version": ase_file.graph.version,
-        "editor": {
-            "main_node_id": main.node_id,
-            "graph": graph_editor,
-            "compiled": compiled_editor,
-            "consistent": graph_editor == compiled_editor,
-        },
+        "editor": editor,
         "properties": properties,
+        "property_presentation": inspect_property_presentation(
+            editor, properties, ase_file.prefix, asecli_editor=ASECLI_GUI_EDITOR
+        ),
         "capabilities": {
             "supported_editors": sorted(SUPPORTED_GUI_EDITORS),
             "built_in_editor": ASECLI_GUI_EDITOR,

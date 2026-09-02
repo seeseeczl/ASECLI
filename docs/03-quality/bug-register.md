@@ -2,10 +2,10 @@
 id: QUALITY-DEFECTS-0001
 type: bug-register
 status: verified
-version: 1.0.0
+version: 1.1.0
 created_at: 2026-09-01T12:54:38+08:00
 owner: long
-related: [AUD-20260901, CR-0002, CR-0003, CR-0004, CR-0005]
+related: [AUD-20260901, CR-0002, CR-0003, CR-0004, CR-0005, CR-0011, CR-0012, BUG-0015, BUG-0016]
 supersedes: []
 evidence: [tests, docs/03-quality/regression-catalog.md]
 ---
@@ -28,3 +28,5 @@ evidence: [tests, docs/03-quality/regression-catalog.md]
 | BUG-0012 | AA-PROTO-001 | SSE/JSON 响应未与当前 JSON-RPC ID 精确关联 | REG-0033 | 所有请求响应强制 ID 一一匹配 | 自动已验证 |
 | BUG-0013 | AA-FAIL-001 | Editor 后验失败按路径删除目标，可误删并发替换的用户文件 | REG-0034 | Python 保留无法证明身份的失败产物并输出事务诊断 | 自动已验证 |
 | BUG-0014 | AA-COMPAT-001 | 全限定基类或预编译程序集中的原生 MZGUI 被静态漏检 | REG-0035 | 扩展源码检测；二进制不确定时阻止写入并支持 Editor 反射确认 | 自动已验证；真实反射待目标 Editor |
+| BUG-0015 | 用户当前团结实例截图对照 | ASECLI 把目标轻量说明条渲染成原生 Info HelpBox，出现大图标、描边和过高容器，功能存在但视觉规范不一致 | REG-0036 | 固定 `asecli.inline-help.v1`，由 `gui-support` 报告契约并在内置资源失效时拒绝安装；C# 改为轻量自绘 | 自动回归与当前团结 `2022.3.61t9` Inspector 已验证；Console 0 error |
+| BUG-0016 | CR-0012 当前团结 v2 创建实测 | MCP for Unity 3.4.7 把 C# 返回值包在 `data.result`，默认安全扫描拦截固定事务执行器的 `DeleteAsset`，提交后的第二次图重载又可能在协议返回前触发插件重连，导致目标已创建但 CLI 报 `BRIDGE_ERROR` | REG-0038 | 兼容裸文本/JSON envelope；`success=false` 失败关闭；仅固定 nonce 事务执行器关闭该次模式扫描；暂存 Save/Load+manifest 后提交并只核对目标 Shader 身份，完整目标图重载交给紧随其后的独立 `recompile` | 自动回归通过；当前团结 `2022.3.61t9`、MCP 3.4.7 的 v2 创建与再次重编译通过，无 `ASECLI-Temp-*` 残留；Inspector 视觉和 Tooltip 已由用户现场确认，验证资产已精确清理 |

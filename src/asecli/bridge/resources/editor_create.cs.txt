@@ -296,30 +296,22 @@ try
     string moveError = UnityEditor.AssetDatabase.MoveAsset(temporaryAssetPath, assetPath);
     if (!string.IsNullOrEmpty(moveError)) throw new System.Exception("asset commit failed: " + moveError);
     committed = true;
-    UnityEditor.AssetDatabase.Refresh();
-    var targetLoadResult = win.LoadFromDisk(assetPath, null);
-    if (targetLoadResult != AmplifyShaderEditor.ShaderLoadResult.LOADED &&
-        targetLoadResult != AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED)
-        throw new System.Exception("ASE target LoadFromDisk failed: " + targetLoadResult);
-    var targetMaster = win.CurrentGraph.CurrentMasterNode as AmplifyShaderEditor.TemplateMultiPassMasterNode;
     var targetShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(assetPath);
-    if (targetMaster == null || targetMaster.CurrentTemplate == null || targetShader == null ||
-        targetMaster.CurrentTemplate.GUID != templateGuid ||
-        targetMaster.ShaderName != shaderName || targetShader.name != shaderName)
-        throw new System.Exception("template or shader identity changed after target reload");
+    if (targetShader == null || targetShader.name != shaderName)
+        throw new System.Exception("shader identity changed after asset commit");
 
     var result = new Newtonsoft.Json.Linq.JObject();
     result["protocol"] = "ASECLI_EDITOR_CREATE_V1";
     result["ase_version"] = aseVersion;
     result["asset_path"] = assetPath;
-    result["template_guid"] = targetMaster.CurrentTemplate.GUID;
+    result["template_guid"] = reloadedMaster.CurrentTemplate.GUID;
     result["shader_name"] = targetShader.name;
     result["saved"] = saved;
     result["reloaded"] = reloaded;
     result["committed"] = committed;
     var manifest = new Newtonsoft.Json.Linq.JObject();
     var manifestTemplate = new Newtonsoft.Json.Linq.JObject();
-    manifestTemplate["guid"] = targetMaster.CurrentTemplate.GUID;
+    manifestTemplate["guid"] = reloadedMaster.CurrentTemplate.GUID;
     manifestTemplate["shader_name"] = targetShader.name;
     manifest["template"] = manifestTemplate;
     manifest["nodes"] = manifestNodes;

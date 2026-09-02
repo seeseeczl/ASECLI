@@ -16,6 +16,7 @@ from ..core import (
     semantic_attribute,
     set_custom_editor,
     set_property_metadata_attribute,
+    sync_compiled_property_metadata,
 )
 from .commands import CliError, _commit_text, _load
 
@@ -45,6 +46,7 @@ def cmd_custom_gui(args) -> dict:
         raise CliError("USAGE_ERROR", "--node or --property is required for ASECLI property metadata operations")
 
     try:
+        initial_presentation = inspect_custom_gui(f)["property_presentation"]
         if args.spec:
             changes.extend(apply_material_gui_spec(f, _load_spec(args.spec)))
         else:
@@ -86,6 +88,8 @@ def cmd_custom_gui(args) -> dict:
                 changes.append(remove_property_metadata_attribute(f.graph, target, type_name))
             for raw in additions:
                 changes.append(set_property_metadata_attribute(f.graph, target, raw))
+        if changes:
+            changes.extend(sync_compiled_property_metadata(f))
         state = inspect_custom_gui(f)
     except KeyError as exc:
         raise CliError("NOT_FOUND", str(exc))
@@ -96,6 +100,15 @@ def cmd_custom_gui(args) -> dict:
         if args.write:
             raise CliError("USAGE_ERROR", "--write requires a custom GUI mutation option")
         return {"file": args.file, "action": "inspect", "state": state, "written": False}
+
+    contract_applies = initial_presentation["claimed"] or state["property_presentation"]["claimed"]
+    if args.write and contract_applies and not state["property_presentation"]["valid"]:
+        raise CliError(
+            "PROPERTY_PRESENTATION_ERROR",
+            "ASECLI-managed property presentation contract failed: "
+            + ", ".join(state["property_presentation"]["violations"]),
+            {"property_presentation": state["property_presentation"]},
+        )
 
     issues = validate_file(f)
     errors = [issue for issue in issues if issue["severity"] == "error"]

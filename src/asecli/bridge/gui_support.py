@@ -10,6 +10,7 @@ from pathlib import Path
 import stat
 
 from ..core.custom_gui import ASECLI_GUI_EDITOR
+from .gui_presentation import inspect_inline_help_presentation, require_inline_help_presentation
 
 GUI_SUPPORT_ASSET_PATH = "Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
 GUI_SUPPORT_SOURCE = (
@@ -56,6 +57,7 @@ def inspect_gui_support(project_root: str | Path) -> dict:
             "foldout": "ASECLIFoldout",
             "tooltip": "ASECLITooltip",
             "help_box": "ASECLIHelpBox",
+            "inline_help_presentation": inspect_inline_help_presentation(GUI_SUPPORT_SOURCE),
             "legacy_read_compatibility": ["FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui"],
             "automatic_technical_tooltip": ["property_name", "shader_default_value"],
             "ase_version_dependency": False,
@@ -72,6 +74,8 @@ def install_gui_support(
 ) -> dict:
     """Plan or install the fixed resource without overwriting user files."""
     state = inspect_gui_support(project_root)
+    if write:
+        require_inline_help_presentation(GUI_SUPPORT_SOURCE)
     target_state = state["asecli_material_gui"]["state"]
     if target_state == "conflict":
         raise FileExistsError(

@@ -13,10 +13,11 @@ from .custom_gui import (
 )
 from .custom_gui_versions import require_property_metadata_tail_version
 from .model import AseFile, AseGraph, NodeLine
+from .property_presentation import set_property_display_name
 
 
 _TOP_KEYS = {"editor", "reorder", "properties"}
-_PROPERTY_KEYS = {"name", "node", "group", "help", "tooltip"}
+_PROPERTY_KEYS = {"name", "node", "display_name", "group", "help", "tooltip"}
 _SEMANTIC_TYPES = {
     "group": "ASECLIFoldout",
     "help": "ASECLIHelpBox",
@@ -110,6 +111,13 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
         changes.extend(_reorder_properties(ase_file.graph, [node for node, _ in resolved]))
 
     for node, entry in resolved:
+        if "display_name" in entry:
+            display_name = entry["display_name"]
+            if not isinstance(display_name, str):
+                raise ValueError(
+                    f"property {node.raw_fields[7]} field 'display_name' must be a string"
+                )
+            changes.append(set_property_display_name(ase_file, node.node_id, display_name))
         for key, type_name in _SEMANTIC_TYPES.items():
             if key not in entry:
                 continue

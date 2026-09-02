@@ -19,6 +19,13 @@ from .custom_gui import (
     set_custom_editor,
     set_property_metadata_attribute,
 )
+from .property_presentation import (
+    contains_han,
+    require_managed_property_presentation,
+    require_property_presentation,
+    set_property_display_name,
+)
+from .compiled_metadata import sync_compiled_property_metadata
 from .commentary import (
     COMMENTARY_TYPE,
     create_comment_group,
@@ -46,7 +53,9 @@ __all__ = [
     "compiled_custom_editor", "decode_custom_unicode", "decode_foldout_title",
     "encode_custom_unicode", "encode_foldout_title", "graph_custom_editor",
     "inspect_custom_gui", "main_master_node", "parse_property_metadata_attribute", "read_property_metadata_tail",
+    "contains_han", "require_managed_property_presentation", "require_property_presentation", "set_property_display_name",
     "remove_property_metadata_attribute", "semantic_attribute", "set_custom_editor", "set_property_metadata_attribute",
+    "sync_compiled_property_metadata",
     "apply_material_gui_spec", "material_property_nodes", "resolve_property_node",
     "COMMENTARY_TYPE", "comment_containment_issues", "create_comment_group",
     "inspect_comment_groups", "parse_commentary_node", "refit_comment_groups",

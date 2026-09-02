@@ -19,6 +19,7 @@ from ..core import (
     disconnect,
     node_from_schema,
     parse_node_line,
+    require_managed_property_presentation,
     set_node_field,
     tidy,
 )
@@ -29,19 +30,16 @@ from .io import (
     atomic_write,
     read_text_snapshot,
 )
+from .recompile_metadata import restore_recompile_metadata, snapshot_recompile_metadata
 
 EXIT_OK = 0
 EXIT_ERROR = 2
 EXIT_BRIDGE = 3
-
-
 class CliError(Exception):
     def __init__(self, code: str, message: str, data: dict | None = None):
         super().__init__(message)
         self.code = code
         self.data = data
-
-
 def _load(path: str) -> AseFile:
     try:
         return AseFile.from_path(path)
@@ -62,6 +60,10 @@ def _save(ase_file: AseFile, path: str, write: bool) -> dict:
         )
     if not write:
         return {"written": False, "preview_bytes": len(ase_file.serialize())}
+    try:
+        require_managed_property_presentation(ase_file)
+    except ValueError as exc:
+        raise CliError("PROPERTY_PRESENTATION_ERROR", str(exc)) from exc
     _commit_text(path, ase_file.serialize(), ase_file.source_digest)
     return {"written": True, "path": str(path)}
 
@@ -224,13 +226,20 @@ def cmd_recompile(args) -> dict:
     if args.instance_token_argv is not None:
         raise CliError("USAGE_ERROR", "do not pass MCP tokens via argv; use ASECLI_MCP_INSTANCE_TOKEN")
     instance_token = os.environ.get("ASECLI_MCP_INSTANCE_TOKEN")
+    metadata_snapshot = snapshot_recompile_metadata(args.file)
     try:
-        return recompile_via_mcp(
+        result = recompile_via_mcp(
             args.file,
             mcp_url=args.mcp_url,
             instance_token=instance_token,
             allow_remote_mcp=args.allow_remote_mcp,
         )
+        if metadata_snapshot:
+            ase_file, restored = restore_recompile_metadata(args.file, metadata_snapshot)
+            output = fix_checksum(ase_file.serialize())
+            _commit_text(args.file, output, ase_file.source_digest)
+            result["metadata_restored"] = restored
+        return result
     except McpError as e:
         raise CliError("BRIDGE_ERROR", str(e))
     except FileNotFoundError as e:

@@ -160,13 +160,55 @@ namespace ASECLI.MaterialGUI
                 materialEditor.ShaderProperty(position, property, label);
 
                 if (!String.IsNullOrEmpty(metadata.Help))
-                    EditorGUILayout.HelpBox(metadata.Help, MessageType.Info);
+                    DrawInlineHelp(metadata.Help);
             }
 
             EditorGUILayout.Space();
             materialEditor.RenderQueueField();
             materialEditor.EnableInstancingField();
             materialEditor.DoubleSidedGIField();
+        }
+
+        private static void DrawInlineHelp(string text)
+        {
+            GUIContent content = new GUIContent(text);
+            GUIStyle style = new GUIStyle(EditorStyles.miniLabel);
+            style.fontStyle = FontStyle.Italic;
+            style.wordWrap = true;
+
+            float textWidth = Mathf.Max(
+                1f,
+                EditorGUIUtility.currentViewWidth - 64f - (EditorGUI.indentLevel * 15f)
+            );
+            float textHeight = style.CalcHeight(content, textWidth);
+            Rect row = EditorGUI.IndentedRect(
+                EditorGUILayout.GetControlRect(false, textHeight + 8f)
+            );
+
+            Rect backgroundRect = new Rect(row.x, row.y - 2f, row.width, row.height + 4f);
+            EditorGUI.DrawRect(backgroundRect, new Color(0f, 0f, 0f, 0.1f));
+
+            Rect accentRect = new Rect(
+                backgroundRect.x + 6f,
+                backgroundRect.y + 6f,
+                3f,
+                Mathf.Max(1f, backgroundRect.height - 12f)
+            );
+            EditorGUI.DrawRect(accentRect, new Color(1f, 1f, 1f, 0.3f));
+
+            Rect textRect = new Rect(
+                row.x + 16f,
+                row.y + 4f,
+                Mathf.Max(1f, row.width - 32f),
+                textHeight
+            );
+            Color previousColor = GUI.color;
+            GUI.color = EditorGUIUtility.isProSkin
+                ? new Color(1f, 1f, 1f, 0.4f)
+                : new Color(0f, 0f, 0f, 0.55f);
+            GUI.Label(textRect, content, style);
+            GUI.color = previousColor;
+            EditorGUILayout.Space(2f);
         }
 
         private bool DrawFoldout(

@@ -7,6 +7,7 @@ import json
 import os
 import sys
 
+from .. import __version__
 from .commands import EXIT_BRIDGE, EXIT_ERROR, EXIT_OK, CliError
 from .commands import (
     cmd_add_node,
@@ -36,6 +37,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
 
 def build_parser() -> argparse.ArgumentParser:
     p = JsonArgumentParser(prog="asecli", description="Agent-native CLI for Amplify Shader Editor assets")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("parse", help="parse ASE file and print graph summary")
@@ -154,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--name")
     s.add_argument("--graph-from", help="donor ASE file whose graph is injected")
     s.add_argument("--backend", choices=("text", "editor", "auto"), default="text")
-    s.add_argument("--spec", help="strict EditorGraphSpec v1 JSON (editor/auto backend)")
+    s.add_argument("--spec", help="strict EditorGraphSpec v2 JSON (editor/auto backend)")
     s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
     s.add_argument("--allow-remote-mcp", action="store_true")
     s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)

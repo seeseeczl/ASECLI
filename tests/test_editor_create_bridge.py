@@ -58,6 +58,17 @@ def _success_result(asset_path: str, manifest: dict) -> str:
     return "ASECLI_EDITOR_CREATE_V1:" + json.dumps(payload, separators=(",", ":"))
 
 
+def _execute_code_envelope(result: str) -> str:
+    return json.dumps(
+        {
+            "success": True,
+            "message": "Code executed successfully.",
+            "data": {"result": result, "compiler": "codedom"},
+        },
+        separators=(",", ":"),
+    )
+
+
 def test_executor_is_fixed_version_gated_transactional_and_closes_windows():
     required = [
         "VersionInfo.StaticToString()",
@@ -86,6 +97,9 @@ def test_executor_is_fixed_version_gated_transactional_and_closes_windows():
     assert EDITOR_CREATE_SNIPPET.index("createdWindow.Close()") < EDITOR_CREATE_SNIPPET.index("success = true")
     assert EDITOR_CREATE_SNIPPET.index("stateRestored = true") < EDITOR_CREATE_SNIPPET.index("success = true")
     assert 'failure.Data["ASECLI cleanup failures"]' in EDITOR_CREATE_SNIPPET
+    post_commit = EDITOR_CREATE_SNIPPET.split("AssetDatabase.MoveAsset", 1)[1].split("catch (System.Exception ex)", 1)[0]
+    assert "AssetDatabase.Refresh" not in post_commit
+    assert "LoadFromDisk(assetPath" not in post_commit
 
 
 def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):
@@ -115,6 +129,7 @@ def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):
     result = create_shader_via_mcp(target, spec)
 
     assert seen["action"] == "execute"
+    assert seen["safety_checks"] is False
     assert result["saved"] is True
     assert result["reloaded"] is True
     assert result["changed"] is True
@@ -124,6 +139,61 @@ def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):
     )["temporary_asset_path"]
     assert result["shader_sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()
     assert result["meta_sha256"] is None
+
+
+def test_current_execute_code_json_envelope_is_unwrapped(tmp_path, monkeypatch):
+    target = _project_target(tmp_path)
+    spec = EditorGraphSpec.from_dict(caster_spec())
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            encoded = arguments["code"].split('FromBase64String("', 1)[1].split('")', 1)[0]
+            decoded = json.loads(base64.b64decode(encoded).decode("utf-8"))
+            target.write_text('Shader "Tests/EditorCaster" {}\n/*ASEBEGIN\nVersion=19602\nASEEND*/\n//CHKSM=0\n')
+            protocol_result = _success_result(decoded["asset_path"], spec.expected_manifest())
+            return {"content": [{"type": "text", "text": _execute_code_envelope(protocol_result)}]}
+
+    monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
+    result = create_shader_via_mcp(target, spec)
+
+    assert result["committed"] is True
+    assert result["manifest"] == spec.expected_manifest()
+
+
+def test_current_execute_code_failure_envelope_fails_closed(tmp_path, monkeypatch):
+    target = _project_target(tmp_path)
+    spec = EditorGraphSpec.from_dict(caster_spec())
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {"success": False, "message": "compiler blocked", "data": None}
+                        ),
+                    }
+                ]
+            }
+
+    monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
+    with pytest.raises(McpError, match="compiler blocked"):
+        create_shader_via_mcp(target, spec)
+
+    assert not target.exists()
 
 
 @pytest.mark.parametrize(

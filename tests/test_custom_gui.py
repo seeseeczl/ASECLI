@@ -28,6 +28,7 @@ from asecli.core import (
     semantic_attribute,
     set_custom_editor,
     set_property_metadata_attribute,
+    sync_compiled_property_metadata,
 )
 
 
@@ -39,7 +40,9 @@ HLIT = ROOT / "tests" / "fixtures" / "HLIT.shader"
 def sample_shader(editor: str = "UnityEditor.ShaderGraphLitGUI") -> str:
     text = f'''Shader "Tests/ASECLI"
 {{
-\tProperties {{}}
+\tProperties {{
+\t\t_BaseColor("基础颜色", Color) = (1,1,1,1)
+\t}}
 \tSubShader {{}}
 \tCustomEditor "{editor}"
 \tFallback Off
@@ -56,7 +59,14 @@ ASEEND*/
 
 
 def multi_property_shader() -> str:
-    text = sample_shader(ASECLI_GUI_EDITOR).replace(";基础颜色;0;0;Create", ";基础颜色;2;0;Create")
+    text = sample_shader(ASECLI_GUI_EDITOR).replace(
+        "\tProperties {\n\t\t_BaseColor(\"基础颜色\", Color) = (1,1,1,1)\n\t}",
+        "\tProperties {\n"
+        "\t\t_BaseColor(\"基础颜色\", Color) = (1,1,1,1)\n"
+        "\t\t_Contrast(\"Contrast\", Range(0, 2)) = 1\n"
+        "\t\t_Coat_IO(\"Coat IO\", Float) = 0\n"
+        "\t}",
+    ).replace(";基础颜色;0;0;Create", ";基础颜色;2;0;Create")
     extra = """Node;AmplifyShaderEditor.RangedFloatNode;12;300,100;Inherit;False;Property;_Contrast;Contrast;0;0;Create;False;0
 Node;AmplifyShaderEditor.RangedFloatNode;13;500,100;Inherit;False;Property;_Coat_IO;Coat IO;1;0;Create;False;0
 """
@@ -272,6 +282,66 @@ def test_asecli_gui_editor_writes_its_own_foldout_tooltip_and_helpbox_protocol()
     }
 
 
+def test_compiled_property_metadata_sync_preserves_unrelated_attributes():
+    text = sample_shader(ASECLI_GUI_EDITOR).replace(
+        "\t\t_BaseColor(\"基础颜色\", Color) = (1,1,1,1)",
+        "\t\t[HDR] [HelpBoxMzgui(Old)] _BaseColor(\"基础颜色\", Color) = (1,1,1,1)",
+    )
+    shader = AseFile.from_text(fix_checksum(text))
+    set_property_metadata_attribute(
+        shader.graph, "10", semantic_attribute("ASECLIFoldout", "基础参数")
+    )
+    set_property_metadata_attribute(
+        shader.graph, "10", semantic_attribute("ASECLIHelpBox", "控制最终固有色。")
+    )
+
+    changes = sync_compiled_property_metadata(shader)
+
+    assert len(changes) == 1
+    declaration = next(line for line in shader.prefix.splitlines() if "_BaseColor(" in line)
+    assert "[HDR]" in declaration
+    assert "[ASECLIFoldout(" in declaration
+    assert "[ASECLIHelpBox(" in declaration
+    assert "HelpBoxMzgui" not in declaration
+
+
+def test_recompile_cli_restores_metadata_discarded_by_editor_save(tmp_path, monkeypatch, capsys):
+    from asecli.cli.main import app
+
+    path = tmp_path / "restore.shader"
+    compiled = sample_shader(ASECLI_GUI_EDITOR).replace(
+        "\t\t_BaseColor(\"基础颜色\", Color) = (1,1,1,1)",
+        "\t\t_BaseColor(\"基础颜色\", Color) = (1,1,1,1)",
+    )
+    shader = AseFile.from_text(fix_checksum(compiled))
+    set_property_metadata_attribute(
+        shader.graph, "10", semantic_attribute("ASECLIFoldout", "基础参数")
+    )
+    set_property_metadata_attribute(
+        shader.graph, "10", semantic_attribute("ASECLIHelpBox", "控制最终固有色。")
+    )
+    path.write_text(fix_checksum(shader.serialize()), encoding="utf-8")
+
+    def fake_recompile(file, **kwargs):
+        path.write_text(fix_checksum(compiled), encoding="utf-8")
+        return {"saved": True, "changed": True}
+
+    monkeypatch.setattr("asecli.cli.commands.recompile_via_mcp", fake_recompile)
+    assert app(["recompile", str(path)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["data"]["metadata_restored"] == 2
+    restored = AseFile.from_path(path)
+    attrs = {
+        item["type"]: item
+        for item in inspect_custom_gui(restored)["properties"][0]["attributes"]
+    }
+    assert attrs["ASECLIFoldout"]["text"] == "基础参数"
+    assert attrs["ASECLIHelpBox"]["text"] == "控制最终固有色。"
+    declaration = next(line for line in restored.prefix.splitlines() if "_BaseColor(" in line)
+    assert "[ASECLIFoldout(" in declaration
+    assert "[ASECLIHelpBox(" in declaration
+
+
 def test_rejects_property_metadata_on_non_property_node():
     graph = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR)).graph
     with pytest.raises(ValueError, match="not an exported PropertyNode"):
@@ -336,6 +406,8 @@ def test_cli_write_is_recoverable_rechecks_checksum_and_roundtrips(tmp_path):
         "颜色强度提示",
         "--group",
         "颜色设置",
+        "--help-box",
+        "控制材质的基础颜色。",
         "--write",
     )
     assert code == 0 and payload["data"]["written"] is True
@@ -386,14 +458,18 @@ def test_cli_raw_attribute_add_remove_and_non_property_failure(tmp_path):
     path = tmp_path / "raw.shader"
     path.write_text(sample_shader(ASECLI_GUI_EDITOR), encoding="utf-8")
     raw = "[ASECLITooltip(#63D0#793A)]"
-    code, payload = run_cli("custom-gui", str(path), "--node", "10", "--add-attribute", raw, "--write")
+    code, payload = run_cli(
+        "custom-gui", str(path), "--node", "10", "--add-attribute", raw,
+        "--help-box", "控制材质的基础颜色。", "--write"
+    )
     assert code == 0
-    assert AseFile.from_path(path).graph.node_by_id("10").raw_fields[-2:] == ["1", raw]
+    assert raw in AseFile.from_path(path).graph.node_by_id("10").raw_fields
     code, payload = run_cli(
         "custom-gui", str(path), "--node", "10", "--remove-attribute", "ASECLITooltip", "--write"
     )
     assert code == 0
-    assert AseFile.from_path(path).graph.node_by_id("10").raw_fields[-1] == "0"
+    remaining = inspect_custom_gui(AseFile.from_path(path))["properties"][0]["attributes"]
+    assert [item["type"] for item in remaining] == ["ASECLIHelpBox"]
     code, payload = run_cli("custom-gui", str(path), "--node", "10", "--add-attribute", "[VectorMzgui(Four)]")
     assert code == 2 and payload["error"]["code"] == "CUSTOM_GUI_ERROR"
     code, payload = run_cli("custom-gui", str(path), "--node", "11", "--tooltip", "提示")
@@ -425,14 +501,21 @@ def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
                 "properties": [
                     {
                         "name": "_BaseColor",
+                        "display_name": "基础颜色",
                         "group": "固有色",
                         "tooltip": "变量名：_BaseColor\n默认值：(1, 1, 1, 1)",
                         "help": "控制车辆基础漆面颜色。",
                     },
                     {
                         "name": "_Contrast",
+                        "display_name": "明暗对比",
                         "tooltip": "变量名：_Contrast\n默认值：1.0",
                         "help": "控制车身明暗对比度；数值越大，对比越弱。",
+                    },
+                    {
+                        "name": "_Coat_IO",
+                        "display_name": "清漆输入输出",
+                        "help": "控制清漆层输入输出参数。",
                     },
                 ],
             },
@@ -441,7 +524,7 @@ def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
         encoding="utf-8",
     )
     code, payload = run_cli("custom-gui", str(path), "--spec", str(spec_path))
-    assert code == 0 and payload["data"]["written"] is False
+    assert code == 0 and payload["data"]["written"] is False, payload
     assert path.read_text(encoding="utf-8") == original
     assert not path.with_suffix(".shader.bak").exists()
 

@@ -71,6 +71,61 @@ def test_packaged_source_defines_asecli_metadata_and_legacy_read_compatibility()
     assert "AmplifyShaderEditor" not in GUI_SUPPORT_SOURCE
 
 
+def test_packaged_source_draws_lightweight_inline_help_style():
+    assert "DrawInlineHelp(metadata.Help)" in GUI_SUPPORT_SOURCE
+    assert "EditorGUILayout.HelpBox(metadata.Help, MessageType.Info)" not in GUI_SUPPORT_SOURCE
+    assert "new GUIStyle(EditorStyles.miniLabel)" in GUI_SUPPORT_SOURCE
+    assert "style.fontStyle = FontStyle.Italic" in GUI_SUPPORT_SOURCE
+    assert "style.wordWrap = true" in GUI_SUPPORT_SOURCE
+    assert "Rect accentRect" in GUI_SUPPORT_SOURCE
+    assert "EditorGUI.DrawRect(backgroundRect" in GUI_SUPPORT_SOURCE
+    assert "EditorGUI.DrawRect(accentRect" in GUI_SUPPORT_SOURCE
+
+
+def test_inspection_reports_the_inline_help_presentation_contract(tmp_path):
+    presentation = inspect_gui_support(unity_project(tmp_path))["capabilities"][
+        "inline_help_presentation"
+    ]
+    assert presentation == {
+        "contract": "asecli.inline-help.v1",
+        "icon": "none",
+        "border": "none",
+        "background_rgba": [0.0, 0.0, 0.0, 0.1],
+        "accent": {
+            "edge": "left",
+            "width": 3.0,
+            "rgba": [1.0, 1.0, 1.0, 0.3],
+        },
+        "typography": {
+            "base": "EditorStyles.miniLabel",
+            "font_style": "italic",
+            "dark_skin_alpha": 0.4,
+            "light_skin_alpha": 0.55,
+        },
+        "layout": {"text_inset": [16.0, 4.0], "word_wrap": True},
+        "valid": True,
+        "violations": [],
+    }
+
+
+def test_install_refuses_a_packaged_gui_that_breaks_the_presentation_contract(
+    tmp_path, monkeypatch
+):
+    project = unity_project(tmp_path)
+    monkeypatch.setattr(
+        "asecli.bridge.gui_support.GUI_SUPPORT_SOURCE",
+        "EditorGUILayout.HelpBox(metadata.Help, MessageType.Info);",
+    )
+    planned = install_gui_support(project)
+    assert planned["capabilities"]["inline_help_presentation"]["valid"] is False
+    assert "forbidden:native_layout_help_box" in planned["capabilities"][
+        "inline_help_presentation"
+    ]["violations"]
+    with pytest.raises(RuntimeError, match="inline-help presentation contract"):
+        install_gui_support(project, write=True)
+    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
 def test_inspect_and_dry_run_do_not_create_project_files(tmp_path):
     project = unity_project(tmp_path)
     target = project / GUI_SUPPORT_ASSET_PATH
@@ -187,6 +242,11 @@ def test_cli_dry_run_write_and_conflict_are_single_json(tmp_path):
     assert code == 0
     assert payload["data"]["provider"] == "missing"
     assert payload["data"]["written"] is False
+    assert payload["data"]["capabilities"]["inline_help_presentation"]["valid"] is True
+    assert (
+        payload["data"]["capabilities"]["inline_help_presentation"]["contract"]
+        == "asecli.inline-help.v1"
+    )
 
     code, payload = run_cli("gui-support", str(project), "--write")
     assert code == 0

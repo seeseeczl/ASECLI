@@ -16,6 +16,7 @@ from .editor_spec import (
     SpecError,
     TemplateSpec,
 )
+from ..core import contains_han
 
 
 GENERIC_NODE_TYPES = frozenset({"WorldPosInputsNode", "TextureCoordinatesNode", "BreakToComponentsNode"})
@@ -31,11 +32,16 @@ OUTPUT_TYPES = frozenset({"INT", "FLOAT", "FLOAT2", "FLOAT3", "FLOAT4", "FLOAT3x
 _ROOT_KEYS = frozenset({"version", "template", "nodes", "connections"})
 _TEMPLATE_KEYS = frozenset({"guid", "shader_name"})
 _COMMON_NODE_KEYS = frozenset({"alias", "kind", "position"})
-_NODE_KEYS = {
+_NODE_KEYS_V1 = {
     "node": _COMMON_NODE_KEYS | {"type"},
     "property": _COMMON_NODE_KEYS | {"type", "property_name", "inspector_name", "parameter_type"},
     "sampler": _COMMON_NODE_KEYS | {"property_name", "inspector_name", "parameter_type"},
     "custom_expression": _COMMON_NODE_KEYS | {"name", "code", "output_type", "inputs"},
+}
+_NODE_KEYS_V2 = {
+    **_NODE_KEYS_V1,
+    "property": _NODE_KEYS_V1["property"] | {"help"},
+    "sampler": _NODE_KEYS_V1["sampler"] | {"help"},
 }
 _ALIAS = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
@@ -50,15 +56,16 @@ _CSHARP_MARKERS = re.compile(
 def parse_editor_graph_spec(value: Any) -> EditorGraphSpec:
     root = _object(value, "spec")
     _unknown(root, _ROOT_KEYS, "spec")
-    if root.get("version") != 1:
-        raise SpecError("spec version must be integer 1")
+    version = root.get("version")
+    if version not in {1, 2}:
+        raise SpecError("spec version must be integer 1 or 2")
     template = _parse_template(root.get("template"))
     raw_nodes = root.get("nodes")
     if not isinstance(raw_nodes, list):
         raise SpecError("spec nodes must be an array")
     if len(raw_nodes) > 128:
         raise SpecError("spec nodes exceeds the v1 limit of 128")
-    nodes = tuple(_parse_node(item, index) for index, item in enumerate(raw_nodes))
+    nodes = tuple(_parse_node(item, index, version) for index, item in enumerate(raw_nodes))
     aliases = {node.alias for node in nodes}
     if len(aliases) != len(nodes):
         raise SpecError("node alias must be unique")
@@ -74,7 +81,7 @@ def parse_editor_graph_spec(value: Any) -> EditorGraphSpec:
     if len({(item.destination.node, item.destination.port) for item in connections}) != len(connections):
         raise SpecError("a destination input port may appear only once")
     validate_connections(template, nodes, connections)
-    return EditorGraphSpec(version=1, template=template, nodes=nodes, connections=connections)
+    return EditorGraphSpec(version=version, template=template, nodes=nodes, connections=connections)
 
 
 def _parse_template(value: Any) -> TemplateSpec:
@@ -89,13 +96,14 @@ def _parse_template(value: Any) -> TemplateSpec:
     return TemplateSpec(guid=guid.lower(), shader_name=shader_name)
 
 
-def _parse_node(value: Any, index: int) -> NodeSpec:
+def _parse_node(value: Any, index: int, version: int) -> NodeSpec:
     label = f"nodes[{index}]"
     obj = _object(value, label)
     kind = obj.get("kind")
-    if kind not in _NODE_KEYS:
+    node_keys = _NODE_KEYS_V2 if version == 2 else _NODE_KEYS_V1
+    if kind not in node_keys:
         raise SpecError(f"{label} has unknown kind {kind!r}")
-    _unknown(obj, _NODE_KEYS[kind], label)
+    _unknown(obj, node_keys[kind], label)
     alias = _string(obj.get("alias"), f"{label} alias", 64)
     if not _ALIAS.fullmatch(alias):
         raise SpecError(f"{label} alias must match {_ALIAS.pattern}")
@@ -108,7 +116,7 @@ def _parse_node(value: Any, index: int) -> NodeSpec:
             raise SpecError(f"{label} type is not in the generic-node allowlist")
         return NodeSpec(alias, kind, position, type=node_type)
     if kind in {"property", "sampler"}:
-        return _parse_property_node(obj, label, alias, kind, position)
+        return _parse_property_node(obj, label, alias, kind, position, version)
     name = _safe_text(obj.get("name"), f"{label} name", 128, False)
     code = _safe_text(obj.get("code"), f"{label} code", 65535, True)
     if any(char in code for char in ("@", "$")) or _CSHARP_MARKERS.search(code):
@@ -125,7 +133,14 @@ def _parse_node(value: Any, index: int) -> NodeSpec:
     return NodeSpec(alias, kind, position, name=name, code=code, output_type=output_type, inputs=inputs)
 
 
-def _parse_property_node(obj: dict, label: str, alias: str, kind: str, position: tuple[float, float]) -> NodeSpec:
+def _parse_property_node(
+    obj: dict,
+    label: str,
+    alias: str,
+    kind: str,
+    position: tuple[float, float],
+    version: int,
+) -> NodeSpec:
     node_type = "SamplerNode" if kind == "sampler" else _string(obj.get("type"), f"{label} type", 64)
     allowed = {"SamplerNode"} if kind == "sampler" else PROPERTY_NODE_TYPES
     if node_type not in allowed:
@@ -134,11 +149,19 @@ def _parse_property_node(obj: dict, label: str, alias: str, kind: str, position:
     if not _PROPERTY_NAME.fullmatch(property_name):
         raise SpecError(f"{label} property_name must be an underscored identifier")
     inspector_name = _safe_text(obj.get("inspector_name"), f"{label} inspector_name", 128, False)
+    help_text = None
+    if version == 2:
+        if not contains_han(inspector_name):
+            raise SpecError(f"{label} inspector_name must contain Chinese characters")
+        help_text = _safe_text(obj.get("help"), f"{label} help", 4096, True)
+        if not contains_han(help_text):
+            raise SpecError(f"{label} help must contain Chinese characters")
     parameter_type = obj.get("parameter_type")
     if parameter_type not in PROPERTY_TYPES:
         raise SpecError(f"{label} parameter_type must be one of {sorted(PROPERTY_TYPES)}")
     return NodeSpec(alias, kind, position, type=None if kind == "sampler" else node_type,
-                    property_name=property_name, inspector_name=inspector_name, parameter_type=parameter_type)
+                    property_name=property_name, inspector_name=inspector_name,
+                    help=help_text, parameter_type=parameter_type)
 
 
 def _parse_input(value: Any, node_label: str, index: int) -> InputSpec:

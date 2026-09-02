@@ -41,6 +41,7 @@ class NodeSpec:
     type: str | None = None
     property_name: str | None = None
     inspector_name: str | None = None
+    help: str | None = None
     parameter_type: str | None = None
     name: str | None = None
     code: str | None = None
@@ -70,6 +71,8 @@ class NodeSpec:
                 inspector_name=self.inspector_name,
                 parameter_type=self.parameter_type,
             )
+            if self.help is not None:
+                result["help"] = self.help
         if self.kind == "custom_expression":
             result.update(
                 name=self.name,
@@ -137,7 +140,13 @@ class EditorGraphSpec:
         }
 
     def editor_payload(self, asset_path: str, temporary_asset_path: str) -> dict:
-        return {**self.to_dict(), "asset_path": asset_path, "temporary_asset_path": temporary_asset_path}
+        # The fixed ASE executor protocol remains v1. Presentation-only fields
+        # are finalized and verified by the CLI after ASE commits the graph.
+        payload = self.to_dict()
+        payload["version"] = 1
+        for node in payload["nodes"]:
+            node.pop("help", None)
+        return {**payload, "asset_path": asset_path, "temporary_asset_path": temporary_asset_path}
 
     def expected_manifest(self) -> dict:
         return {

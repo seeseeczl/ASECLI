@@ -215,3 +215,35 @@ def test_property_inspector_name_accepts_chinese_display_name():
 
     assert spec.nodes[0].inspector_name == "投射遮罩"
     assert spec.expected_manifest()["nodes"][0]["inspector_name"] == "投射遮罩"
+
+
+def test_v2_requires_chinese_display_name_and_chinese_help_for_every_property():
+    raw = caster_spec()
+    raw["version"] = 2
+    raw["nodes"][0]["inspector_name"] = "投射遮罩"
+    raw["nodes"][0]["help"] = "控制投射遮罩贴图；白色区域显示阴影。"
+
+    spec = EditorGraphSpec.from_dict(raw)
+
+    assert spec.version == 2
+    assert spec.nodes[0].help == "控制投射遮罩贴图；白色区域显示阴影。"
+    assert spec.editor_payload("Assets/Caster.shader", "Assets/ASECLI-Temp-Caster.shader")["version"] == 1
+
+    missing_help = caster_spec()
+    missing_help["version"] = 2
+    missing_help["nodes"][0]["inspector_name"] = "投射遮罩"
+    with pytest.raises(SpecError, match="help"):
+        EditorGraphSpec.from_dict(missing_help)
+
+    english_display = caster_spec()
+    english_display["version"] = 2
+    english_display["nodes"][0]["help"] = "控制投射遮罩贴图。"
+    with pytest.raises(SpecError, match="inspector_name.*Chinese"):
+        EditorGraphSpec.from_dict(english_display)
+
+    english_help = caster_spec()
+    english_help["version"] = 2
+    english_help["nodes"][0]["inspector_name"] = "投射遮罩"
+    english_help["nodes"][0]["help"] = "Controls the caster mask."
+    with pytest.raises(SpecError, match="help.*Chinese"):
+        EditorGraphSpec.from_dict(english_help)

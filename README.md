@@ -16,8 +16,8 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 | 图读取与安全检查 | 解析节点/连线、结构校验、CHKSM 校验与修复、无效节点审计 | 否 |
 | 图编辑 | 设置已知字段、schema 驱动或原始行加节点、连线/断线、受保护删节点、最小差异写回 | 否 |
 | 图整理 | 分层网格布局、原生 Comment 框创建/嵌套、真实节点边界检查与自动收框、Local Var 治理规则 | 创建/检查真实边界时需要 |
-| 材质 Inspector | 安装唯一的 ASECLI ShaderGUI、折叠分组、Tooltip、HelpBox、属性排序与原子 JSON 规范；旧标记只读兼容 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
-| Shader 创建 | 从既有编译壳克隆；或由严格 `EditorGraphSpec v1` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
+| 材质 Inspector | 安装唯一的 ASECLI ShaderGUI、折叠分组、Tooltip、轻量说明条、属性排序与原子 JSON 规范；`gui-support` 报告并执行说明条呈现契约；旧标记只读兼容 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
+| Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
 | 编译桥接 | 通过 MCP for Unity 请求 ASE 重新生成 HLSL，并验证工具结果/保存语义 | 是 |
 | Agent 集成 | 全部子命令单行 JSON 输出；稳定错误码与退出码，适合 Agent 子进程编排 | 否 |
 | 工程交付 | 双 Python CI、锁文件、回归目录、可复现 wheel/sdist、SBOM、供应链与许可证检查 | 否 |
@@ -28,6 +28,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 - **节点 schema 库**：295 种节点类型的参数结构来自 ASE 运行时序列化提取；未知或版本不兼容的结构拒绝猜写。
 - **安全写入**：写前比对 SHA-256 快照、加独占锁、拒绝符号链接和陈旧快照；既有文件写入前生成相邻 `.bak` 备份。
 - **受控 Editor 创建**：固定 C# 执行器 + 白名单 JSON 规格，拒绝任意 C#、任意反射字段和不支持版本的降级写入。
+- **属性呈现契约**：所有由 `create` 生成的 ASE Shader 必须满足 `asecli.property-presentation.v1`；公开属性使用中文显示名，Tooltip 自动读取英文变量名与 Shader 默认值，属性下方必须有中文使用说明。
 - **证据分层**：文本/自动化通过不等于真实 Editor、目标 Inspector 或最终渲染画面通过；README 会明确标注这些边界。
 
 ## 环境要求
@@ -38,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前已发布版本仍为 `v0.1.0`；工作树中的 `0.2.0` 只是通过本地构建门禁的候选版本，尚未提交、打 tag 或发布。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -167,11 +168,11 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `remove-node <file> --node N [--force-external] [--write]` | 删除节点及附属连线。 | 默认预演；外部源码仍引用的 Property 默认拒删。`--force-external` 只用于已迁移消费者的明确操作。 |
 | `fix-checksum <file> [--write]` | 重算 `//CHKSM`，并报告旧值、实际值和是否已有效。 | 默认预演；`--write` 后写入并备份原文件。 |
 | `layout <file> [--gap-x X] [--gap-y Y] [--write]` | 按左到右数据流排列节点，保持连线和非位置字段不变。 | 默认预演；只改坐标。真实画布的节点宽高和贝塞尔线仍需 Editor 验收。 |
-| `gui-support <project> [--write]` | 检查或安装固定路径的 ASECLI ShaderGUI。 | 默认只检查；`--write` 仅在目标缺失时安装，目标内容冲突时拒绝覆盖，随后需 Editor 重编译。 |
-| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；为属性设置或清除 Foldout、Tooltip、HelpBox；也可原子应用 JSON 规范与排序。 | 默认预演；写入后需 `validate` 和 `recompile`。 |
+| `gui-support <project> [--write]` | 检查或安装固定路径的 ASECLI ShaderGUI，并报告内置说明条呈现契约。 | 默认只检查；`--write` 仅在目标缺失且内置资源满足 `asecli.inline-help.v1` 时安装，目标内容冲突或样式契约失效时拒绝写入，随后需 Editor 重编译。 |
+| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；为属性设置或清除 Foldout、Tooltip、HelpBox；也可原子应用显示名、说明和排序规范。 | 查询结果包含 `asecli.property-presentation.v1`；已由 ASECLI GUI 管理的文件若写后不合规则拒绝写入。 |
 | `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
-| `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；已有目标必须显式 `--force`。文本后端不需要 Unity。 |
-| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v1` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；目标必须位于 `Assets/` 且不存在，禁止 `--force`。 |
+| `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
+| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `help`，目标必须位于 `Assets/` 且不存在。 |
 | `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，并报告 `changed`。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。 |
 
 ### 推荐使用流程
@@ -222,12 +223,14 @@ asecli recompile Assets/Example.shader
   "properties": [
     {
       "name": "_PaintColor",
+      "display_name": "车漆颜色",
       "group": "固有色",
       "tooltip": "车身基础漆色。",
       "help": "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。"
     },
     {
       "name": "_Contrast",
+      "display_name": "明暗对比",
       "help": "控制车身明暗对比度；数值越大，对比越弱。"
     }
   ]
@@ -264,7 +267,7 @@ asecli comment-group Assets/Example.shader --fit --padding 30 --write
 #### 4. 创建与编译
 
 ```bash
-# 文本后端：立即新建目标；可从 donor 仅注入节点图
+# 文本后端：立即新建目标；模板和 donor 组合结果必须已经满足属性呈现契约
 asecli create Assets/NewShader.shader --from Assets/Template.shader \
   --name "Vehicle/NewShader" --graph-from Assets/Donor.shader
 
@@ -285,7 +288,7 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "template": {
     "guid": "2992e84f91cbeb14eab234972e07ea9d",
     "shader_name": "Vehicle/LocalShadow/Caster"
@@ -296,7 +299,8 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
       "kind": "sampler",
       "position": [-520, 20],
       "property_name": "_CasterMask",
-      "inspector_name": "Caster Mask",
+      "inspector_name": "投射遮罩",
+      "help": "控制投射遮罩贴图；白色区域显示阴影，黑色区域不显示。",
       "parameter_type": "Property"
     }
   ],
@@ -306,9 +310,11 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
 }
 ```
 
+- CLI 创建要求 `EditorGraphSpec v2`。每个 Property/Sampler 必须提供含中文的 `inspector_name` 和 `help`；v1 仅保留底层桥接兼容，不再作为正式 CLI 创建输入。
 - 首期绑定 ASE `1.9.6.2`；Master 端口契约只开放已实测的 URP Unlit 模板 GUID。未知版本、模板 Master 端口、节点、字段、端口或类型在写入前失败。
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
-- 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标重载一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
+- 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图；CLI 属性收尾后使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
+- MCP 3.4.7 默认按源码模式拦截 `AssetDatabase.DeleteAsset`。CLI 仅对包内固定、参数已校验且暂存名带随机 nonce 的事务执行器设置该次 `safety_checks=false`；不会把用户 C# 透传到这一入口。
 - MCP 客户端超时代表完成状态未知，不等同于 Editor 已停止或已回滚。重试前先检查目标文件及同目录 `ASECLI-Temp-*`，避免把迟到成功误判为失败。
 - 隔离团结 E2E 已证明 Caster-like/Receiver-like 图可创建、保存、关闭并由新进程重载；这不证明目标工程的运行时矩阵注入、材质绑定或最终渲染画面正确。
 
@@ -321,7 +327,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 {"ok": false, "error": {"code": "NOT_FOUND", "message": "..."}}
 ```
 
-常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`EXTERNAL_REFERENCE`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
+常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`EXTERNAL_REFERENCE`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
 退出码：`0` 成功 · `2` 用法/校验/解析错误 · `3` 桥接错误
 
 ## ASE 格式备忘（Agent 必读）
@@ -334,11 +340,13 @@ stdout 恒为单行 JSON，agent 可直接解析：
 
 ### 自定义 GUI 分组规则
 
-- 公开属性默认使用中文显示名。新 Property 通过 EditorGraphSpec 的 `inspector_name` 写入；已有属性先用 `custom-gui` 查看 `display_name`，再由 ASE Editor 或确认过的节点字段修改，不要只编辑重编译后会被覆盖的 ShaderLab `Properties` 行。
+- `asecli.property-presentation.v1` 是硬门禁：每个导出 Property 必须使用中文 `display_name`、由 ASECLI GUI 自动显示英文变量名与 Shader 默认值的 Tooltip，并具有一条中文 `ASECLIHelpBox` 使用说明。`custom-gui` 查询结果会逐属性报告 `valid` 和 `violations`。
+- 新 Property 通过 EditorGraphSpec v2 的 `inspector_name`/`help` 写入；已有属性使用 `custom-gui --spec` 的 `display_name`/`help` 原子治理。CLI 同步图字段与编译区显示名，不要手工只改 ShaderLab `Properties` 行。
 - `--group` 会给目标属性写入 `ASECLIFoldout`；`--tooltip` 与 `--help-box` 分别写 `ASECLITooltip` 和 `ASECLIHelpBox`。目标属性成为分组首项，后续属性一直归入该组，直到下一个带非空分组标题的属性；因此应选择材质面板中该组的第一个 PropertyNode。
 - `--property _PaintColor` 可替代节点 ID；批量整理使用 `--spec`。`reorder=true` 按 `properties` 数组重写 PropertyNode 的 `m_orderIndex`，未列属性保持原相对顺序并追加。
 - ASECLI GUI 会在 Tooltip 中自动追加准确变量名与默认基线，并通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值。`--tooltip` 只写可选的额外悬浮说明，不再人工复制变量名和默认值。
 - `--help-box` 是属性下方的常驻中文说明，应写清用途、通道/单位和“调大/调小”的结果，不重复变量名和默认值。中文、换行和 emoji 按已验证的 UTF-16 `#XXXX` 规则编码。
+- 常驻说明统一遵循 `asecli.inline-help.v1`：无图标、无原生 HelpBox 外框、弱背景、左侧强调线、小号弱化斜体文字并自动换行。`gui-support` 在 JSON 的 `capabilities.inline_help_presentation` 中报告契约和校验结果；契约无效时 `--write` 失败关闭。
 - 先运行 `gui-support <project>`，确认 `recommended_editor` 后使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。旧 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 只读取兼容；同语义写入或对应 clear 会迁移该属性，工具不扫描、选择或写入原生 MZGUI。
 - `custom-gui --write` 会同步图内主 Master 与编译区 `CustomEditor`、重算 `CHKSM` 并保留 `.bak`；Property 属性声明由 ASE 生成，因此随后必须执行 `validate` 和 `recompile`。
 
@@ -358,9 +366,9 @@ BatchMode 只验证编译与元数据，不替代实际 Inspector 中的 Tooltip
   "editor": "ASECLI.MaterialGUI.ASECLIMaterialGUI",
   "reorder": true,
   "properties": [
-    {"name": "_PaintColor", "group": "固有色", "tooltip": "车身基础漆色。", "help": "控制车辆基础漆面颜色。"},
-    {"name": "_Contrast", "help": "控制车身明暗对比度；数值越大，对比越弱。"},
-    {"name": "_Coat_IO", "group": "清漆层", "help": "控制是否启用清漆层。"}
+    {"name": "_PaintColor", "display_name": "车漆颜色", "group": "固有色", "tooltip": "车身基础漆色。", "help": "控制车辆基础漆面颜色。"},
+    {"name": "_Contrast", "display_name": "明暗对比", "help": "控制车身明暗对比度；数值越大，对比越弱。"},
+    {"name": "_Coat_IO", "display_name": "清漆开关", "group": "清漆层", "help": "控制是否启用清漆层。"}
   ]
 }
 ```
