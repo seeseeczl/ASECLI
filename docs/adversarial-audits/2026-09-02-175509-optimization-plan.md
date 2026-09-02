@@ -42,7 +42,7 @@
 - [x] 全量 pytest、REG catalog、CI governance、供应链、双 Python 和可复现构建通过。
 - [x] AA-TEST-003 已在当前真实团结实例完成 v2 创建、暂存重载、提交、独立 recompile、reconciliation 和 Inspector 验收；中文显示名/中文说明可见，用户现场确认两项 Tooltip 气泡正常。新进程重开受“仅用当前实例”约束未执行，不冒充已验证。
 - [x] AA-OPT-003 已完成 `0.2.0` 版本、可复现构建、隔离安装与 0.1.0 回滚演练；用户随后授权提交和推送，`0.2.0` 候选已进入 `origin/main`；tag/Release 仍未获单独授权，因此没有执行。
-- [x] 残留风险已在 README、REG-0037/0038/0039、TASK-0032 和本计划中分层披露。
+- [x] 残留风险已在 README、REG-0037/0038/0039/0040、TASK-0032 和本计划中分层披露。
 
 ## 6. 未映射项
 
@@ -50,9 +50,9 @@
 
 ## 7. 执行记录（2026-09-02）
 
-- 自动回归：Python 3.10/3.12 均 `223 passed, 3 skipped`；REG catalog 35 条、CI governance、离线供应链、ASECLI Skill 和 `git diff --check` 通过。
+- 自动回归：Python 3.10/3.12 均 `223 passed, 3 skipped`；REG catalog 36 条、CI governance、离线供应链、ASECLI Skill 和 `git diff --check` 通过。
 - 构建：`asecli-0.2.0-py3-none-any.whl` 与 `asecli-0.2.0.tar.gz` 双构建逐字节一致；隔离环境完成 0.2.0 安装、0.1.0 回滚和 0.2.0 恢复。最终产物 SHA-256 仅在构建完成后的外部回执/Release manifest 记录，避免 sdist 收录本文后形成自引用哈希。
 - 架构：Project Architect strict 当前工作树与 HEAD 均为同一批 31 项历史问题（kickoff 2、traceability 25、fitness 4），本次未新增。
 - 真实 Editor：当前团结 `2022.3.61t9`、ASE `1.9.6.2`、MCP 3.4.7 成功创建 v2 Sampler/RangedFloat，Save/暂存重载/manifest/commit 均确认；独立 `recompile` 后 `_AuditMask`、`_AuditStrength` 图/编译区双向一致、中文显示名和中文 HelpBox 零违规。Inspector 中“验证遮罩”“验证强度”及各自中文说明可见，当前实例反射得到 Tooltip 为 `_AuditMask`/`None` 与 `_AuditStrength`/`0`，用户现场确认两项气泡正常。
-- 实测新增缺陷：BUG-0016/REG-0038 记录 MCP `data.result` envelope、安全扫描拦截固定回滚代码和回执前插件重连；已最小修复并在当前实例复验。首次 `0.2.0` 推送又以 GitHub run 33623943475 复现 BUG-0017：verify 全绿，但 package 安装路径、SPDX 与 artifact 名仍硬编码 `0.1.0`；REG-0039 已要求单一动态版本源并阻止工作流重新硬编码。
-- 清理与边界：视觉验收后已恢复 `VehicleLocalShadowReceiver.mat` 选择，并由当前实例精确删除验证 `.shader/.meta/.mat` 四个文件；磁盘与 AssetDatabase 均确认不存在，且无 `ASECLI-Temp-*` 残留。新进程重开因用户明确要求仅使用当前实例而未执行；目标平台渲染未执行。代码已提交并推送，修复提交的远端 package 仍需复验；tag/Release 未执行。
+- 实测新增缺陷：BUG-0016/REG-0038 记录 MCP `data.result` envelope、安全扫描拦截固定回滚代码和回执前插件重连；已最小修复并在当前实例复验。首次 `0.2.0` 推送又以 GitHub run 33623943475 复现 BUG-0017：verify 全绿，但 package 安装路径、SPDX 与 artifact 名仍硬编码 `0.1.0`；REG-0039 已要求单一动态版本源并阻止工作流重新硬编码。run 33624498244 随后全绿，但下载 artifact 的 SHA256SUMS 含 `dist/` 前缀而不能直接校验；BUG-0018/REG-0040 已要求生成可移植清单并做下载后复验。
+- 清理与边界：视觉验收后已恢复 `VehicleLocalShadowReceiver.mat` 选择，并由当前实例精确删除验证 `.shader/.meta/.mat` 四个文件；磁盘与 AssetDatabase 均确认不存在，且无 `ASECLI-Temp-*` 残留。新进程重开因用户明确要求仅使用当前实例而未执行；目标平台渲染未执行。代码已提交并推送，最终修复提交的远端 package 与下载 artifact 清单仍需复验；tag/Release 未执行。

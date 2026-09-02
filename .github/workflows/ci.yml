@@ -75,7 +75,7 @@ jobs:
             ${{ env.ASECLI_REPRO_REPORT }}
           if-no-files-found: error
       - run: mkdir dist && cp "$ASECLI_BUILD_A"/* dist/
-      - run: shasum -a 256 dist/*.whl dist/*.tar.gz > dist/SHA256SUMS
+      - run: cd dist && shasum -a 256 *.whl *.tar.gz > SHA256SUMS
       - run: uv run --frozen python tools/generate_sbom.py --dist dist --output "dist/asecli-$ASECLI_VERSION.spdx.json"
       - run: uv run --frozen python tools/supply_chain_check.py --output dist/supply-chain-check.json
       - run: uv venv .artifact-venv --python 3.12

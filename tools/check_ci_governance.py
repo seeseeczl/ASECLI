@@ -34,8 +34,11 @@ def main() -> int:
 
     hardcoded_artifact_version = re.compile(r"asecli-\d+\.\d+\.\d+")
     for path in (root / ".github/workflows").glob("*.yml"):
-        if hardcoded_artifact_version.search(path.read_text(encoding="utf-8")):
+        workflow = path.read_text(encoding="utf-8")
+        if hardcoded_artifact_version.search(workflow):
             findings.append(f"hard-coded asecli artifact version: {path.relative_to(root)}")
+        if "shasum -a 256 dist/*.whl dist/*.tar.gz" in workflow:
+            findings.append(f"non-portable artifact checksum paths: {path.relative_to(root)}")
 
     print(json.dumps({"ok": not findings, "findings": findings}, ensure_ascii=False))
     return 0 if not findings else 1
