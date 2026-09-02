@@ -38,7 +38,7 @@
 
 - 普通 `pytest` 与 mock 证明纯文本、CLI、MCP 响应解析和安全契约，不替代真实 Tuanjie/MCP。
 - `@pytest.mark.bridge` 只有在隔离工程、真实编辑器和实际 MCP 会话中运行后才能标为目标平台通过；当前证据为 `1 passed, 79 deselected`，测试 shader 前后 SHA-256 不同且最终 validate 0 errors。
-- 本地构建/安装/回滚只证明可复制交付流程；GitHub Actions run 33510909955 已完成双 Python、可复现构建、SPDX、供应链、隔离安装与下载 artifact 复验，但 GitHub Release/PyPI 仍未执行。
+- 本地构建/安装/回滚只证明可复制交付流程；`v0.1.0@fbd9941` 的 GitHub Actions run 33594698477 已完成双 Python、可复现构建、SPDX、供应链与隔离安装。私有正式 Release 的六项资产已下载复验，最终 wheel 的在线依赖漏洞扫描未发现依赖漏洞；PyPI/CLI Hub/公开分发仍未执行。
 - REG-0022 的纯文本读写只证明 ASE 元数据与编译指令正确；材质 Inspector 中折叠、悬停和帮助框的真实视觉/交互效果，必须在写回并重编译后的目标 Tuanjie/Unity 工程单独验收。
 - REG-0030 的 Python 测试证明 ASECLI 安装、冲突保护和资源契约；隔离团结 `2022.3.61t9` 已通过当前 C# 资源编译、三种 ASECLI attribute 实例化、旧标记读取和 Shader 默认值读取（`1 passed`）。同版本当前运行实例还确认了原生同名旧 drawer 冲突、fallback 源读取、新/旧 HelpBox 与标题点击的展开/收起。用户提供的实机截图还确认实际悬停浮层显示变量名 `_BaseColor` 和默认值 `RGBA(1.000, 1.000, 1.000, 1.000)`；桌面自动化不具备独立鼠标停留 API，但不再将 Tooltip 视觉列为未验收。
 - REG-0023/0024 自动测试证明规范的原子文本行为和原生 Comment 结构，不证明普通节点默认尺寸估计后的视觉边距；目标 ASE 编辑器仍需检查折叠顺序、说明可读性、框边距和连线可读性。
