@@ -3,12 +3,12 @@ FR-0001,功能,已确认,ADR-0001,MOD-CORE,TASK-0003 TASK-0004 TASK-0014,REG-000
 FR-0002,功能,已确认,ADR-0003 ADR-0006,MOD-SCHEMA MOD-CORE,TASK-0005 TASK-0006 TASK-0007,REG-0002 REG-0009 REG-0013 REG-0015,2026-09-01 自动回归通过,,long,图修改与 schema 版本安全
 FR-0003,功能,已确认,ADR-0003 ADR-0006,MOD-CHECK MOD-CLI,TASK-0008 TASK-0009,REG-0003 REG-0004 REG-0018,2026-09-01 自动回归通过,,long,校验与显式 checksum 写入
 FR-0004,功能,已确认,ADR-0002 ADR-0007,MOD-BRIDGE,TASK-0001 TASK-0011,REG-0005 REG-0016 REG-0017,2026-09-01 隔离 Tuanjie/MCP 成功失败路径通过,REL-0001,long,MCP 重编译
-FR-0005,功能,已确认,ADR-0002 ADR-0006 ADR-0015,MOD-CORE MOD-CLI,TASK-0012 TASK-0032,REG-0006 REG-0014 REG-0037,2026-09-02 自动验证文本创建对属性呈现契约失败关闭,REL-0001,long,模板壳与 donor 图创建必须产生合规最终文件
+FR-0005,功能,已确认,ADR-0002 ADR-0006 ADR-0015,MOD-CORE MOD-CLI,TASK-0012 TASK-0032,REG-0006 REG-0014 REG-0037,2026-09-02 自动验证文本创建对属性呈现契约失败关闭；v0.2.0 私有正式 Release 已发布,REL-0001 REL-0003,long,模板壳与 donor 图创建必须产生合规最终文件
 FR-0006,功能,已确认,ADR-0001,MOD-SKILL,TASK-0013,REG-0010,2026-09-01 Agent E2E 隔离验收通过,REL-0001,long,Agent 技能文档
 FR-0007,功能,已确认,ADR-0001 ADR-0006 ADR-0007,MOD-CLI,TASK-0010 TASK-0013,REG-0007 REG-0017 REG-0018,2026-09-01 自动回归通过,,long,CLI JSON 契约与安全输入
 FR-0008,功能,已确认,ADR-0005,MOD-LAYOUT,TASK-0015,REG-0012,2026-09-01 自动回归通过,,long,节点布局整理
 FR-0009,功能,已确认,ADR-0010 ADR-0011 ADR-0013 ADR-0014,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0020 TASK-0021 TASK-0030 TASK-0031,REG-0022 REG-0023 REG-0030 REG-0032 REG-0035 REG-0036,2026-09-02 自动与团结 Inspector/Tooltip/轻量说明条通过；v0.1.0@fbd9941 的既有发布证据保持历史记录,REL-0002,long,新写入为 ASECLI 三标记与唯一内置 GUI；说明条呈现契约由 gui-support 公开报告并写前强制；旧三标记只读兼容
-FR-0010,功能,已确认,ADR-0011 ADR-0015,MOD-CUSTOM-GUI MOD-COMMENTARY MOD-CLI MOD-SKILL,TASK-0013 TASK-0021 TASK-0022 TASK-0032,REG-0010 REG-0023 REG-0024 REG-0037,2026-09-02 属性呈现契约自动门禁通过；当前团结 v2 临时材质的中文显示名/说明可见且 Tooltip 由用户现场确认；Master 设置目标平台待实际任务验收,,long,中文显示名 自动技术 Tooltip 中文说明现由 CLI 强制
+FR-0010,功能,已确认,ADR-0011 ADR-0015,MOD-CUSTOM-GUI MOD-COMMENTARY MOD-CLI MOD-SKILL,TASK-0013 TASK-0021 TASK-0022 TASK-0032,REG-0010 REG-0023 REG-0024 REG-0037,2026-09-02 属性呈现契约自动门禁通过；当前团结 v2 临时材质的中文显示名/说明可见且 Tooltip 由用户现场确认；Master 设置目标平台待实际任务验收,REL-0003,long,中文显示名 自动技术 Tooltip 中文说明现由 CLI 强制
 CR-0007,变更,已确认,ADR-0011,MOD-SKILL,TASK-0013,REG-0010,2026-09-01 Skill 与真实参考静态证据通过目标图待应用,,long,跨区复用优先 Register/Get Local Var 防蜘蛛网
 CR-0010,变更,已确认,ADR-0014,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0030,REG-0022 REG-0023 REG-0030 REG-0032 REG-0035,2026-09-02 自动与团结 Inspector/Tooltip 通过；v0.1.0@fbd9941 的 CI 33594698477、私有 Release 五项载荷 hash 和清单摘要、隔离安装与回滚通过,REL-0002,long,ASECLI 三标记新写入；旧三标记只读兼容并有无属性 API 的源读取 fallback；移除原生选择与 runtime probe
 CR-0001,变更,已确认,ADR-0002,MOD-BRIDGE,TASK-0011,REG-0005,2026-09-01 真实 MCP bridge 通过,REL-0001,long,桥接传输改为 MCP 主通道
@@ -25,8 +25,8 @@ BUG-0006,缺陷,已解决,ADR-0006,MOD-CHECK MOD-CLI,TASK-0009,REG-0004 REG-0018
 BUG-0007,缺陷,已解决,ADR-0001,MOD-CORE,TASK-0014,REG-0011,2026-09-01 1007 节点 5 轮通过,,long,性能假门禁
 BUG-0008,缺陷,已解决,ADR-0001,MOD-CLI,TASK-0016,REG-0020,2026-09-01 catalog 18 条可收集,,long,治理路径漂移
 BUG-0009,缺陷,已解决,ADR-0008,MOD-CORE MOD-CLI,TASK-0017,REG-0019,2026-09-01 自动回归通过,,long,跨模块私有导入
-CR-0006,变更,已确认,ADR-0009,MOD-CLI,TASK-0018 TASK-0019,REG-0021,2026-09-02 v0.1.0 私有正式 Release、五项载荷 hash 和清单摘要、SPDX、供应链与漏洞扫描通过,REL-0001 REL-0002,long,CI REL 与供应链基线；公开包仓仍未发布
-FR-0011,功能,已确认,ADR-0012 ADR-0015,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028 TASK-0032,REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 REG-0040,2026-09-02 v2 规格与 CLI 后验治理自动通过；当前团结 2022.3.61t9/MCP 3.4.7 完成 v2 创建 独立重编译和 Inspector 验收；验证资产已清理；CI 版本化包路径与可移植校验清单已补强；新进程重开按约束未执行,,long,正式 CLI 使用 EditorGraphSpec v2 强制属性呈现
+CR-0006,变更,已确认,ADR-0009,MOD-CLI,TASK-0018 TASK-0019,REG-0021,2026-09-02 v0.2.0 私有正式 Release、五项载荷 hash 和清单摘要、SPDX、供应链与漏洞扫描通过,REL-0001 REL-0002 REL-0003,long,CI REL 与供应链基线；公开包仓仍未发布
+FR-0011,功能,已确认,ADR-0012 ADR-0015,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028 TASK-0032,REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 REG-0040,2026-09-02 v2 规格与 CLI 后验治理自动通过；当前团结 2022.3.61t9/MCP 3.4.7 完成 v2 创建 独立重编译和 Inspector 验收；验证资产已清理；CI 版本化包路径与可移植校验清单已补强；v0.2.0 已私有正式发布；新进程重开按约束未执行,REL-0003,long,正式 CLI 使用 EditorGraphSpec v2 强制属性呈现
 CR-0008,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028,REG-0026 REG-0027 REG-0028 REG-0029,2026-09-01 自动回归与隔离团结双进程 E2E 通过,,long,离线文本与窄范围 Editor 后端按能力路由；目标画面待验
 CR-0009,变更,已确认,ADR-0009 ADR-0010 ADR-0012 ADR-0013,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI,TASK-0029,REG-0031 REG-0032 REG-0033 REG-0034 REG-0035,2026-09-01 自动与 GitHub run 33510909955 artifact 通过；真实 GUI probe 待验,,long,第二轮对抗性审计整改
 BUG-0010,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0029,REG-0031,2026-09-01 GitHub run 33510909955 与下载 artifact 复验通过,,long,构建输出自包含导致 sdist 不一致
@@ -36,8 +36,8 @@ BUG-0013,缺陷,已解决,ADR-0012,MOD-BRIDGE MOD-CLI,TASK-0029,REG-0034,2026-09
 BUG-0014,缺陷,已解决,ADR-0013,MOD-GUI-SUPPORT,TASK-0029,REG-0035,2026-09-01 自动通过真实反射待目标 Editor,,long,原生 MZGUI 检测假阴性
 BUG-0015,缺陷,已解决,ADR-0014,MOD-GUI-SUPPORT,TASK-0031,REG-0036,2026-09-02 自动回归与当前团结 2022.3.61t9 Inspector 对照通过；Console 0 error,,long,原生 Info HelpBox 不符合目标轻量说明条样式；CLI 现已公开并强制 asecli.inline-help.v1
 CR-0011,变更,已确认,ADR-0014,MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI,TASK-0031,REG-0036,2026-09-02 全量 208 passed/3 skipped；当前团结 Inspector 与 Console 通过；strict 与 HEAD 同为 29 项历史问题,,long,gui-support additive 公开 asecli.inline-help.v1 并在失效时写前拒绝；待后续发布
-CR-0012,变更,已确认,ADR-0015,MOD-CUSTOM-GUI MOD-BRIDGE MOD-CLI,TASK-0032,REG-0037 REG-0038 REG-0039 REG-0040,2026-09-02 双 Python 223 passed/3 skipped；REG 36 条、治理、供应链、Skill 和可复现 0.2.0 构建通过；现有两个真实 Shader 共 7 属性零违规；当前团结 v2 创建/重编译后两属性零差异；Inspector 中文显示名/说明可见且 Tooltip 由用户现场确认；验证资产已清理；首次推送的 package 历史版本硬编码与下载清单路径前缀已修复,,long,asecli.property-presentation.v1 可查询可治理并强制所有 CLI create 输出；新进程重开未执行；0.2.0 已推送但尚未打 tag 或发布
-CR-0013,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0032,REG-0038,2026-09-02 失败优先契约测试后 editor_create 与 CLI 回归断言 staging_reloaded 与 target_graph_reloaded,,long,create JSON 区分暂存重载与目标图重载；reloaded 保留为暂存兼容别名
-BUG-0016,缺陷,已解决,ADR-0012,MOD-BRIDGE,TASK-0032,REG-0038,2026-09-02 自动回归和当前团结 2022.3.61t9/MCP 3.4.7 v2 创建与重编译通过,,long,兼容 execute_code data.result envelope和安全扫描；移除回执前重复目标图加载
-BUG-0017,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0039,2026-09-02 GitHub run 33623943475 失败优先；本地动态版本路径 SBOM 与治理检查通过；远端修复提交待复验,,long,0.2.0 package job 不得硬编码 0.1.0 artifact 路径
-BUG-0018,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0040,2026-09-02 run 33624498244 下载 artifact 失败优先；本地可移植 SHA256SUMS 通过；远端修复提交待复验,,long,artifact 校验清单不得包含 CI 工作区 dist 路径前缀
+CR-0012,变更,已确认,ADR-0015,MOD-CUSTOM-GUI MOD-BRIDGE MOD-CLI,TASK-0032,REG-0037 REG-0038 REG-0039 REG-0040,2026-09-02 双 Python 223 passed/3 skipped；REG 36 条、治理、供应链、Skill 和可复现 0.2.0 构建通过；现有两个真实 Shader 共 7 属性零违规；当前团结 v2 创建/重编译后两属性零差异；Inspector 中文显示名/说明可见且 Tooltip 由用户现场确认；验证资产已清理；v0.2.0 私有正式 Release 五项载荷 hash 和清单摘要通过,REL-0003,long,asecli.property-presentation.v1 可查询可治理并强制所有 CLI create 输出；新进程重开未执行
+CR-0013,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0032,REG-0038,2026-09-02 失败优先契约测试后 editor_create 与 CLI 回归断言 staging_reloaded 与 target_graph_reloaded；随 v0.2.0 私有正式 Release 交付,REL-0003,long,create JSON 区分暂存重载与目标图重载；reloaded 保留为暂存兼容别名
+BUG-0016,缺陷,已解决,ADR-0012,MOD-BRIDGE,TASK-0032,REG-0038,2026-09-02 自动回归和当前团结 2022.3.61t9/MCP 3.4.7 v2 创建与重编译通过,REL-0003,long,兼容 execute_code data.result envelope和安全扫描；移除回执前重复目标图加载
+BUG-0017,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0039,2026-09-02 GitHub run 33637146781 动态 0.2.0 包路径通过；私有 Release 已发布,REL-0003,long,0.2.0 package job 不得硬编码 0.1.0 artifact 路径
+BUG-0018,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0040,2026-09-02 run 33637146781 下载 artifact SHA256SUMS 可直接校验；私有 Release 五项载荷复验通过,REL-0003,long,artifact 校验清单不得包含 CI 工作区 dist 路径前缀

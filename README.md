@@ -39,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前已发布版本仍为 `v0.1.0`；`main` 中的 `0.2.0` 是已提交并推送的候选版本，尚未打 tag 或发布。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前已发布版本为 `v0.2.0`；需要回滚时仍可安装不可变的 `v0.1.0`。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -47,17 +47,24 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 gh auth login
-mkdir asecli-v0.1.0
-cd asecli-v0.1.0
-gh release download v0.1.0 --repo seeseeczl/ASECLI
+mkdir asecli-v0.2.0
+cd asecli-v0.2.0
+gh release download v0.2.0 --repo seeseeczl/ASECLI
 shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.1.0-py3-none-any.whl
+uv tool install ./asecli-0.2.0-py3-none-any.whl
 asecli --help
 ```
 
 `uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
 
 ```bash
+uv tool install --force ./asecli-0.2.0-py3-none-any.whl
+```
+
+回滚到上一正式版：
+
+```bash
+gh release download v0.1.0 --repo seeseeczl/ASECLI
 uv tool install --force ./asecli-0.1.0-py3-none-any.whl
 ```
 
@@ -67,7 +74,7 @@ uv tool install --force ./asecli-0.1.0-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.1.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.1.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。
+正式版本与校验资产见 [ASECLI v0.2.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.2.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
@@ -485,7 +492,7 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.1.0` 已按本次授权发布为私有正式 Release，后续版本不会因此自动发布。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.2.0` 已按本次授权发布为私有正式 Release，后续版本不会因此自动发布。
 
 ### 供应链、许可证与密钥
 
