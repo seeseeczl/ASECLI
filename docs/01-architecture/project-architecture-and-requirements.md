@@ -5,7 +5,7 @@ status: 已确认
 version: 1.9.0
 created_at: 2026-08-31T23:25:00+08:00
 owner: long
-related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, BUG-0015, BUG-0017, BUG-0018, FR-0009, FR-0010, FR-0011, AUD-20260901]
+related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, CR-0013, BUG-0015, BUG-0017, BUG-0018, FR-0009, FR-0010, FR-0011, AUD-20260901]
 supersedes: 无（首次启动）
 evidence: [ASE 源码分析; MCP for Unity 桥接实验; 2026-09-01 标准审计与整改]
 kickoff_completion: complete

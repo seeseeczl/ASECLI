@@ -210,7 +210,7 @@ Editor 创建规则：
 - 只用于尚不存在、位于当前 Unity/Tuanjie 工程 `Assets/` 下的 `.shader`；禁止 `--force`，不得拿它覆盖或迁移生产 Shader。
 - 正式 CLI 创建使用 `EditorGraphSpec v2`，每个 Property/Sampler 必填中文 `inspector_name` 与中文 `help`；底层 v1 只保留桥接兼容。URP Unlit 模板 GUID `2992e84f91cbeb14eab234972e07ea9d` 的端口、方向、基本类型和 `property_name` 唯一性均在 MCP 前校验。
 - 固定执行器调用 ASE 的 `CreateNewTemplateShader`、`CreateNode`、`ParentGraph.CreateConnection`、`SaveToDisk`、`LoadFromDisk`；不要生成或要求用户提供一次性 C#，也不要手工拼 ShaderLab/HLSL/ASEBEGIN 冒充 Editor 结果。
-- 成功结果必须对账 `template_guid`、`shader_name`、节点/属性/Custom Expression 输入输出和连接 manifest。创建调用只重载并核对暂存图，提交后由独立 `recompile` 重载目标，避免 MCP 插件重连吞掉成功回执；最终发布前仍要用新 Editor 进程重开目标。结构通过不等于目标材质和渲染画面通过。
+- 成功结果必须对账 `template_guid`、`shader_name`、节点/属性/Custom Expression 输入输出和连接 manifest。创建调用只重载并核对暂存图：JSON 的 `reloaded`/`staging_reloaded=true` 不等于目标图已重开，`target_graph_reloaded` 为 `false`。提交后由独立 `recompile` 重载目标，避免 MCP 插件重连吞掉成功回执；最终发布前仍要用新 Editor 进程重开目标。结构通过不等于目标材质和渲染画面通过。
 - MCP 3.4.7 的模式扫描会拦截固定回滚代码中的 `DeleteAsset`；CLI 只对包内固定、nonce 隔离的创建执行器设置该次 `safety_checks=false`，规格不能传入任意 C#。
 - MCP 超时是未知完成状态。重试前检查目标和同目录 `ASECLI-Temp-*`；若目标已出现，先 `validate` 并在 ASE 中重开核对，不能直接再次创建。
 
@@ -220,6 +220,7 @@ Editor 创建规则：
 - 错误码：`PARSE_ERROR` / `NOT_FOUND` / `USAGE_ERROR` / `SCHEMA_UNAVAILABLE` / `GUI_SUPPORT_ERROR` / `CUSTOM_GUI_ERROR` / `PROPERTY_PRESENTATION_ERROR` / `COMMENT_GROUP_ERROR` / `EXTERNAL_REFERENCE` / `VALIDATION_ERROR` / `CHECKSUM_FORMAT_ERROR` / `WRITE_CONFLICT` / `UNSAFE_PATH` / `WRITE_ERROR` / `BRIDGE_ERROR` / `INTERNAL`。
 - 退出码：0 成功；2 用法/校验/解析错误；3 桥接错误。
 - 不加 `--write` 时命令只做 dry-run（`data.written=false`）。
+- Editor `create` 成功 data 保留 `reloaded` 作为暂存重载兼容别名，并含 `staging_reloaded=true` 与 `target_graph_reloaded=false`；目标图重载必须走随后的独立 `recompile`。
 
 ## 桥接前提
 

@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import stat
 
-from ..core.custom_gui import ASECLI_GUI_EDITOR
+from ..core import ASECLI_GUI_EDITOR
 from .gui_presentation import inspect_inline_help_presentation, require_inline_help_presentation
 
 GUI_SUPPORT_ASSET_PATH = "Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"

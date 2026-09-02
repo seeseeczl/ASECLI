@@ -146,6 +146,8 @@ def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, m
             "ase_version": "1.9.6.2",
             "saved": True,
             "reloaded": True,
+            "staging_reloaded": True,
+            "target_graph_reloaded": False,
             "committed": True,
             "changed": True,
             "manifest": spec.expected_manifest(),
@@ -158,6 +160,9 @@ def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, m
     assert rc == 0
     assert payload["data"]["backend"] == "editor"
     assert payload["data"]["saved"] is True
+    assert payload["data"]["reloaded"] is True
+    assert payload["data"]["staging_reloaded"] is True
+    assert payload["data"]["target_graph_reloaded"] is False
     assert payload["data"]["property_presentation"]["valid"] is True
     assert AseFile.from_path(target).graph.nodes
 

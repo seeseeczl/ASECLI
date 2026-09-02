@@ -71,7 +71,10 @@ def create_shader_via_mcp(
         "template_guid": response["template_guid"],
         "shader_name": response["shader_name"],
         "saved": True,
+        # Compat: reloaded means the staging asset was LoadFromDisk'd, not the committed target.
         "reloaded": True,
+        "staging_reloaded": True,
+        "target_graph_reloaded": False,
         "committed": True,
         "changed": True,
         "manifest": response["manifest"],

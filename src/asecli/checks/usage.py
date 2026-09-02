@@ -6,9 +6,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 import re
 
-from ..core.custom_gui import is_material_property_node
-from ..core.local_vars import local_var_edges
-from ..core.model import AseGraph, NodeLine
+from ..core import AseGraph, NodeLine, is_material_property_node, local_var_edges
 
 
 COMMENTARY_TYPE = "AmplifyShaderEditor.CommentaryNode"

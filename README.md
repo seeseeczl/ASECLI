@@ -313,7 +313,7 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
 - CLI 创建要求 `EditorGraphSpec v2`。每个 Property/Sampler 必须提供含中文的 `inspector_name` 和 `help`；v1 仅保留底层桥接兼容，不再作为正式 CLI 创建输入。
 - 首期绑定 ASE `1.9.6.2`；Master 端口契约只开放已实测的 URP Unlit 模板 GUID。未知版本、模板 Master 端口、节点、字段、端口或类型在写入前失败。
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
-- 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图；CLI 属性收尾后使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
+- 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图。成功 JSON 中 `reloaded` 与 `staging_reloaded` 表示暂存图已 LoadFromDisk；`target_graph_reloaded` 恒为 `false`。CLI 属性收尾后必须使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
 - MCP 3.4.7 默认按源码模式拦截 `AssetDatabase.DeleteAsset`。CLI 仅对包内固定、参数已校验且暂存名带随机 nonce 的事务执行器设置该次 `safety_checks=false`；不会把用户 C# 透传到这一入口。
 - MCP 客户端超时代表完成状态未知，不等同于 Editor 已停止或已回滚。重试前先检查目标文件及同目录 `ASECLI-Temp-*`，避免把迟到成功误判为失败。
 - 隔离团结 E2E 已证明 Caster-like/Receiver-like 图可创建、保存、关闭并由新进程重载；这不证明目标工程的运行时矩阵注入、材质绑定或最终渲染画面正确。

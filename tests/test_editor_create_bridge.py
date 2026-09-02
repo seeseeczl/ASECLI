@@ -132,6 +132,8 @@ def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):
     assert seen["safety_checks"] is False
     assert result["saved"] is True
     assert result["reloaded"] is True
+    assert result["staging_reloaded"] is True
+    assert result["target_graph_reloaded"] is False
     assert result["changed"] is True
     assert len(result["transaction_nonce"]) == 32
     assert result["transaction_nonce"] in json.loads(
