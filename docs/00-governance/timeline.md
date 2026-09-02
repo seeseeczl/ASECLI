@@ -34,3 +34,4 @@
 | 2026-09-01 | 审计 | Editor 创建后端对抗性审计发现 P1=2/P2=2；Shader 身份、端口预检、属性唯一性和关闭回滚均已修复，结构能力条件通过；生产工程与目标渲染画面未执行 | TASK-0028 AA-COR-001 AA-COR-002 AA-DATA-001 AA-FAIL-001 |
 | 2026-09-01 | 审计/交付 | 第二轮对抗性审计 AA-OPT-001～005 完成；本地 206 passed/2 skipped，GitHub Actions run 33510909955 的 Python 3.10/3.12/package 全绿，下载 artifact 哈希/SPDX/隔离安装复验通过；目标 GUI probe、Inspector 与渲染仍待验 | CR-0009 TASK-0029 REG-0031~0035 |
 | 2026-09-02 | 验证/修复 | 使用当前运行的团结 `2022.3.61t9` 实机发现旧 drawer 同名冲突和 ShaderGUI 实例跨 Layout/Repaint 丢失折叠状态；改为仅从 `Assets/` 源 Shader 补齐缺失旧元数据，并持久化折叠状态。新/旧样例的分组、默认值、HelpBox、标题点击展开/收起通过；用户实机截图确认 Tooltip 悬停浮层显示变量名和默认值 | CR-0010 AA-COMPAT-001 AA-UI-001 REG-0030 |
+| 2026-09-02 | 交付 | `e513fc5` 已推送 `main`；[GitHub Actions run 33594344611](https://github.com/seeseeczl/ASECLI/actions/runs/33594344611) 的 Python 3.10、3.12、package 全绿。下载 artifact 后 SHA256SUMS 校验 wheel `8d19a0…2318`、sdist `c43e69…da32`；隔离环境完成上一版→当前→上一版 wheel 回滚并三次 parse 成功 | TASK-0030 CR-0010 REG-0030 |

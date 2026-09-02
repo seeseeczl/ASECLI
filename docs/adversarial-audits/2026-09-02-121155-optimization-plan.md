@@ -40,9 +40,9 @@
 - [ ] AA-OPT-001 与 AA-OPT-002 完成并复验。
 - [ ] AA-OPT-003、AA-OPT-004 完成，或仅在有明确不支持范围、风险接受人和时间记录后继续。
 - [ ] Python 3.10/3.12 回归、治理、回归目录、供应链、双构建和 artifact GUI 安装冒烟测试通过。
-- [ ] 当前 C# GUI 在隔离真实 Editor 完成新/旧标记编译与 Inspector 交互验收。
-- [ ] 提交、push 后，当前 commit 的远端 CI 通过；下载 artifact 后重算 hash，完成回滚观察。
-- [ ] 残留风险已在关联报告和发布记录中披露。
+- [x] 当前 C# GUI 在隔离真实团结 Editor 完成新/旧标记编译与 Inspector 交互验收。
+- [x] commit `e513fc5` push 后的远端 CI 通过；下载 artifact 后重算 hash，完成回滚观察。
+- [x] 残留风险已在关联报告和发布记录中披露。
 
 ## 6. 未映射项（如有）
 
@@ -54,7 +54,7 @@
 - `AA-OPT-002` / `AA-TEST-002`：团结 BatchMode 部分已完成。当前 wheel 在隔离工程安装成功；隔离团结 `2022.3.61t9` 对当前资源执行 C# 编译、新/旧三标记 metadata、decorator 实例和 `_Value=1.25` 默认值验证，`tests/test_material_gui_e2e.py` 为 `1 passed`。不使用 Unity 2021 结果作为本 CR 的证据。
 - `AA-OPT-003`：当前团结版本的 `ShaderUtil.GetShaderPropertyAttributes` 路径已通过真实验证；旧标记的内部读取 shim 已存在。没有可用的“API 缺失”团结目标版本，因此该 fallback 不能标为跨版本已验收，也不会扩展支持矩阵。
 - `AA-OPT-004` / `AA-TEST-003` / `AA-TEST-004`：已完成，README 首次 metadata 写入携带唯一 `--editor`，CI package job 覆盖 wheel 安装后的 `gui-support --write` 烟测。
-- Foldout 点击与 HelpBox 已由当前团结窗口验收；用户提供的当前实例截图确认 Tooltip 悬停浮层。完整双 Python 回归、双构建复现已通过；远端 CI、下载 artifact hash 与回滚观察仍必须以最终提交为对象重新执行。
+- Foldout 点击与 HelpBox 已由当前团结窗口验收；用户提供的当前实例截图确认 Tooltip 悬停浮层。完整双 Python 回归、双构建复现已通过；commit `e513fc5` 的远端 CI、下载 artifact hash 与回滚观察也已完成。
 
 ## 8. 实机执行补记（2026-09-02，团结 2022.3.61t9）
 
@@ -62,4 +62,4 @@
 - [新增-必要] `AA-OPT-005` 已完成：将 `ShaderGUI` 的折叠状态改为静态并在切换时请求重绘，防止 IMGUI Layout/Repaint 重建实例后“箭头变化而内容未折叠”。当前窗口的新、旧样例均完成展开、收起、恢复，收起时属性、HelpBox 与 Followup 均消失。
 - 自动回归：定向命令为 `67 passed, 1 skipped`；随后 Python 3.10、3.12 全量均为 `203 passed, 3 skipped`，`tools/check_regression_catalog.py` 和 `git diff --check` 通过。环境门控的 BatchMode E2E 未在本次修正后复跑，使用中的当前团结实例完成了 C# 编译与真实 Inspector 验收。
 - 构建：两次 `uv build` 的 wheel/sdist 逐字节一致；wheel SHA-256 `a1e3b94cbb164d7cd9da4903bbf75ceb25083f2f718b32d69b7f5df6c7ea887f`，C# 资源 SHA-256 `97b5785812138b604898007998d6067e846e5e287e3f674940bfec37320c3109`。
-- 未闭合门禁：后续提交后的远端 CI、下载 artifact/hash 与回滚观察尚未执行。因此发布结论仍为**条件通过，尚不可发布**。
+- 远端交付门禁已闭合：commit `e513fc5` 的 CI、artifact hash 与隔离回滚均已完成。项目仍为内部专有工具；未创建 GitHub Release、PyPI 或公开分发。
