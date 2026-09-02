@@ -48,7 +48,7 @@ kickoff_completion: complete
 | FR-0007 | 功能 | CLI JSON 输出契约：stdout 恒为合法 JSON（含 ok 字段），统一错误码 | 所有子命令契约测试通过 | REG-0007 | 已确认 |
 | FR-0008 | 功能 | 节点精排：按数据流拓扑从左向右分层递进，同阶段严格列对齐、同列等距、重复分支复用同一模板，Master 最右；保持连线与参数不变 | 布局后连线集合不变；同输入确定性输出；仅 x/y 字段变化；DAG 边向右推进；给定间距下列/行网格精确；真实 ASE 画布具备人工精排感 | REG-0012 | 已确认 |
 | FR-0009 | 功能 | 操作自定义材质 GUI：查询/同步 Shader `CustomEditor`，对已识别的 PropertyNode 尾部增删分组、悬停提示和帮助框；目标工程没有原生 MZGUI 时安装与 ASE 解耦的内置 GUI | 原生/内置提供者检测正确；不覆盖冲突文件；两个 CustomEditor 均可承载同一属性协议；内置 Tooltip 自动读取变量名和 Shader 默认值；未知尾部失败关闭 | REG-0022 REG-0030 | 已确认 |
-| FR-0010 | 功能 | 按参考规范整理材质属性与 ASE 图：公开属性使用中文显示名，Tooltip 展示准确变量名与 Shader 默认值，HelpBox 解释用途/调节结果，并按 ShaderLab 属性名批量排序和中文分组；用原生 Comment 框形成“外层功能、内层因果”的嵌套分组；跨区或多消费者结果用 Register/Get Local Var 治理复用 | JSON 规范原子应用且未列属性稳定追加；显示名、变量名、默认值与说明在真实 Inspector 一致；Comment 不移动节点/连线；同层或无父子关系的组不重叠，父子组仅允许完整包含；复用结果形成一个语义 Register/多个就近 Get，一次性相邻链路保持直连；失败可恢复 | REG-0010 REG-0023 REG-0024 | 已确认 |
+| FR-0010 | 功能 | 按参考规范整理材质属性与 ASE 图：公开属性使用中文显示名，Tooltip 展示准确变量名与 Shader 默认值，HelpBox 解释用途/调节结果，并按 ShaderLab 属性名批量排序和中文分组；用原生 Comment 框形成“外层功能、内层因果”的嵌套分组；跨区或多消费者结果用 Register/Get Local Var 治理复用；Master / Output 上方基础设置默认保持，下方功能开关按需选择 | JSON 规范原子应用且未列属性稳定追加；显示名、变量名、默认值与说明在真实 Inspector 一致；Comment 不移动节点/连线；同层或无父子关系的组不重叠，父子组仅允许完整包含；复用结果形成一个语义 Register/多个就近 Get，一次性相邻链路保持直连；Master 设置以最大平台兼容性和最小充分计算为准，目标平台未验证时明确标记；失败可恢复 | REG-0010 REG-0023 REG-0024 | 已确认 |
 | FR-0011 | 功能 | 通过受控 ASE Editor API 创建包含动态/不透明节点的新 Shader；声明式规格只允许白名单节点/字段，ASE 自己生成 ShaderLab/HLSL/ASEBEGIN | Caster-like Sampler→Master 与 Receiver-like Property+CustomExpression 保存重载后 manifest 一致；不支持版本/字段零写入；失败无目标半写或暂存残留 | REG-0026 REG-0027 REG-0028 REG-0029 | 已验证（结构；目标画面待验） |
 | NFR-0001 | 非功能 | Roundtrip 保真：未修改字段逐字节不变 | roundtrip 测试断言 | REG-0001 | 已确认 |
 | NFR-0002 | 非功能 | 未知节点 passthrough：schema 未覆盖时保真透传 | 混合样本测试 | REG-0002 | 已确认 |
@@ -81,7 +81,7 @@ kickoff_completion: complete
 | MOD-CHECK | src/asecli/checks | 结构校验与 CHKSM 修复 | validate/fix_checksum | 允许 core；禁止 bridge/cli | FR-0003 ADR-0003 | long |
 | MOD-BRIDGE | src/asecli/bridge | MCP 传输、URL/token 信任边界、tool result、重编译、受控 Editor 图创建与 GUI 支持安装 | `McpClient` / `recompile_via_mcp` / `create_shader_via_mcp` / `inspect_gui_support` / `install_gui_support` | 标准库；禁止依赖 cli | FR-0004 FR-0009 FR-0011 CR-0008 ADR-0002 ADR-0007 ADR-0012 ADR-0013 | long |
 | MOD-CLI | src/asecli/cli | 命令入口与 JSON 输出契约；组合根；create 后端路由 | `asecli <command>` | 允许 core/schema/check/bridge | FR-0007 FR-0011 CR-0008 ADR-0001 ADR-0012 | long |
-| MOD-SKILL | skills/asecli | Agent 技能、节点精排与材质属性呈现规范（文档资产） | `SKILL.md`；`references/layout-standard.md`；`references/material-property-standard.md` | 无代码依赖 | FR-0006 FR-0008 FR-0009 FR-0010 CR-0007 ADR-0001 ADR-0010 ADR-0011 | long |
+| MOD-SKILL | skills/asecli | Agent 技能、节点精排、材质属性呈现与 Master / Output 设置规范（文档资产） | `SKILL.md`；`references/layout-standard.md`；`references/material-property-standard.md`；`references/master-output-settings-standard.md` | 无代码依赖 | FR-0006 FR-0008 FR-0009 FR-0010 CR-0007 ADR-0001 ADR-0010 ADR-0011 | long |
 | MOD-LAYOUT | src/asecli/core/layout.py | 节点布局算法（左到右分层递进 + 严格列/行网格 + 交叉减少）；布局结果所有权 | `layout_positions(graph) -> dict[id, (x, y)]` | 允许依赖 core 模型；禁止依赖 schema/bridge/cli | FR-0008 ADR-0005 | long |
 | MOD-CUSTOM-GUI | src/asecli/core/custom_gui.py; material_gui_spec.py | ASE 1.9.6.2 CustomEditor/MZGUI 解析、原生文本编码、属性名定位与声明式批量写回 | `inspect_custom_gui` / `resolve_property_node` / `apply_material_gui_spec` | 仅依赖 core model/标准库；CLI 只能走公开 API | FR-0009 FR-0010 ADR-0010 ADR-0011 | long |
 | MOD-GUI-SUPPORT | src/asecli/bridge/gui_support.py; bridge/resources/asecli_material_gui.cs.txt | 检测原生 MZGUI；安全安装 clean-room ShaderGUI；解释 Foldout/Tooltip/HelpBox 并动态生成技术 Tooltip | `inspect_gui_support` / `install_gui_support`; `ASECLI.MaterialGUI.ASECLIMaterialGUI` | Python 仅标准库；C# 仅 UnityEditor/UnityEngine；禁止依赖 ASE API | FR-0009 ADR-0013 | long |
@@ -106,6 +106,7 @@ kickoff_completion: complete
 - 视觉规范：严格对齐与阶段递进优先于机械追求零交叉。线与线可在空白通道中少量、简洁地交叉，但不得穿过无关节点；重复分支必须保持相同列、行距和内部模板，最终精排感必须由真实 ASE 画布验收。
 - Local Var 边界：Comment 表达算法职责，Local Var 表达模块间数据接口；Register 放生产者右侧、Get 放消费者输入侧。一次性同组相邻链路保持直连，禁止为表面整齐隐藏关键依赖或使用 `Value/Temp1/base` 等模糊名。
 - 工具边界：真实 ASE 1.9.6.2 将 Register 端口类型随输入同步，当前 schema `layout_ok=false`；CLI 不通过不完整 schema猜造，必须由真实 ASE 创建或复用同版本同类型序列化样本后 validate/recompile。
+- Master / Output 边界：上方基础生成设置默认继承模板和现有 Shader，不主动缩窄平台或提高特性等级；下方功能开关按实际消费者、Pass / variant 成本和目标效果选择。Master 行仍按 opaque 管理，只能在真实 ASE Editor 或已登记的语义能力中修改；目标平台未实测时不得宣称兼容或性能通过。
 
 ### FR-0011 影响分析与兼容边界
 

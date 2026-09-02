@@ -48,6 +48,8 @@ asecli fix-checksum <file> --write
 
 创建、转换或重新整理节点图时，必须先读 [ASE 节点图精排规范](references/layout-standard.md)。核心目标是严格对齐、从左到右层层递进、重复结构一致和整体“经过精心排列”的秩序感；不是机械追求零交叉。
 
+选择或整理 Master / Output 节点设置时，必须先读 [ASE Master / Output 设置规范](references/master-output-settings-standard.md)。上方基础生成设置默认保持模板和现有 Shader 原值，以最大平台兼容性为先；下方功能开关按真实需求选择，并避免无用 Pass、变体和重复计算。Master 序列化仍视为 opaque，不得用通用字段写入猜改。
+
 ### 链路 C：提示文案与分组（写元数据不需要 Unity，最终生效需要重编译）
 
 创建或整理公开材质属性时，必须先读 [ASE 材质属性呈现规范](references/material-property-standard.md)。默认采用四层结构：中文显示名；Tooltip 展示准确变量名与 Shader 默认值；控件下方 HelpBox 解释用途和调节结果；最后按语义使用中文 Foldout 分组。

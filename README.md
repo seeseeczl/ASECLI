@@ -214,6 +214,14 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 - 排版修复只能改变位置和必要的 Comment 边界，不得改变 Shader 参数、端口连接、计算顺序或引入重复计算。跨组长线仍不清晰时才使用 `Register Local Var` / `Get Local Var`。
 - 完整规则与量化/视觉验收边界见 [`skills/asecli/references/layout-standard.md`](skills/asecli/references/layout-standard.md)。真实 ASE 画布仍需复核精排感、贝塞尔线路径和组间关系；编辑器或 MCP 不可用时应明确报告未验证。
 
+### Master / Output 设置规范
+
+- 上方基础生成设置默认继承当前 Shader 和项目模板，不主动改变 Workflow、Surface、Blend、Cull、Render Queue、Precision、Shader Model、渲染路径或平台列表；优先保持最大平台兼容性。
+- 下方 Normal、Emission、Alpha、Vertex Position 等可选端口，以及 Cast/Receive Shadows、GPU Instancing、Fog、Meta、Depth、Clear Coat、DOTS、Tessellation、Debug 等功能开关按真实用途判断，只保留有节点链、消费者或验收依据的能力。
+- 不为可能使用的功能预建昂贵计算链，不复制等价计算；但也不能只为减少 Pass 或变体就关闭会改变既有效果的能力。
+- Master 节点序列化仍是 opaque。除已登记的语义命令外，必须在真实 ASE Editor 中修改并完成编译、画面与目标平台核对，不得用 `set-field` 或 raw 行猜写。
+- 完整决策表、成本边界与验收要求见 [`skills/asecli/references/master-output-settings-standard.md`](skills/asecli/references/master-output-settings-standard.md)。
+
 ### 无效节点审计
 
 - `graph-audit` 从有效 Master 输出反向追踪 Wire 和 Register/Get Local Var，列出不通向输出的节点。
