@@ -1,4 +1,4 @@
-"""REG-0022: ASE 1.9.6.2 CustomEditor and MZGUI operations."""
+"""REG-0022: ASE 1.9.6.2 CustomEditor and property-metadata operations."""
 
 from __future__ import annotations
 
@@ -23,11 +23,11 @@ from asecli.core import (
     encode_foldout_title,
     inspect_custom_gui,
     parse_graph_text,
-    read_mzgui_tail,
-    remove_mzgui_attribute,
+    read_property_metadata_tail,
+    remove_property_metadata_attribute,
     semantic_attribute,
     set_custom_editor,
-    set_mzgui_attribute,
+    set_property_metadata_attribute,
 )
 
 
@@ -37,7 +37,7 @@ HLIT = ROOT / "tests" / "fixtures" / "HLIT.shader"
 
 
 def sample_shader(editor: str = "UnityEditor.ShaderGraphLitGUI") -> str:
-    text = f'''Shader "Tests/MZGUI"
+    text = f'''Shader "Tests/ASECLI"
 {{
 \tProperties {{}}
 \tSubShader {{}}
@@ -56,7 +56,7 @@ ASEEND*/
 
 
 def multi_property_shader() -> str:
-    text = sample_shader("MZGUI.MZGUI").replace(";基础颜色;0;0;Create", ";基础颜色;2;0;Create")
+    text = sample_shader(ASECLI_GUI_EDITOR).replace(";基础颜色;0;0;Create", ";基础颜色;2;0;Create")
     extra = """Node;AmplifyShaderEditor.RangedFloatNode;12;300,100;Inherit;False;Property;_Contrast;Contrast;0;0;Create;False;0
 Node;AmplifyShaderEditor.RangedFloatNode;13;500,100;Inherit;False;Property;_Coat_IO;Coat IO;1;0;Create;False;0
 """
@@ -89,26 +89,26 @@ def test_reads_hlit_graph_and_compiled_custom_editor():
 
 
 def test_inspection_returns_property_order_index():
-    state = inspect_custom_gui(AseFile.from_text(sample_shader("MZGUI.MZGUI")))
+    state = inspect_custom_gui(AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR)))
     assert state["properties"][0]["order_index"] == 0
 
 
-def test_inspection_advertises_native_and_builtin_gui_providers():
+def test_inspection_advertises_the_asecli_material_gui():
     state = inspect_custom_gui(AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR)))
     assert state["editor"]["graph"] == ASECLI_GUI_EDITOR
-    assert state["capabilities"]["built_in_compat_editor"] == ASECLI_GUI_EDITOR
-    assert set(state["capabilities"]["supported_editors_for_mzgui"]) == SUPPORTED_GUI_EDITORS
+    assert state["capabilities"]["built_in_editor"] == ASECLI_GUI_EDITOR
+    assert set(state["capabilities"]["supported_editors"]) == SUPPORTED_GUI_EDITORS
 
 
 def test_custom_editor_updates_only_main_master_and_compiled_directive():
     shader = AseFile.from_text(sample_shader())
     secondary_before = shader.graph.node_by_id("0").to_line()
-    change = set_custom_editor(shader, "MZGUI.MZGUI")
+    change = set_custom_editor(shader, ASECLI_GUI_EDITOR)
     assert change["main_node_id"] == "1"
     assert shader.graph.node_by_id("0").to_line() == secondary_before
-    assert shader.graph.node_by_id("1").raw_fields[9] == "MZGUI.MZGUI"
-    assert compiled_custom_editor(shader) == "MZGUI.MZGUI"
-    assert shader.serialize().count('CustomEditor "MZGUI.MZGUI"') == 1
+    assert shader.graph.node_by_id("1").raw_fields[9] == ASECLI_GUI_EDITOR
+    assert compiled_custom_editor(shader) == ASECLI_GUI_EDITOR
+    assert shader.serialize().count(f'CustomEditor "{ASECLI_GUI_EDITOR}"') == 1
     set_custom_editor(shader, None)
     assert shader.graph.node_by_id("1").raw_fields[9] == ""
     assert compiled_custom_editor(shader) is None
@@ -117,12 +117,12 @@ def test_custom_editor_updates_only_main_master_and_compiled_directive():
 def test_custom_editor_can_be_inserted_when_compiled_directive_is_missing():
     shader = AseFile.from_text(sample_shader().replace('\tCustomEditor "UnityEditor.ShaderGraphLitGUI"\n', ""))
     assert compiled_custom_editor(shader) is None
-    set_custom_editor(shader, "MZGUI.MZGUI")
-    assert compiled_custom_editor(shader) == "MZGUI.MZGUI"
-    assert shader.prefix.index('CustomEditor "MZGUI.MZGUI"') < shader.prefix.index("Fallback Off")
+    set_custom_editor(shader, ASECLI_GUI_EDITOR)
+    assert compiled_custom_editor(shader) == ASECLI_GUI_EDITOR
+    assert shader.prefix.index(f'CustomEditor "{ASECLI_GUI_EDITOR}"') < shader.prefix.index("Fallback Off")
 
 
-def test_native_unicode_codecs_match_mzgui_utf16_behavior():
+def test_property_metadata_unicode_codecs_use_the_verified_utf16_format():
     text = "提示 A\n😀"
     encoded = encode_custom_unicode(text)
     assert encoded.startswith("#63D0#793A#0020#0041#000A#D83D#DE00")
@@ -130,26 +130,42 @@ def test_native_unicode_codecs_match_mzgui_utf16_behavior():
     assert decode_foldout_title(encode_foldout_title("基础参数 😀")) == "基础参数 😀"
 
 
-def test_reads_real_mzgui_test_foldout_tail():
+def test_reads_legacy_foldout_tail_without_using_it_for_new_writes():
     # Unmodified node line from ASE 1.9.6.2 Examples/MZGUI_Test.shader.
     body = """Version=19602
 Node;AmplifyShaderEditor.IntNode;122;992,-32;Inherit;False;Property;_Int0;整数;0;0;Create;False;0;0;0;True;0;False;0;0;False;0;1;INT;0;1;[FoldoutMzgui(Foldout #6298#53e0#9875 01)]
 """
     graph = parse_graph_text(body)
     node = graph.node_by_id("122")
-    tail = read_mzgui_tail(graph, node)
+    tail = read_property_metadata_tail(graph, node)
     assert tail.attributes == ("[FoldoutMzgui(Foldout #6298#53e0#9875 01)]",)
     assert decode_foldout_title("Foldout #6298#53e0#9875 01") == "Foldout 折叠页 01"
 
 
-def test_mzgui_tail_roundtrips_on_verified_19602_layout():
-    shader = AseFile.from_text(sample_shader("MZGUI.MZGUI"))
-    set_mzgui_attribute(
+def test_writing_a_legacy_semantic_attribute_migrates_only_that_attribute():
+    text = sample_shader(ASECLI_GUI_EDITOR).replace(
+        ";基础颜色;0;0;Create;False;0\n",
+        ";基础颜色;0;1;[TooltipMzgui(#65E7#6807#63D0#793A)]\n",
+    )
+    shader = AseFile.from_text(fix_checksum(text))
+    set_property_metadata_attribute(
         shader.graph,
         "10",
-        semantic_attribute("HelpBoxMzgui", "跨版本尾部能力探测"),
+        semantic_attribute("ASECLITooltip", "新提示"),
     )
-    tail = read_mzgui_tail(shader.graph, shader.graph.node_by_id("10"))
+    attributes = read_property_metadata_tail(shader.graph, shader.graph.node_by_id("10")).attributes
+    assert len(attributes) == 1
+    assert attributes[0].startswith("[ASECLITooltip(")
+
+
+def test_property_metadata_tail_roundtrips_on_verified_19602_layout():
+    shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
+    set_property_metadata_attribute(
+        shader.graph,
+        "10",
+        semantic_attribute("ASECLIHelpBox", "跨版本尾部能力探测"),
+    )
+    tail = read_property_metadata_tail(shader.graph, shader.graph.node_by_id("10"))
     assert len(tail.attributes) == 1
     assert parse_graph_text(shader.graph.serialize()).node_by_id("10").raw_fields == (
         shader.graph.node_by_id("10").raw_fields
@@ -158,7 +174,7 @@ def test_mzgui_tail_roundtrips_on_verified_19602_layout():
 
 def test_unknown_future_version_rejects_custom_editor_and_tail_without_mutation():
     shader = AseFile.from_text(
-        sample_shader("MZGUI.MZGUI").replace("Version=19602", "Version=25000")
+        sample_shader(ASECLI_GUI_EDITOR).replace("Version=19602", "Version=25000")
     )
     master = shader.graph.node_by_id("1")
     master.raw_fields[9] = "UNRELATED_FIELD_9"
@@ -168,32 +184,32 @@ def test_unknown_future_version_rejects_custom_editor_and_tail_without_mutation(
     shader.graph.replace_node(node)
     before = shader.serialize()
     with pytest.raises(ValueError, match="unsupported ASE graph version"):
-        set_custom_editor(shader, "MZGUI.MZGUI")
+        set_custom_editor(shader, ASECLI_GUI_EDITOR)
     assert shader.serialize() == before
     with pytest.raises(ValueError, match="unsupported ASE graph version"):
-        set_mzgui_attribute(
+        set_property_metadata_attribute(
             shader.graph,
             "10",
-            semantic_attribute("HelpBoxMzgui", "不得猜写"),
+            semantic_attribute("ASECLIHelpBox", "不得猜写"),
         )
     assert shader.serialize() == before
 
 
 def test_real_19109_hlit_exposes_only_verified_custom_editor_capability():
     state = inspect_custom_gui(AseFile.from_path(HLIT))
-    assert state["version_capabilities"] == {"custom_editor": True, "mzgui_tail": False}
+    assert state["version_capabilities"] == {"custom_editor": True, "property_metadata_tail": False}
     assert state["properties"] == []
 
 
 def test_cli_unknown_future_version_fails_before_backup_or_write(tmp_path):
     path = tmp_path / "future.shader"
-    original = sample_shader("MZGUI.MZGUI").replace("Version=19602", "Version=25000")
+    original = sample_shader(ASECLI_GUI_EDITOR).replace("Version=19602", "Version=25000")
     path.write_text(original, encoding="utf-8")
     code, payload = run_cli(
         "custom-gui",
         str(path),
         "--editor",
-        "MZGUI.MZGUI",
+        ASECLI_GUI_EDITOR,
         "--property",
         "_BaseColor",
         "--help-box",
@@ -208,58 +224,58 @@ def test_cli_unknown_future_version_fails_before_backup_or_write(tmp_path):
 
 
 def test_unknown_property_tail_fails_closed_instead_of_guessing_an_index():
-    shader = AseFile.from_text(sample_shader("MZGUI.MZGUI"))
+    shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
     node = shader.graph.node_by_id("10")
     node.raw_fields[-1] = "unknown-tail-format"
     shader.graph.replace_node(node)
-    with pytest.raises(ValueError, match="no valid MZGUI serialization tail"):
-        set_mzgui_attribute(
+    with pytest.raises(ValueError, match="no valid property metadata serialization tail"):
+        set_property_metadata_attribute(
             shader.graph,
             "10",
-            semantic_attribute("HelpBoxMzgui", "不得猜写"),
+            semantic_attribute("ASECLIHelpBox", "不得猜写"),
         )
 
 
 def test_group_tooltip_helpbox_add_replace_remove_and_count():
-    shader = AseFile.from_text(sample_shader("MZGUI.MZGUI"))
+    shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
     graph = shader.graph
-    set_mzgui_attribute(graph, "10", semantic_attribute("FoldoutMzgui", "基础参数"))
-    set_mzgui_attribute(graph, "10", semantic_attribute("TooltipMzgui", "变量名：_BaseColor\n默认值：(1, 1, 1, 1)"))
-    set_mzgui_attribute(graph, "10", semantic_attribute("HelpBoxMzgui", "请按项目规范设置"))
-    set_mzgui_attribute(graph, "10", semantic_attribute("TooltipMzgui", "变量名：_BaseColor\n默认值：(0.5, 0.5, 0.5, 1)"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIFoldout", "基础参数"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLITooltip", "变量名：_BaseColor\n默认值：(1, 1, 1, 1)"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIHelpBox", "请按项目规范设置"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLITooltip", "变量名：_BaseColor\n默认值：(0.5, 0.5, 0.5, 1)"))
     node = graph.node_by_id("10")
-    tail = read_mzgui_tail(graph, node)
+    tail = read_property_metadata_tail(graph, node)
     assert node.raw_fields[tail.count_index] == "3"
     state = inspect_custom_gui(shader)
     attrs = {item["type"]: item for item in state["properties"][0]["attributes"]}
-    assert attrs["FoldoutMzgui"]["text"] == "基础参数"
-    assert attrs["TooltipMzgui"]["text"] == "变量名：_BaseColor\n默认值：(0.5, 0.5, 0.5, 1)"
-    assert attrs["HelpBoxMzgui"]["text"] == "请按项目规范设置"
-    removed = remove_mzgui_attribute(graph, "10", "TooltipMzgui")
+    assert attrs["ASECLIFoldout"]["text"] == "基础参数"
+    assert attrs["ASECLITooltip"]["text"] == "变量名：_BaseColor\n默认值：(0.5, 0.5, 0.5, 1)"
+    assert attrs["ASECLIHelpBox"]["text"] == "请按项目规范设置"
+    removed = remove_property_metadata_attribute(graph, "10", "ASECLITooltip")
     assert len(removed["removed"]) == 1
     assert graph.node_by_id("10").raw_fields[-3] == "2"
 
 
-def test_builtin_gui_editor_accepts_same_foldout_tooltip_and_helpbox_protocol():
+def test_asecli_gui_editor_writes_its_own_foldout_tooltip_and_helpbox_protocol():
     shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
     graph = shader.graph
-    set_mzgui_attribute(graph, "10", semantic_attribute("FoldoutMzgui", "基础参数"))
-    set_mzgui_attribute(graph, "10", semantic_attribute("TooltipMzgui", "基础颜色"))
-    set_mzgui_attribute(graph, "10", semantic_attribute("HelpBoxMzgui", "控制最终固有色。"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIFoldout", "基础参数"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLITooltip", "基础颜色"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIHelpBox", "控制最终固有色。"))
     state = inspect_custom_gui(shader)
     assert state["editor"]["graph"] == ASECLI_GUI_EDITOR
     attributes = {item["type"]: item["text"] for item in state["properties"][0]["attributes"]}
     assert attributes == {
-        "FoldoutMzgui": "基础参数",
-        "TooltipMzgui": "基础颜色",
-        "HelpBoxMzgui": "控制最终固有色。",
+        "ASECLIFoldout": "基础参数",
+        "ASECLITooltip": "基础颜色",
+        "ASECLIHelpBox": "控制最终固有色。",
     }
 
 
-def test_rejects_mzgui_on_non_property_node():
-    graph = AseFile.from_text(sample_shader("MZGUI.MZGUI")).graph
+def test_rejects_property_metadata_on_non_property_node():
+    graph = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR)).graph
     with pytest.raises(ValueError, match="not an exported PropertyNode"):
-        set_mzgui_attribute(graph, "11", semantic_attribute("TooltipMzgui", "提示"))
+        set_property_metadata_attribute(graph, "11", semantic_attribute("ASECLITooltip", "提示"))
 
 
 @pytest.mark.parametrize(
@@ -280,7 +296,7 @@ def test_cli_rejects_custom_editor_injection_as_single_json(tmp_path, bad):
     assert not path.with_suffix(".shader.bak").exists()
 
 
-def test_cli_dry_run_is_unchanged_and_requires_explicit_mzgui_editor(tmp_path):
+def test_cli_dry_run_is_unchanged_and_requires_explicit_asecli_editor(tmp_path):
     path = tmp_path / "dry.shader"
     path.write_text(sample_shader(), encoding="utf-8")
     before = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -291,7 +307,7 @@ def test_cli_dry_run_is_unchanged_and_requires_explicit_mzgui_editor(tmp_path):
         "custom-gui",
         str(path),
         "--editor",
-        "MZGUI.MZGUI",
+        ASECLI_GUI_EDITOR,
         "--node",
         "10",
         "--tooltip",
@@ -313,7 +329,7 @@ def test_cli_write_is_recoverable_rechecks_checksum_and_roundtrips(tmp_path):
         "custom-gui",
         str(path),
         "--editor",
-        "MZGUI.MZGUI",
+        ASECLI_GUI_EDITOR,
         "--node",
         "10",
         "--tooltip",
@@ -331,8 +347,8 @@ def test_cli_write_is_recoverable_rechecks_checksum_and_roundtrips(tmp_path):
     state = inspect_custom_gui(written)
     assert state["editor"]["consistent"] is True
     attrs = {item["type"]: item for item in state["properties"][0]["attributes"]}
-    assert attrs["TooltipMzgui"]["text"] == "颜色强度提示"
-    assert attrs["FoldoutMzgui"]["text"] == "颜色设置"
+    assert attrs["ASECLITooltip"]["text"] == "颜色强度提示"
+    assert attrs["ASECLIFoldout"]["text"] == "颜色设置"
 
 
 def test_cli_can_select_builtin_gui_and_add_annotations_in_one_operation(tmp_path):
@@ -358,32 +374,42 @@ def test_cli_can_select_builtin_gui_and_add_annotations_in_one_operation(tmp_pat
     assert AseFile.from_path(path).graph.node_by_id("1").raw_fields[9] == ASECLI_GUI_EDITOR
 
 
+def test_readme_single_property_example_selects_the_required_asecli_editor():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert (
+        "asecli custom-gui Assets/Example.shader --editor "
+        "ASECLI.MaterialGUI.ASECLIMaterialGUI --property _PaintColor"
+    ) in readme
+
+
 def test_cli_raw_attribute_add_remove_and_non_property_failure(tmp_path):
     path = tmp_path / "raw.shader"
-    path.write_text(sample_shader("MZGUI.MZGUI"), encoding="utf-8")
-    raw = "[VectorMzgui(Four)]"
+    path.write_text(sample_shader(ASECLI_GUI_EDITOR), encoding="utf-8")
+    raw = "[ASECLITooltip(#63D0#793A)]"
     code, payload = run_cli("custom-gui", str(path), "--node", "10", "--add-attribute", raw, "--write")
     assert code == 0
     assert AseFile.from_path(path).graph.node_by_id("10").raw_fields[-2:] == ["1", raw]
     code, payload = run_cli(
-        "custom-gui", str(path), "--node", "10", "--remove-attribute", "VectorMzgui", "--write"
+        "custom-gui", str(path), "--node", "10", "--remove-attribute", "ASECLITooltip", "--write"
     )
     assert code == 0
     assert AseFile.from_path(path).graph.node_by_id("10").raw_fields[-1] == "0"
+    code, payload = run_cli("custom-gui", str(path), "--node", "10", "--add-attribute", "[VectorMzgui(Four)]")
+    assert code == 2 and payload["error"]["code"] == "CUSTOM_GUI_ERROR"
     code, payload = run_cli("custom-gui", str(path), "--node", "11", "--tooltip", "提示")
     assert code == 2 and payload["error"]["code"] == "CUSTOM_GUI_ERROR"
 
 
 def test_cli_property_name_target_sets_help_box(tmp_path):
     path = tmp_path / "property.shader"
-    path.write_text(sample_shader("MZGUI.MZGUI"), encoding="utf-8")
+    path.write_text(sample_shader(ASECLI_GUI_EDITOR), encoding="utf-8")
     code, payload = run_cli(
         "custom-gui", str(path), "--property", "_BaseColor", "--help-box", "车漆颜色", "--write"
     )
     assert code == 0
     assert payload["data"]["changes"][0]["node_id"] == "10"
     attrs = inspect_custom_gui(AseFile.from_path(path))["properties"][0]["attributes"]
-    assert {item["type"]: item for item in attrs}["HelpBoxMzgui"]["text"] == "车漆颜色"
+    assert {item["type"]: item for item in attrs}["ASECLIHelpBox"]["text"] == "车漆颜色"
 
 
 def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
@@ -394,7 +420,7 @@ def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
     spec_path.write_text(
         json.dumps(
             {
-                "editor": "MZGUI.MZGUI",
+                "editor": ASECLI_GUI_EDITOR,
                 "reorder": True,
                 "properties": [
                     {
@@ -430,12 +456,12 @@ def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
     base_attrs = {item["type"]: item["text"] for item in properties["_BaseColor"]["attributes"]}
     contrast_attrs = {item["type"]: item["text"] for item in properties["_Contrast"]["attributes"]}
     assert base_attrs == {
-        "FoldoutMzgui": "固有色",
-        "HelpBoxMzgui": "控制车辆基础漆面颜色。",
-        "TooltipMzgui": "变量名：_BaseColor\n默认值：(1, 1, 1, 1)",
+        "ASECLIFoldout": "固有色",
+        "ASECLIHelpBox": "控制车辆基础漆面颜色。",
+        "ASECLITooltip": "变量名：_BaseColor\n默认值：(1, 1, 1, 1)",
     }
-    assert contrast_attrs["TooltipMzgui"] == "变量名：_Contrast\n默认值：1.0"
-    assert contrast_attrs["HelpBoxMzgui"].endswith("对比越弱。")
+    assert contrast_attrs["ASECLITooltip"] == "变量名：_Contrast\n默认值：1.0"
+    assert contrast_attrs["ASECLIHelpBox"].endswith("对比越弱。")
     assert verify_checksum(path.read_text(encoding="utf-8"))[0] is True
 
 
@@ -461,12 +487,12 @@ def test_cli_json_spec_rejects_invalid_or_duplicate_entries_atomically(tmp_path,
     assert not path.with_suffix(".shader.bak").exists()
 
 
-def test_cli_spec_rejects_conflicts_missing_file_and_non_mzgui_additions(tmp_path):
+def test_cli_spec_rejects_conflicts_missing_file_and_non_asecli_additions(tmp_path):
     path = tmp_path / "conflict.shader"
     path.write_text(sample_shader(), encoding="utf-8")
     spec_path = tmp_path / "spec.json"
     spec_path.write_text(json.dumps({"properties": [{"name": "_BaseColor", "help": "说明"}]}), encoding="utf-8")
-    code, payload = run_cli("custom-gui", str(path), "--spec", str(spec_path), "--editor", "MZGUI.MZGUI")
+    code, payload = run_cli("custom-gui", str(path), "--spec", str(spec_path), "--editor", ASECLI_GUI_EDITOR)
     assert code == 2 and payload["error"]["code"] == "USAGE_ERROR"
     code, payload = run_cli("custom-gui", str(path), "--spec", str(tmp_path / "missing.json"))
     assert code == 2 and payload["error"]["code"] == "NOT_FOUND"

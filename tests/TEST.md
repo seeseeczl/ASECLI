@@ -1,16 +1,14 @@
 # ASECLI test plan
 
-## Current refinement: built-in material GUI compatibility
+## Current refinement: ASECLI material GUI protocol
 
 Planned coverage before implementation:
 
-- `tests/test_gui_support.py`: GUI provider detection, dry-run, idempotent install,
-  conflict refusal, native MZGUI preference, native/built-in duplicate-provider
-  fail-closed behavior, packaged C# capability contract, and CLI JSON behavior.
-- `tests/test_custom_gui.py`: both native `MZGUI.MZGUI` and the built-in
-  `ASECLI.MaterialGUI.ASECLIMaterialGUI` are accepted for Foldout, Tooltip, and
-  HelpBox metadata; Property tails are capability-probed across graph-version
-  values and unknown layouts fail closed instead of using a guessed field index.
+- `tests/test_gui_support.py`: 唯一 ASECLI GUI 的 dry-run、幂等安装、冲突/符号链接/
+  竞争写入拒绝、已有原生 MZGUI 文件不阻断、打包 C# 契约和 CLI JSON 行为。
+- `tests/test_custom_gui.py`: 只生成 `ASECLIFoldout`、`ASECLITooltip`、
+  `ASECLIHelpBox`；旧三标记可读取，并在同语义写入或清理时迁移。Property
+  尾部按图版本探测，未知布局失败关闭而非猜测字段下标。
 - `tests/test_cli_contract.py`: `gui-support` participates in the stable one-line
   JSON error contract.
 
@@ -18,7 +16,16 @@ The Python suite can verify installation safety, packaged source text, metadata
 contracts, and serialization. Compilation and visual behavior of the generated C#
 resource require a real Unity/Tuanjie Editor gate and are reported separately.
 
-## Results — 2026-09-01
+## Current real Editor result — 2026-09-02 (CR-0010)
+
+- 隔离团结 `2022.3.61t9`：`ASECLI_GUI_TEST_PROJECT=<带 .asecli-gui-e2e-isolated 标记的临时工程> ASECLI_TUANJIE_PATH=<Tuanjie.app/Contents/MacOS/Tuanjie> uv run --frozen pytest -q -m bridge tests/test_material_gui_e2e.py` 为 `1 passed in 10.23s`。
+- 当前修复后的双构建 wheel SHA-256 均为 `a1e3b94cbb164d7cd9da4903bbf75ceb25083f2f718b32d69b7f5df6c7ea887f`；打包 C# 资源与当前实例安装资源 SHA-256 均为 `97b5785812138b604898007998d6067e846e5e287e3f674940bfec37320c3109`。
+- BatchMode 验证当前资源无 C# 或 Shader 编译错误；新三标记和旧三标记均实例化 decorator、读取分组/Tooltip/HelpBox，`Material(shader)` 默认 `_Value=1.25`。当前团结 `2022.3.61t9` 运行实例还验证了无 `GetShaderPropertyAttributes` 时与原生同名旧 drawer 的冲突修复，以及新/旧分组的标题点击展开/收起和 HelpBox 可见性。本记录不使用 Unity 2021 作为 CR-0010 证据。
+- 定向自动回归：`uv run pytest tests/test_gui_support.py tests/test_custom_gui.py tests/test_cli_contract.py tests/test_material_gui_e2e.py -q` 为 `67 passed, 1 skipped`。
+- 修复后的全量回归：Python 3.10 与 Python 3.12 均为 `203 passed, 3 skipped`；REG catalog 校验与 `git diff --check` 通过。
+- Tooltip 视觉验收：用户提供的当前团结实例实机截图显示真实悬停浮层，内容为 `变量名：_BaseColor` 与 `默认值：RGBA(1.000, 1.000, 1.000, 1.000)`；该浮层来自 Inspector 实际渲染，不以元数据读取或 C# 拼接路径替代。
+
+## Historical results — 2026-09-01 (pre-CR-0010 protocol)
 
 - Focused GUI/CLI contract: `62 passed in 3.83s`.
 - Full repository suite: `189 passed, 2 skipped in 10.69s`; the skipped tests are
@@ -31,11 +38,9 @@ resource require a real Unity/Tuanjie Editor gate and are reported separately.
   `827ed7b91df1761a62eac6780066d162a73fd22e005bf64c5d9516b864841879`;
   the wheel installed into an isolated Python 3.12 environment and its real
   `asecli gui-support` entry point detected the installed resource successfully.
-- Real Editor gate: Unity `2021.3.7f1c1` compiled the installed C# resource and a
-  verifier read `FoldoutMzgui`, `TooltipMzgui`, `HelpBoxMzgui`, plus the Shader
-  default `_Value=1.25` from a default Material. This compile also covers the
-  dependency-hash cache invalidation path and reflective Int-property fallback;
-  the verifier does not yet mutate a Shader default or exercise an Int property.
+- Real Editor gate: this is a pre-CR-0010 historical Unity `2021.3.7f1c1` record.
+  It is retained for provenance only and is not used as current acceptance evidence;
+  current GUI verification is the isolated Tuanjie result above.
 
 Open gap: BatchMode did not exercise mouse-hover, foldout clicking, or the final
 Inspector appearance. Those remain target-project UI acceptance checks.

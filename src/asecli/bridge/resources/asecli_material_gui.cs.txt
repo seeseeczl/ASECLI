@@ -1,12 +1,13 @@
-// ASECLI clean-room material GUI compatibility layer.
-// Implements only the public FoldoutMzgui, TooltipMzgui, and HelpBoxMzgui
-// attribute behavior needed by ASECLI-generated shaders. It contains no MZGUI source.
+// ASECLI clean-room material GUI.
+// Implements ASECLIFoldout, ASECLITooltip, and ASECLIHelpBox metadata for
+// ASECLI-generated shaders, and reads the three historical MZGUI names.
 
 #if UNITY_EDITOR
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -22,6 +23,39 @@ namespace ASECLI.MaterialGUI
 
     // These zero-height decorators let Unity retain its normal property/drawer path
     // while ASECLIMaterialGUI interprets their metadata at the ShaderGUI layer.
+    public sealed class ASECLIFoldoutDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "ASECLIFoldout"; } }
+        public string MetadataValue { get; private set; }
+        public ASECLIFoldoutDecorator() : this(String.Empty) { }
+        public ASECLIFoldoutDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class ASECLITooltipDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "ASECLITooltip"; } }
+        public string MetadataValue { get; private set; }
+        public ASECLITooltipDecorator() : this(String.Empty) { }
+        public ASECLITooltipDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class ASECLIHelpBoxDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "ASECLIHelpBox"; } }
+        public string MetadataValue { get; private set; }
+        public ASECLIHelpBoxDecorator() : this(String.Empty) { }
+        public ASECLIHelpBoxDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    // Input-only shims for the historical serialized attributes. They are only
+    // needed by the MaterialPropertyHandler fallback when ShaderUtil cannot
+    // return raw property attributes; ASECLI never writes these names.
     public sealed class FoldoutMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
     {
         public string MetadataType { get { return "FoldoutMzgui"; } }
@@ -63,9 +97,14 @@ namespace ASECLI.MaterialGUI
 
         private static readonly Regex CustomUnicodePattern =
             new Regex("#([0-9A-Fa-f]{4})", RegexOptions.Compiled);
+        private static readonly Regex RawPropertyAttributePattern =
+            new Regex("\\[(?<attribute>[^\\]\\r\\n]*)\\]", RegexOptions.Compiled);
         private static bool metadataWarningLogged;
 
-        private readonly Dictionary<string, bool> foldoutStates =
+        // ShaderGUI instances can be recreated between IMGUI Layout and Repaint
+        // passes. Foldout state therefore must outlive one inspector instance,
+        // otherwise a click changes the arrow but leaves the previous layout.
+        private static readonly Dictionary<string, bool> foldoutStates =
             new Dictionary<string, bool>(StringComparer.Ordinal);
         private Shader cachedShader;
         private Hash128 cachedDependencyHash;
@@ -96,7 +135,12 @@ namespace ASECLI.MaterialGUI
                 if (!String.IsNullOrEmpty(metadata.Foldout))
                 {
                     insideFoldout = true;
-                    currentFoldoutOpen = DrawFoldout(shader, property, metadata.Foldout);
+                    currentFoldoutOpen = DrawFoldout(
+                        shader,
+                        property,
+                        metadata.Foldout,
+                        materialEditor
+                    );
                 }
 
                 if (insideFoldout && !currentFoldoutOpen)
@@ -125,18 +169,25 @@ namespace ASECLI.MaterialGUI
             materialEditor.DoubleSidedGIField();
         }
 
-        private bool DrawFoldout(Shader shader, MaterialProperty property, string title)
+        private bool DrawFoldout(
+            Shader shader,
+            MaterialProperty property,
+            string title,
+            MaterialEditor materialEditor)
         {
             string key = shader.name + "\n" + property.name;
             bool state;
             if (!foldoutStates.TryGetValue(key, out state))
                 state = true;
+            bool previousState = state;
 #if UNITY_2019_3_OR_NEWER
             state = EditorGUILayout.Foldout(state, title, true, EditorStyles.foldoutHeader);
 #else
             state = EditorGUILayout.Foldout(state, title, true);
 #endif
             foldoutStates[key] = state;
+            if (state != previousState && materialEditor != null)
+                materialEditor.Repaint();
             return state;
         }
 
@@ -223,6 +274,16 @@ namespace ASECLI.MaterialGUI
                                     ApplyMetadata(metadata, decorator.MetadataType, decorator.MetadataValue);
                             }
                         }
+
+                        // Tuanjie 2022.3 has no ShaderUtil.GetShaderPropertyAttributes.
+                        // Its MaterialPropertyHandler can resolve a historical marker to
+                        // another package's drawer with the same unqualified type name.
+                        // In that case the drawer does not implement our private interface,
+                        // so recover only missing ASECLI/legacy metadata from this shader's
+                        // source asset. This is input-only compatibility, never a writer.
+                        PropertyMetadata sourceMetadata;
+                        if (TryReadSourceMetadata(shader, name, out sourceMetadata))
+                            MergeMissingMetadata(metadata, sourceMetadata);
                     }
                     result[name] = metadata;
                 }
@@ -236,6 +297,66 @@ namespace ASECLI.MaterialGUI
                 }
             }
             return result;
+        }
+
+        private static bool TryReadSourceMetadata(
+            Shader shader,
+            string propertyName,
+            out PropertyMetadata metadata)
+        {
+            metadata = new PropertyMetadata();
+            string assetPath = AssetDatabase.GetAssetPath(shader);
+            if (String.IsNullOrEmpty(assetPath) ||
+                !assetPath.StartsWith("Assets/", StringComparison.Ordinal))
+                return false;
+
+            try
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                string fullPath = Path.Combine(projectRoot, assetPath);
+                if (!File.Exists(fullPath))
+                    return false;
+
+                string escapedPropertyName = Regex.Escape(propertyName);
+                Regex declarationPattern = new Regex(
+                    @"(?m)^[\t ]*(?<attributes>(?:\[[^\]\r\n]*\][\t ]*)*)" +
+                    escapedPropertyName +
+                    @"[\t ]*\(",
+                    RegexOptions.CultureInvariant
+                );
+                Match declaration = declarationPattern.Match(File.ReadAllText(fullPath));
+                if (!declaration.Success)
+                    return false;
+
+                foreach (Match attribute in RawPropertyAttributePattern.Matches(
+                    declaration.Groups["attributes"].Value))
+                    ApplyAttribute(metadata, attribute.Value);
+                return !String.IsNullOrEmpty(metadata.Foldout) ||
+                    !String.IsNullOrEmpty(metadata.Tooltip) ||
+                    !String.IsNullOrEmpty(metadata.Help);
+            }
+            catch (Exception exception)
+            {
+                if (!metadataWarningLogged)
+                {
+                    metadataWarningLogged = true;
+                    Debug.LogWarning("ASECLI Material GUI could not read shader source metadata: " +
+                        exception.Message);
+                }
+                return false;
+            }
+        }
+
+        private static void MergeMissingMetadata(
+            PropertyMetadata target,
+            PropertyMetadata source)
+        {
+            if (String.IsNullOrEmpty(target.Foldout))
+                target.Foldout = source.Foldout;
+            if (String.IsNullOrEmpty(target.Tooltip))
+                target.Tooltip = source.Tooltip;
+            if (String.IsNullOrEmpty(target.Help))
+                target.Help = source.Help;
         }
 
         private static MethodInfo FindShaderUtilMethod(string name, params Type[] parameterTypes)
@@ -269,11 +390,14 @@ namespace ASECLI.MaterialGUI
 
         private static void ApplyMetadata(PropertyMetadata metadata, string typeName, string arguments)
         {
-            if (String.Equals(typeName, "FoldoutMzgui", StringComparison.OrdinalIgnoreCase))
+            if (String.Equals(typeName, "ASECLIFoldout", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(typeName, "FoldoutMzgui", StringComparison.OrdinalIgnoreCase))
                 metadata.Foldout = DecodeFoldout(arguments);
-            else if (String.Equals(typeName, "TooltipMzgui", StringComparison.OrdinalIgnoreCase))
+            else if (String.Equals(typeName, "ASECLITooltip", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(typeName, "TooltipMzgui", StringComparison.OrdinalIgnoreCase))
                 metadata.Tooltip = AppendLine(metadata.Tooltip, DecodeCustomUnicode(arguments));
-            else if (String.Equals(typeName, "HelpBoxMzgui", StringComparison.OrdinalIgnoreCase))
+            else if (String.Equals(typeName, "ASECLIHelpBox", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(typeName, "HelpBoxMzgui", StringComparison.OrdinalIgnoreCase))
                 metadata.Help = AppendLine(metadata.Help, DecodeCustomUnicode(arguments));
         }
 

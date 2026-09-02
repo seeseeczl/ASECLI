@@ -7,10 +7,8 @@ from .graph_inspect import measure_node_bounds_via_mcp
 from .gui_support import (
     ASECLI_GUI_EDITOR,
     GUI_SUPPORT_ASSET_PATH,
-    MZGUI_EDITOR,
     inspect_gui_support,
     install_gui_support,
-    probe_native_mzgui_via_mcp,
 )
 from .recompile import recompile_via_mcp
 
@@ -20,13 +18,11 @@ __all__ = [
     "GUI_SUPPORT_ASSET_PATH",
     "McpClient",
     "McpError",
-    "MZGUI_EDITOR",
     "SpecError",
     "create_shader_via_mcp",
     "load_editor_graph_spec",
     "inspect_gui_support",
     "install_gui_support",
-    "probe_native_mzgui_via_mcp",
     "measure_node_bounds_via_mcp",
     "recompile_via_mcp",
     "route_create_backend",

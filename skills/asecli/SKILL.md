@@ -12,7 +12,7 @@ description: Create, modify, validate, layout, install or configure grouped and 
 3. `//CHKSM=` 是 SHA1（大写 hex），对 `//CHKSM=` 之前的**整个文件**计算；校验失败**不阻断** ASE 加载。
 4. `connect --from` 是输出端（数据源），`--to` 是输入端（消费者）。
 5. Master 节点（TemplateMultiPassMasterNode 等）布局为 opaque，只能整行替换或用 `layout` 移动。
-6. 自定义材质面板分两层：ASE 图只序列化主 Master 的 `CustomEditor` 与 PropertyNode 尾部属性，Unity `ShaderGUI` 负责实际显示。先用 `gui-support` 选择原生 MZGUI 或内置兼容层，再用 `custom-gui` 操作；未知 ASE 尾部不得猜写。
+6. 自定义材质面板分两层：ASE 图只序列化主 Master 的 `CustomEditor` 与 PropertyNode 尾部属性，Unity `ShaderGUI` 负责实际显示。先用 `gui-support` 检查或安装唯一的 ASECLI GUI，再用 `custom-gui` 操作；未知 ASE 尾部不得猜写。
 7. PropertyNode 绝对字段 9 是 `m_orderIndex`，决定材质 Inspector 顺序；ASE `CommentaryNode` 保存框尺寸、说明、成员 ID、标题和颜色，必须用语义命令维护可变长字段。
 
 ## 三条链路
@@ -55,10 +55,8 @@ asecli fix-checksum <file> --write
 创建或整理公开材质属性时，必须先读 [ASE 材质属性呈现规范](references/material-property-standard.md)。默认采用四层结构：中文显示名；Tooltip 展示准确变量名与 Shader 默认值；控件下方 HelpBox 解释用途和调节结果；最后按语义使用中文 Foldout 分组。
 
 ```bash
-# 先检测目标工程。provider=native_mzgui 时沿用 MZGUI.MZGUI；provider=missing 时安装内置层
-# provider=unknown 时连接同一目标 Editor 并执行 --runtime-probe；provider=multiple 时停止
+# 检查唯一 ASECLI GUI 的固定安装路径；provider=missing 时安装内置层
 asecli gui-support /path/to/UnityProject
-asecli gui-support /path/to/UnityProject --runtime-probe
 asecli gui-support /path/to/UnityProject --write
 
 # 先查询，返回主 Master/编译区 Inspector 是否一致，以及可操作的 PropertyNode id
@@ -83,17 +81,17 @@ asecli validate <file>
 asecli recompile <file>
 ```
 
-- `--group` 写 `FoldoutMzgui`。把它加在组内第一个 PropertyNode；后续属性归入该组，直到下一个非空分组标题。
+- `--group` 写 `ASECLIFoldout`，`--tooltip` 写 `ASECLITooltip`，`--help-box` 写 `ASECLIHelpBox`。把 group 加在组内第一个 PropertyNode；后续属性归入该组，直到下一个非空分组标题。
 - Property 的公开显示名以中文为主；创建新节点时用 EditorGraphSpec 的 `inspector_name`，已有节点先通过 `custom-gui` 查询 `display_name`，再走 ASE Editor 或该节点类型确认过的固定字段修改。不要只改编译区 `Properties` 行。
-- 原生 MZGUI 和内置 GUI 会自动在 Tooltip 末尾追加变量名与默认基线。内置 GUI 从默认 `Material(shader)` 读取真实 Shader 默认值；`--tooltip` 只用于可选的额外悬浮说明，不手工抄写技术信息。
-- `--help-box` 写属性下方的常驻说明，是规范的主说明方式：说明用途、调节方向、通道、单位或限制，不重复变量名和默认值。工具会按 MZGUI 原生 UTF-16 `#XXXX` 规则编码中文、换行和 emoji。
-- 新增属性前必须运行 `gui-support`。原生 MZGUI 存在时使用 `MZGUI.MZGUI`；确认缺失后才安装 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。`provider=unknown` 表示源码/DLL 候选无法静态定型，必须连接同一目标工程用 `--runtime-probe`；`provider=multiple` 时停止并人工移除固定内置资源。不得把 unknown 当 missing，也不得猜选提供者。
-- `--add-attribute '[RampMzgui(...)]'` / `--remove-attribute RampMzgui` 是专家入口，只用于 ASE 1.9.6.2 已注册的 MZGUI 类型。
+- ASECLI GUI 会自动在 Tooltip 末尾追加变量名与默认基线，并从默认 `Material(shader)` 读取真实 Shader 默认值；`--tooltip` 只用于可选的额外悬浮说明，不手工抄写技术信息。
+- `--help-box` 写属性下方的常驻说明，是规范的主说明方式：说明用途、调节方向、通道、单位或限制，不重复变量名和默认值。工具按已验证的 UTF-16 `#XXXX` 规则编码中文、换行和 emoji。
+- 新增属性前必须运行 `gui-support`，并使用返回的唯一 `recommended_editor`：`ASECLI.MaterialGUI.ASECLIMaterialGUI`。旧三种 `*Mzgui` 标记只读兼容；同语义写入或 clear 会迁移被触碰属性。固定安装路径冲突时停止，工具不会扫描、选择或写入原生 MZGUI。
+- `--add-attribute` / `--remove-attribute` 是专家入口，只接受 `ASECLIFoldout`、`ASECLITooltip`、`ASECLIHelpBox`。
 - `--write` 同步图内主 Master 与编译区 `CustomEditor`、重算 CHKSM 并生成 `.bak`；Property 声明仍必须经 `recompile` 由 ASE 正式生成。
 
 ### 批量整理属性的规范
 
-当用户要求“整理材质属性、分组并补说明”时，创建 JSON 规范并一次应用；不要逐条写盘。数组顺序就是最终顺序，未列属性保持原相对顺序并追加。下例使用内置 GUI；若 `gui-support` 返回原生 MZGUI，只替换 `editor`：
+当用户要求“整理材质属性、分组并补说明”时，创建 JSON 规范并一次应用；不要逐条写盘。数组顺序就是最终顺序，未列属性保持原相对顺序并追加。JSON 的 `editor` 固定使用 ASECLI GUI：
 
 ```json
 {
@@ -118,10 +116,10 @@ asecli recompile <file>
 ```
 
 - 参考分组名称：固有色、阴影层、底漆层、清漆层、环境层、AO层、法线层、珠光层、伪装层。
-- 每组只有第一个 PropertyNode 写 `group`/`FoldoutMzgui`；组内其他属性不要重复写组名。
+- 每组只有第一个 PropertyNode 写 `group`/`ASECLIFoldout`；组内其他属性不要重复写组名。
 - 每个公开属性应有中文 `display_name`；变量名和 Shader 默认值由 GUI 提供者自动生成技术 Tooltip。`custom-gui` 规范只写额外注解，不修改显示名或真实默认值；两者不正确时先在 PropertyNode/Editor 规格中修正。
 - 每个 `help` 至少覆盖实际需要的内容：用途；贴图通道或数值单位；数值调大/调小时结果。无法从图或项目语义确认时，不编造因果，先保留待确认说明。
-- `group`、`help`、`tooltip` 的值为 `null` 时清除对应 MZGUI 属性。重复属性、未知字段、错误类型和非 MZGUI 新增会使整批操作失败且不写文件。
+- `group`、`help`、`tooltip` 的值为 `null` 时清除对应 ASECLI 属性及同语义旧标记。重复属性、未知字段、错误类型和非 ASECLI 新增会使整批操作失败且不写文件。
 
 ### 链路 D：ASE 节点图 Comment 打组与说明
 
@@ -238,8 +236,8 @@ Editor 创建规则：
 
 - 修改前先 `validate`；发现 `DANGLING_WIRE`/`DUPLICATE_NODE_ID` 先修复再继续。
 - `SCHEMA_UNAVAILABLE` 时：用 `parse` 拿节点行原文，改用 `--line` 整行插入或整行替换。
-- `GUI_SUPPORT_ERROR` 时：检查目标是否为 Unity/Tuanjie 工程根目录；固定安装路径若已有不同内容，停止并人工辨认。`provider=unknown` 时连接同一工程执行 `--runtime-probe`，不得直接安装或覆盖。
-- `CUSTOM_GUI_ERROR` 时：检查目标是否为 `Property` 节点、当前图尾部是否可识别，以及 `CustomEditor` 是否为 `gui-support` 返回的原生或内置提供者；不要改用 `set-field` 绕过。
+- `GUI_SUPPORT_ERROR` 时：检查目标是否为 Unity/Tuanjie 工程根目录；固定安装路径若已有不同内容，停止并人工辨认，不得覆盖。
+- `CUSTOM_GUI_ERROR` 时：检查目标是否为 `Property` 节点、当前图尾部是否可识别，以及 `CustomEditor` 是否为 `gui-support` 返回的 ASECLI Editor；不要改用 `set-field` 绕过。
 - `COMMENT_GROUP_ERROR` 时：检查成员是否重复/已属于其他 Comment、是否同时选择了内层框与其子节点，以及标题是否包含分号或换行；不要用 raw `--line` 绕过树形归属检查。
 - `WRITE_CONFLICT` 时：文件已被另一个 Agent 或编辑器修改；重新加载、比较差异后再执行，不得直接覆盖。`UNSAFE_PATH` 时检查目标、备份或旧 `.tmp` 是否为符号链接。
 - Editor 创建返回 `BRIDGE_ERROR` 时：检查 ASE 版本、模板 GUID、目标、同目录 `ASECLI-Temp-*` 和 Editor 日志。若响应含 `cleanup=skipped_untrusted_post_commit_asset`，目标是为防误删而保留的后验失败现场，先核对 nonce/hash；若 MCP 超时，按未知完成状态处理，不要立刻重试。

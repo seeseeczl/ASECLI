@@ -117,3 +117,12 @@
 - 兼容：ASE 版本差异只存在于 PropertyNode 元数据写入端；无法动态识别合法尾部时失败关闭。Inspector 层对 ASE 版本无感。Unity 2021.3 已验证 `MaterialPropertyHandler` 路径；新版 `ShaderUtil.GetShaderPropertyAttributes` 作为后备。
 - 安全与许可：不复制或打包 MZGUI 专有源码；只实现 Foldout/Tooltip/HelpBox 与技术 Tooltip。原生提供者存在时不安装；固定路径存在不同内容时拒绝覆盖；不实现 Ramp、搜索、还原按钮和关键字面板。
 - 验收边界：Python 覆盖检测、dry-run、安装、哈希、冲突和 CLI 契约；隔离 Unity 覆盖 C# 编译、三种 attribute 实例化与默认值读取；目标 Inspector 的折叠点击、悬停触发和视觉排版仍需真实 UI 验收。
+
+### ADR-0014 ASECLI 自有元数据协议与唯一内置 GUI
+
+- 状态：已确认（2026-09-02，CR-0010 / FR-0009）
+- 背景：`*Mzgui` 既是序列化属性类型又绑定原生提供者选择，继续把新资产写为该名称会把外部 GUI 标识带入项目。静态扫描和 Editor 反射也使仅安装自有 GUI 的路径依赖无关 MCP 与外部实现。
+- 决策：新写入只使用 `[ASECLIFoldout(...)]`、`[ASECLITooltip(...)]`、`[ASECLIHelpBox(...)]`，唯一推荐 `CustomEditor` 为 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。`gui-support` 只检查和安装固定 ASECLI 资源，移除原生提供者探测、优先级与 `--runtime-probe`。C# 正常属性读取与 Python inspection 仍识别旧三标记；同语义写入或 clear 时只迁移被触碰的属性。
+- 兼容与迁移：不批量修改用户 Shader，不写入或选择 `MZGUI.MZGUI`。含旧属性的 Shader 可查询和由内置 GUI 读取；要开始新写入，用户必须显式把主 Master/编译指令改为 ASECLI Editor。原始专家入口仅接受三种 ASECLI 类型。
+- 安全与回滚：固定目标路径的内容冲突和符号链接仍拒绝覆盖；安装使用创建时排他写入。回滚本变更仅恢复上一版 CLI/资源，不自动更改用户 Shader 或删除内置安装资源。
+- 验收边界：Python 回归证明协议写入、旧属性读取、触碰迁移、安装、冲突与 CLI 契约；新的 C# 资源尚需隔离 Unity/Tuanjie 编译和目标 Inspector 的视觉/交互验收。

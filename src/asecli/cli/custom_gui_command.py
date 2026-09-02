@@ -1,4 +1,4 @@
-"""CLI composition for ASE CustomEditor and MZGUI metadata."""
+"""CLI composition for ASE CustomEditor and property metadata."""
 
 from __future__ import annotations
 
@@ -11,17 +11,17 @@ from ..core import (
     apply_material_gui_spec,
     graph_custom_editor,
     inspect_custom_gui,
-    remove_mzgui_attribute,
+    remove_property_metadata_attribute,
     resolve_property_node,
     semantic_attribute,
     set_custom_editor,
-    set_mzgui_attribute,
+    set_property_metadata_attribute,
 )
 from .commands import CliError, _commit_text, _load
 
 
 def cmd_custom_gui(args) -> dict:
-    """Inspect or safely mutate ASE CustomEditor and MZGUI property metadata."""
+    """Inspect or safely mutate ASE CustomEditor and ASECLI property metadata."""
     f = _load(args.file)
     changes = []
     node_actions = any(
@@ -42,7 +42,7 @@ def cmd_custom_gui(args) -> dict:
     if args.spec and (args.node is not None or args.property is not None):
         raise CliError("USAGE_ERROR", "--spec cannot be combined with --node or --property")
     if node_actions and args.node is None and args.property is None:
-        raise CliError("USAGE_ERROR", "--node or --property is required for MZGUI property operations")
+        raise CliError("USAGE_ERROR", "--node or --property is required for ASECLI property metadata operations")
 
     try:
         if args.spec:
@@ -61,31 +61,31 @@ def cmd_custom_gui(args) -> dict:
 
             additions: list[str] = []
             if args.group is not None:
-                additions.append(semantic_attribute("FoldoutMzgui", args.group))
+                additions.append(semantic_attribute("ASECLIFoldout", args.group))
             if args.tooltip is not None:
-                additions.append(semantic_attribute("TooltipMzgui", args.tooltip))
+                additions.append(semantic_attribute("ASECLITooltip", args.tooltip))
             if args.help_box is not None:
-                additions.append(semantic_attribute("HelpBoxMzgui", args.help_box))
+                additions.append(semantic_attribute("ASECLIHelpBox", args.help_box))
             additions.extend(args.add_attribute or [])
 
             if additions and graph_custom_editor(f.graph) not in SUPPORTED_GUI_EDITORS:
                 supported = ", ".join(sorted(SUPPORTED_GUI_EDITORS))
                 raise ValueError(
-                    "MZGUI-compatible attributes require a supported graph CustomEditor; "
+                    "ASECLI property metadata requires the ASECLI material GUI; "
                     f"pass --editor with one of: {supported}"
                 )
 
             removals = (
-                [(args.clear_group, "FoldoutMzgui"), (args.clear_tooltip, "TooltipMzgui"),
-                 (args.clear_help_box, "HelpBoxMzgui")]
+                [(args.clear_group, "ASECLIFoldout"), (args.clear_tooltip, "ASECLITooltip"),
+                 (args.clear_help_box, "ASECLIHelpBox")]
             )
             for enabled, type_name in removals:
                 if enabled:
-                    changes.append(remove_mzgui_attribute(f.graph, target, type_name))
+                    changes.append(remove_property_metadata_attribute(f.graph, target, type_name))
             for type_name in args.remove_attribute or []:
-                changes.append(remove_mzgui_attribute(f.graph, target, type_name))
+                changes.append(remove_property_metadata_attribute(f.graph, target, type_name))
             for raw in additions:
-                changes.append(set_mzgui_attribute(f.graph, target, raw))
+                changes.append(set_property_metadata_attribute(f.graph, target, raw))
         state = inspect_custom_gui(f)
     except KeyError as exc:
         raise CliError("NOT_FOUND", str(exc))

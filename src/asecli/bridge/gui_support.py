@@ -1,4 +1,4 @@
-"""Detect and install ASECLI's clean-room Unity material GUI compatibility layer."""
+"""Inspect and install ASECLI's clean-room Unity material GUI."""
 
 from __future__ import annotations
 
@@ -7,14 +7,9 @@ import hashlib
 from importlib import resources
 import os
 from pathlib import Path
+import stat
 
-from ..core.custom_gui import ASECLI_GUI_EDITOR, MZGUI_EDITOR
-from .gui_provider_detection import (
-    GUI_SUPPORT_PROBE_SNIPPET,
-    probe_native_mzgui_for_assets,
-    scan_native_mzgui,
-    validate_runtime_probe,
-)
+from ..core.custom_gui import ASECLI_GUI_EDITOR
 
 GUI_SUPPORT_ASSET_PATH = "Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
 GUI_SUPPORT_SOURCE = (
@@ -23,6 +18,11 @@ GUI_SUPPORT_SOURCE = (
     .read_text(encoding="utf-8")
 )
 GUI_SUPPORT_SHA256 = hashlib.sha256(GUI_SUPPORT_SOURCE.encode("utf-8")).hexdigest()
+_SECURE_DIRECTORY_OPERATIONS_AVAILABLE = (
+    os.open in os.supports_dir_fd
+    and os.mkdir in os.supports_dir_fd
+    and hasattr(os, "O_NOFOLLOW")
+)
 
 @dataclass(frozen=True)
 class UnityProject:
@@ -31,58 +31,20 @@ class UnityProject:
     target: Path
 
 
-def inspect_gui_support(project_root: str | Path, *, runtime_probe: dict | None = None) -> dict:
-    """Inspect available material-GUI providers without changing the project."""
+def inspect_gui_support(project_root: str | Path) -> dict:
+    """Inspect the fixed ASECLI material-GUI resource without changing the project."""
     project = _unity_project(project_root)
-    native_evidence, native_candidates = scan_native_mzgui(
-        project.root, skip_source_name=Path(GUI_SUPPORT_ASSET_PATH).name
-    )
-    runtime_evidence = None
-    if runtime_probe is not None:
-        validate_runtime_probe(runtime_probe, project.assets)
-        runtime_evidence = runtime_probe
-        if runtime_probe["detected"]:
-            native_evidence.append("runtime:" + (runtime_probe.get("assembly") or MZGUI_EDITOR))
-        else:
-            native_candidates = [*native_candidates, *native_evidence] if native_evidence else []
-            native_evidence = []
     target_state, actual_sha256 = _target_state(project.target)
-    providers = []
-    if native_evidence:
-        providers.append("native_mzgui")
-    if target_state == "installed":
-        providers.append("asecli_compat")
-
-    if native_evidence:
-        provider = "native_mzgui" if target_state != "installed" else "multiple"
-        recommended_editor = MZGUI_EDITOR if provider == "native_mzgui" else None
-    elif target_state == "conflict":
-        provider = "target_conflict"
-        recommended_editor = None
-    elif native_candidates:
-        provider = "unknown"
-        recommended_editor = None
-    elif target_state == "installed":
-        provider = "asecli_compat"
-        recommended_editor = ASECLI_GUI_EDITOR
-    else:
-        provider = "missing"
-        recommended_editor = ASECLI_GUI_EDITOR
+    provider = "target_conflict" if target_state == "conflict" else (
+        "asecli_compat" if target_state == "installed" else "missing"
+    )
+    recommended_editor = None if target_state == "conflict" else ASECLI_GUI_EDITOR
 
     return {
         "project_root": str(project.root),
         "provider": provider,
-        "providers": providers,
         "recommended_editor": recommended_editor,
-        "native_mzgui": {
-            "detected": bool(native_evidence),
-            "status": "detected" if native_evidence else ("unknown" if native_candidates else "not_detected"),
-            "editor": MZGUI_EDITOR,
-            "evidence": native_evidence,
-            "candidates": native_candidates,
-            "runtime_probe": runtime_evidence,
-        },
-        "asecli_compat": {
+        "asecli_material_gui": {
             "editor": ASECLI_GUI_EDITOR,
             "target": str(project.target),
             "asset_path": GUI_SUPPORT_ASSET_PATH,
@@ -91,9 +53,10 @@ def inspect_gui_support(project_root: str | Path, *, runtime_probe: dict | None 
             "actual_sha256": actual_sha256,
         },
         "capabilities": {
-            "foldout": "FoldoutMzgui",
-            "tooltip": "TooltipMzgui",
-            "help_box": "HelpBoxMzgui",
+            "foldout": "ASECLIFoldout",
+            "tooltip": "ASECLITooltip",
+            "help_box": "ASECLIHelpBox",
+            "legacy_read_compatibility": ["FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui"],
             "automatic_technical_tooltip": ["property_name", "shader_default_value"],
             "ase_version_dependency": False,
         },
@@ -106,47 +69,119 @@ def install_gui_support(
     project_root: str | Path,
     *,
     write: bool = False,
-    runtime_probe: dict | None = None,
 ) -> dict:
-    """Plan or install the fixed compatibility asset without overwriting files."""
-    state = inspect_gui_support(project_root, runtime_probe=runtime_probe)
-    target_state = state["asecli_compat"]["state"]
-    if state["provider"] == "multiple":
-        raise RuntimeError(
-            "native MZGUI and ASECLI compatibility GUI are both installed; remove the fixed ASECLI asset "
-            "before selecting MZGUI.MZGUI"
-        )
-    if state["native_mzgui"]["detected"]:
-        state["action"] = "use_native_mzgui"
-        state["would_write"] = False
-        return state
-    if state["provider"] == "unknown":
-        raise RuntimeError(
-            "native MZGUI may exist in an unverified source or assembly; run gui-support with --runtime-probe "
-            "while the target project Editor is connected before installing"
-        )
+    """Plan or install the fixed resource without overwriting user files."""
+    state = inspect_gui_support(project_root)
+    target_state = state["asecli_material_gui"]["state"]
     if target_state == "conflict":
         raise FileExistsError(
             "ASECLI GUI support target already exists with different content; refusing to overwrite: "
-            + state["asecli_compat"]["target"]
+            + state["asecli_material_gui"]["target"]
         )
     if target_state == "installed":
         state["action"] = "already_installed"
         state["would_write"] = False
         return state
 
-    state["action"] = "install_asecli_compat"
+    state["action"] = "install_asecli_material_gui"
     if not write:
         return state
 
-    project = _unity_project(project_root)
-    project.target.parent.mkdir(parents=True, exist_ok=True)
-    _assert_inside_project(project.target, project.root)
+    _install_gui_resource(_unity_project(project_root))
+
+    installed = inspect_gui_support(project_root)
+    if installed["asecli_material_gui"]["state"] != "installed":
+        raise RuntimeError("ASECLI GUI support was written but failed digest verification")
+    installed["action"] = "install_asecli_material_gui"
+    installed["would_write"] = False
+    installed["written"] = True
+    installed["requires_editor_recompile"] = True
+    return installed
+
+
+def _install_gui_resource(project: UnityProject) -> None:
+    """Create the resource through verified directory descriptors only."""
+    _require_secure_directory_operations()
+    descriptors: list[int] = []
     try:
-        descriptor = os.open(project.target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        root_descriptor = _open_directory(project.root)
+        descriptors.append(root_descriptor)
+        assets_descriptor = _open_directory_at(root_descriptor, "Assets")
+        descriptors.append(assets_descriptor)
+        editor_descriptor = _open_or_create_directory(assets_descriptor, "Editor")
+        descriptors.append(editor_descriptor)
+        support_descriptor = _open_or_create_directory(editor_descriptor, "ASECLI")
+        descriptors.append(support_descriptor)
+        _create_gui_resource(support_descriptor, project.target)
+        os.fsync(support_descriptor)
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+def _require_secure_directory_operations() -> None:
+    if not _SECURE_DIRECTORY_OPERATIONS_AVAILABLE:
+        raise RuntimeError(
+            "secure ASECLI GUI installation requires dir_fd and O_NOFOLLOW support on this platform"
+        )
+
+
+def _directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | os.O_NOFOLLOW
+    )
+
+
+def _open_directory(path: Path) -> int:
+    descriptor = os.open(path, _directory_flags())
+    _require_directory(descriptor, path)
+    return descriptor
+
+
+def _open_directory_at(parent_descriptor: int, name: str) -> int:
+    descriptor = os.open(name, _directory_flags(), dir_fd=parent_descriptor)
+    _require_directory(descriptor, Path(name))
+    return descriptor
+
+
+def _open_or_create_directory(parent_descriptor: int, name: str) -> int:
+    try:
+        return _open_directory_at(parent_descriptor, name)
+    except FileNotFoundError:
+        try:
+            os.mkdir(name, mode=0o755, dir_fd=parent_descriptor)
+        except FileExistsError:
+            pass
+        return _open_directory_at(parent_descriptor, name)
+
+
+def _require_directory(descriptor: int, path: Path) -> None:
+    if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+        return
+    os.close(descriptor)
+    raise NotADirectoryError(f"ASECLI GUI support directory is not a directory: {path}")
+
+
+def _create_gui_resource(parent_descriptor: int, target: Path) -> None:
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | os.O_NOFOLLOW
+    )
+    try:
+        descriptor = os.open(target.name, flags, 0o644, dir_fd=parent_descriptor)
     except FileExistsError as exc:
         raise FileExistsError(
-            f"ASECLI GUI support target appeared during installation; refusing to overwrite: {project.target}"
+            f"ASECLI GUI support target appeared during installation; refusing to overwrite: {target}"
+        ) from exc
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"ASECLI GUI support directory changed during installation; refusing to write: {target}"
         ) from exc
     opened_stat = os.fstat(descriptor)
     try:
@@ -154,23 +189,18 @@ def install_gui_support(
             handle.write(GUI_SUPPORT_SOURCE)
             handle.flush()
             os.fsync(handle.fileno())
-    except Exception:
-        try:
-            current_stat = project.target.lstat()
-            if (current_stat.st_dev, current_stat.st_ino) == (opened_stat.st_dev, opened_stat.st_ino):
-                project.target.unlink()
-        except FileNotFoundError:
-            pass
+    except BaseException:
+        _unlink_created_resource(parent_descriptor, target.name, opened_stat)
         raise
 
-    installed = inspect_gui_support(project_root, runtime_probe=runtime_probe)
-    if installed["asecli_compat"]["state"] != "installed":
-        raise RuntimeError("ASECLI GUI support was written but failed digest verification")
-    installed["action"] = "install_asecli_compat"
-    installed["would_write"] = False
-    installed["written"] = True
-    installed["requires_editor_recompile"] = True
-    return installed
+
+def _unlink_created_resource(parent_descriptor: int, name: str, opened_stat: os.stat_result) -> None:
+    try:
+        current_stat = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        if (current_stat.st_dev, current_stat.st_ino) == (opened_stat.st_dev, opened_stat.st_ino):
+            os.unlink(name, dir_fd=parent_descriptor)
+    except FileNotFoundError:
+        pass
 
 
 def _unity_project(project_root: str | Path) -> UnityProject:
@@ -204,20 +234,3 @@ def _target_state(target: Path) -> tuple[str, str | None]:
         return "conflict", None
     actual = hashlib.sha256(target.read_bytes()).hexdigest()
     return ("installed" if actual == GUI_SUPPORT_SHA256 else "conflict"), actual
-
-
-def probe_native_mzgui_via_mcp(
-    project_root: str | Path,
-    *,
-    mcp_url: str = "http://127.0.0.1:8080/mcp",
-    instance_token: str | None = None,
-    allow_remote_mcp: bool = False,
-) -> dict:
-    """Ask the connected target Editor to reflect the actual MZGUI.MZGUI type."""
-    project = _unity_project(project_root)
-    return probe_native_mzgui_for_assets(
-        project.assets,
-        mcp_url=mcp_url,
-        instance_token=instance_token,
-        allow_remote_mcp=allow_remote_mcp,
-    )

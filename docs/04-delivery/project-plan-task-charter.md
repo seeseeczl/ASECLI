@@ -2,10 +2,10 @@
 id: PLAN-0001
 type: project-plan-task-charter
 status: 已确认
-version: 1.5.0
+version: 1.6.0
 created_at: 2026-08-31T23:30:00+08:00
 owner: long
-related: [ARCH-REQ-0001, PRJ-ASECLI, FR-0009, FR-0010, FR-0011, CR-0007, CR-0008, AUD-20260901]
+related: [ARCH-REQ-0001, PRJ-ASECLI, FR-0009, FR-0010, FR-0011, CR-0007, CR-0008, CR-0010, AUD-20260901]
 supersedes: 无（首次启动）
 evidence: [ARCH-REQ-0001 需求基线; 第一性原理计划书; 2026-09-01 标准审计与整改]
 kickoff_completion: complete
@@ -16,7 +16,7 @@ kickoff_completion: complete
 ## 计划依据与目标
 
 - 上游架构与需求总纲版本/链接：ARCH-REQ-0001 v1.0.0 — docs/01-architecture/project-architecture-and-requirements.md
-- 本计划覆盖的 FR/NFR/CR：FR-0001～FR-0011、NFR-0001～NFR-0004、CR-0001～CR-0009
+- 本计划覆盖的 FR/NFR/CR：FR-0001～FR-0011、NFR-0001～NFR-0004、CR-0001～CR-0010
 - 首个可交付垂直切片：MS-2 结束时——对真实 ASE shader 完成 parse→set-prop→写回→roundtrip 校验（纯文本链路，无 Unity）
 - 交付假设、依赖与不包含范围：D4/D6/D10 已由 TASK-0001 验证；真实桥接依赖隔离 Tuanjie 工程与 MCP 会话；不包含 Hub/PyPI 远程发布与 UI
 
@@ -32,6 +32,7 @@ kickoff_completion: complete
 | MS-6 自定义材质 GUI | ASE 1.9.6.2 CustomEditor、分组、提示和帮助框语义命令 | TASK-0020 | MS-3 | REG-0022 自动通过；真实 MZGUI_Test 隔离副本读写/validate 通过 | long | 2026-09-01 | 2026-09-08 | 已验证（真实 UI 待目标工程验收） |
 | MS-7 参考规范吸收 | 属性批量排序/分组/说明规范；原生 Comment 嵌套分组 | TASK-0021 TASK-0022 | MS-6 | REG-0023 REG-0024 与双 Python/strict 全绿；真实 Inspector/ASE 视觉另行验收 | long | 2026-09-01 | 2026-09-08 | 已验证（真实 UI 待目标工程验收） |
 | MS-8 Editor API 创建 | 受控规格创建模板、Sampler、CustomExpression；Save→Load manifest 与事务失败关闭 | TASK-0023~0028 | MS-4 | REG-0026~0029；自动门禁全绿，隔离团结 Caster/Receiver-like 重载一致 | long | 2026-09-02 | 2026-09-01 | 已验证（结构；目标画面待验） |
+| MS-9 ASECLI GUI 协议迁移 | ASECLI 三标记、唯一内置 GUI、旧标记读取兼容与文档治理同步 | TASK-0030 | MS-6 | 定向 67 passed/1 skipped、Python 3.10/3.12 全量均 203 passed/3 skipped、双构建通过；当前团结 2022.3.61t9 验证新/旧 metadata、HelpBox、默认值和标题点击折叠；用户实机截图确认 Tooltip 悬停 | long | 2026-09-02 | 2026-09-02 | 已验证（远端交付待验） |
 
 ## 原子任务卡
 
@@ -66,6 +67,7 @@ kickoff_completion: complete
 | TASK-0027 | FR-0011 CR-0008 | 隔离团结工程 Caster-like/Receiver-like 真实创建与关闭重载 | TASK-0026；隔离工程/MCP | tests/test_editor_create_e2e.py；系统临时目录证据 | 修改 FlymeAuto3Test 生产文件；用 mock 代替 Editor | TASK-0026/long/2026-09-02 | REG-0029 | 需写生产工程或 Save/Load 不稳定时停止 | 1 passed/39.60s；11/14 nodes；双进程重载；关闭异常回滚；Console 0 error | 已验证（目标画面待验） |
 | TASK-0028 | FR-0011 CR-0008 | 对抗性审计、必要修复、治理与交付回写 | TASK-0027 | tests/**；docs/adversarial-audits/**；治理文档 | push/Release；把未跑目标画面写成通过 | TASK-0027/long/2026-09-02 | 全量/strict/REG catalog | P0/P1 未清零时阻塞 | 2026-09-01-193521 审计 4 项已修；全量/治理/REG/diff 门禁通过 | 已验证 |
 | TASK-0029 | CR-0009 BUG-0010~0014 | 执行第二轮对抗性审计优化计划并恢复发布门禁 | TASK-0028 | CI/build 诊断；custom_gui versions；MCP ID；Editor 后验；GUI provider；tests/docs | 删除一致性门禁；未知版本猜写；按路径清理；把 mock 写成真实 UI | TASK-0028/long/2026-09-01 | REG-0031~0035；全量/strict/远程 CI | 远程 artifact 或未知版本门禁失败时阻塞 | 206 passed/2 skipped；GitHub run 33510909955 与下载 artifact 复验通过；真实 GUI probe/Inspector/渲染待验 | 已验证（目标 GUI 待验） |
+| TASK-0030 | CR-0010 FR-0009 | 将新写入迁移为 ASECLI 自有三标记和唯一内置 GUI；旧三标记只读兼容；移除原生提供者选择 | 用户 2026-09-02 批准；TASK-0029 | core/custom_gui*；bridge/gui_support.py；C# resource；CLI；tests；README/SKILL/治理 | 批量修改用户 Shader；恢复原生扫描/反射；新增依赖；宣称未跑的 Tooltip 悬停已通过 | long/2026-09-02 | REG-0022 REG-0023 REG-0030 REG-0032 REG-0035；定向 67 passed/1 skipped、Python 3.10/3.12 全量均 203 passed/3 skipped、双构建通过；团结 `2022.3.61t9` 当前实例验证原生同名旧 drawer fallback、新/旧 HelpBox/默认值/标题点击折叠；用户截图确认 Tooltip 悬停 | C# 编译或安全门禁失败时停止 | CR-0010 ADR-0014；后续提交的远端 CI/artifact/回滚需另验 | 已验证（自动与团结 Inspector） |
 
 ## 验证、风险与回滚
 

@@ -80,6 +80,12 @@ jobs:
       - run: uv venv .artifact-venv --python 3.12
       - run: uv pip install --python .artifact-venv/bin/python dist/asecli-0.1.0-py3-none-any.whl
       - run: .artifact-venv/bin/asecli parse tests/fixtures/step-antialiasing.function.txt
+      - name: Smoke test packaged GUI installer
+        run: |
+          test_project="$RUNNER_TEMP/asecli-gui-smoke"
+          mkdir -p "$test_project/Assets" "$test_project/ProjectSettings"
+          .artifact-venv/bin/asecli gui-support "$test_project" --write
+          test -f "$test_project/Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: asecli-0.1.0-python-${{ runner.arch }}

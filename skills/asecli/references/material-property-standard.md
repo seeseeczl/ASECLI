@@ -24,10 +24,10 @@
 默认值：(1, 1, 1, 1)
 ```
 
-- 这两行由 GUI 提供者自动追加，不写进 `TooltipMzgui` 文本。原生 MZGUI 使用自己的默认基线逻辑；ASECLI 内置 GUI 从默认 `Material(shader)` 读取 Shader 默认值，不读取当前材质实例值。
+- 这两行由 ASECLI GUI 自动追加，不写进 `ASECLITooltip` 文本。ASECLI GUI 从默认 `Material(shader)` 读取 Shader 默认值，不读取当前材质实例值。
 - 因为是显示时动态读取，Shader 默认值变化后无需人工同步一份字符串，也不会把旧默认值留在 ASE 节点尾部。
 - `--tooltip` 仅用于可选的额外悬浮说明；用途、通道和调节结果仍优先放在 HelpBox，避免 Tooltip 过长。
-- 开始前运行 `asecli gui-support <project-root>`。原生 MZGUI 存在时使用 `MZGUI.MZGUI`；缺失时显式 `--write` 安装内置层，并使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。若返回 `provider=multiple`，停止写入，人工移除固定内置资源 `Assets/Editor/ASECLI/ASECLIMaterialGUI.cs`、等待 Editor 重编译并重新检测，不得猜选提供者。
+- 开始前运行 `asecli gui-support <project-root>`。缺失时显式 `--write` 安装内置层，并使用唯一的 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。若返回 `target_conflict`，停止写入并人工辨认固定资源 `Assets/Editor/ASECLI/ASECLIMaterialGUI.cs`，不得覆盖。
 
 `custom-gui` 示例：
 
@@ -39,7 +39,7 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
 
 ### 3. 属性下方帮助说明
 
-- 每个需要解释的公开属性使用 `HelpBoxMzgui` 在控件下方提供常驻中文说明。
+- 每个需要解释的公开属性使用 `ASECLIHelpBox` 在控件下方提供常驻中文说明。
 - 说明优先回答：控制什么；数值调大/调小时发生什么；贴图各通道表达什么；必要的单位、范围、依赖或性能影响。
 - 颜色、贴图、开关等不适合“调大/调小”的类型，改写为对选择结果、通道或启用条件的说明。
 - 一到两句即可，不复述中文显示名，也不重复 Tooltip 中的变量名和默认值。
@@ -49,7 +49,7 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
 
 - 使用中文 Foldout 标题按功能组织属性，例如：固有色、阴影层、底漆层、清漆层、环境层、AO 层、法线层、珠光层、伪装层。
 - 排序优先满足实际调节流程：常用基础项在前，细节与高级项在后，诊断/调试项最后。
-- 每组只有第一个 PropertyNode 写 `FoldoutMzgui`；后续属性继承该组，直到下一个分组标题。
+- 每组只有第一个 PropertyNode 写 `ASECLIFoldout`；后续属性继承该组，直到下一个分组标题。
 - 避免一个属性一个组，也不要用“其他”“参数 1”这类无语义标题。确实只有一个独立功能时可以单项成组。
 
 ## 批量规范示例
@@ -81,7 +81,7 @@ asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --prop
 写入后执行：
 
 1. `asecli gui-support <project-root>`：确认 `provider`、`recommended_editor` 与 Shader 的 `CustomEditor` 一致；内置层安装后等待 Editor 脚本重编译。
-2. `asecli custom-gui <file>`：确认每个公开属性的 `display_name`、`property_name`、顺序及三类 MZGUI 属性正确。
+2. `asecli custom-gui <file>`：确认每个公开属性的 `display_name`、`property_name`、顺序及三类 ASECLI 属性正确；旧三标记只作为兼容读取信息。
 3. `asecli validate <file>`：确认图结构、属性和 CHKSM 无错误。
 4. `asecli recompile <file>`：让 ASE 正式生成 ShaderLab 属性声明。
 5. 在真实材质 Inspector 中检查：中文显示名可读；悬浮时同时看到准确变量名与默认值；帮助说明显示在对应控件下方；Foldout 分组与排序符合调节流程。

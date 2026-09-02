@@ -8,7 +8,7 @@ from .model import AseGraph
 TARGET_ASE_VERSION = "1.9.6.2"
 TARGET_GRAPH_VERSION = "19602"
 CUSTOM_EDITOR_GRAPH_VERSIONS = frozenset(("19109", "19602"))
-MZGUI_TAIL_GRAPH_VERSIONS = frozenset(("19602",))
+PROPERTY_METADATA_TAIL_GRAPH_VERSIONS = frozenset(("19602",))
 
 
 def _require_graph_version(graph: AseGraph, supported: frozenset[str], capability: str) -> None:
@@ -27,5 +27,9 @@ def require_custom_editor_version(graph: AseGraph) -> None:
     _require_graph_version(graph, CUSTOM_EDITOR_GRAPH_VERSIONS, "serialized CustomEditor")
 
 
-def require_mzgui_tail_version(graph: AseGraph) -> None:
-    _require_graph_version(graph, MZGUI_TAIL_GRAPH_VERSIONS, "MZGUI property metadata")
+def require_property_metadata_tail_version(graph: AseGraph) -> None:
+    _require_graph_version(
+        graph,
+        PROPERTY_METADATA_TAIL_GRAPH_VERSIONS,
+        "ASECLI property metadata",
+    )

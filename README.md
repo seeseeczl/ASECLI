@@ -9,17 +9,26 @@ AseCLI 是一个面向 AI Agent 的本地 CLI 工具。它把 ASE 嵌在 `.shade
 Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你验收效果
 ```
 
-## 特性
+## 能力总览
 
-- **纯文本读写引擎**：真实样本逐字节 roundtrip 一致，修改产生最小差异
-- **节点 schema 库**：295 种节点类型的参数结构由 ASE 运行时序列化自动提取（格式由 ASE 自己保证）
-- **结构校验**：悬空连线、重复节点 ID、CHKSM 校验（SHA1，已逆向验证）
-- **自动布局**：Sugiyama-lite 分层排列——输入在左、输出在右、Master 靠右、对齐等距，只动 x/y
-- **自定义材质 GUI**：按属性名批量排序；原生 MZGUI 缺失时可安装内置兼容层，继续提供中文折叠分组、常驻帮助说明，以及自动显示变量名和 Shader 默认值的悬停提示
-- **节点图语义分组**：用 ASE 原生 `CommentaryNode` 自动包围节点，支持“外层功能、内层因果”的嵌套说明
-- **无 UI**：stdout 恒为 JSON，专为 agent 子进程调用设计
-- **编译桥**：经 MCP for Unity（`execute_code`）触发 Unity 内 ASE 重新生成并保存
-- **受控 Editor 创建**：用严格 `EditorGraphSpec v1` 驱动 ASE 1.9.6.2 自己创建节点、连线、生成 ShaderLab/HLSL/ASEBEGIN，并保存、关闭、重载核对
+| 领域 | 能力清单 | 是否需要运行中的 Unity/Tuanjie |
+| --- | --- | --- |
+| 图读取与安全检查 | 解析节点/连线、结构校验、CHKSM 校验与修复、无效节点审计 | 否 |
+| 图编辑 | 设置已知字段、schema 驱动或原始行加节点、连线/断线、受保护删节点、最小差异写回 | 否 |
+| 图整理 | 分层网格布局、原生 Comment 框创建/嵌套、真实节点边界检查与自动收框、Local Var 治理规则 | 创建/检查真实边界时需要 |
+| 材质 Inspector | 安装唯一的 ASECLI ShaderGUI、折叠分组、Tooltip、HelpBox、属性排序与原子 JSON 规范；旧标记只读兼容 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
+| Shader 创建 | 从既有编译壳克隆；或由严格 `EditorGraphSpec v1` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
+| 编译桥接 | 通过 MCP for Unity 请求 ASE 重新生成 HLSL，并验证工具结果/保存语义 | 是 |
+| Agent 集成 | 全部子命令单行 JSON 输出；稳定错误码与退出码，适合 Agent 子进程编排 | 否 |
+| 工程交付 | 双 Python CI、锁文件、回归目录、可复现 wheel/sdist、SBOM、供应链与许可证检查 | 否 |
+
+核心实现特性：
+
+- **纯文本读写引擎**：真实样本逐字节 roundtrip 一致；布局只改变坐标，其他写操作会先执行结构校验。
+- **节点 schema 库**：295 种节点类型的参数结构来自 ASE 运行时序列化提取；未知或版本不兼容的结构拒绝猜写。
+- **安全写入**：写前比对 SHA-256 快照、加独占锁、拒绝符号链接和陈旧快照；既有文件写入前生成相邻 `.bak` 备份。
+- **受控 Editor 创建**：固定 C# 执行器 + 白名单 JSON 规格，拒绝任意 C#、任意反射字段和不支持版本的降级写入。
+- **证据分层**：文本/自动化通过不等于真实 Editor、目标 Inspector 或最终渲染画面通过；README 会明确标注这些边界。
 
 ## 环境要求
 
@@ -27,14 +36,40 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 - 查看/修改/校验/布局：不需要 Unity
 - Editor 创建/编译（`create --backend editor` / `recompile`）：Unity/团结引擎打开目标工程 + MCP for Unity 会话已启动
 
-## 安装
+## 安装与运行
+
+项目当前是内部专有工具，未声明 PyPI、CLI Hub 或公开包仓分发。请从仓库源码或受控 CI artifact 安装。
+
+### 方式一：源码开发运行（推荐）
 
 ```bash
 git clone git@github.com:seeseeczl/ASECLI.git
 cd ASECLI
-uv tool install .          # 安装为全局 asecli 命令
-# 或开发模式：uv sync && uv run asecli --help
+uv sync --frozen
+uv run --frozen asecli --help
 ```
+
+后续所有示例中的 `asecli` 都可替换为 `uv run --frozen asecli`，无需向全局环境安装任何内容。
+
+### 方式二：安装为本机命令
+
+```bash
+git clone git@github.com:seeseeczl/ASECLI.git
+cd ASECLI
+uv tool install .
+asecli --help
+```
+
+### 方式三：从受控 wheel 安装
+
+仅使用项目 CI 生成、并已核对 SHA-256 的 wheel：
+
+```bash
+uv tool install /path/to/asecli-0.1.0-py3-none-any.whl
+asecli --help
+```
+
+升级源码副本时使用 `git pull --ff-only` 后重新执行 `uv sync --frozen`。若 lock 检查失败，不要跳过冻结安装；先解决 `uv.lock` 与项目声明的不一致。
 
 ## 快速上手
 
@@ -60,10 +95,8 @@ asecli layout MyShader.shader --write
 # 7. 修复 checksum（默认只预览，显式写入才落盘并保留 .bak）
 asecli fix-checksum MyShader.shader --write
 
-# 8. 先检测目标工程的 GUI 提供者；默认 dry-run，缺失时才显式安装
+# 8. 检查 ASECLI GUI 的固定安装路径；默认 dry-run，缺失时显式安装
 asecli gui-support /path/to/UnityProject
-# 若静态扫描返回 provider=unknown，在已连接目标 Editor 时用反射确认
-asecli gui-support /path/to/UnityProject --runtime-probe
 asecli gui-support /path/to/UnityProject --write
 
 # 使用上一步 JSON 返回的 recommended_editor；也可直接用 ShaderLab 属性名定位
@@ -87,28 +120,133 @@ asecli create Assets/NewShader.shader --from MyShader.shader --name "NewShader" 
 asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 ```
 
-所有修改类命令不加 `--write` 时为 dry-run（只预览不落盘）。
+除 `create` 与 `recompile` 外，所有会修改已有 ASE 文件或项目资源的命令都必须显式传 `--write`；未传时仅返回预演结果。`create` 会立即创建目标文件，`recompile` 会立即请求编辑器写回，使用前应先完成路径与目标确认。
 
-## 命令参考
+## 完整命令目录
 
-| 命令 | 说明 | 需要 Unity |
+所有命令都可用 `asecli <command> --help` 查看参数。下表列出当前全部 15 个公开子命令及其实际副作用。
+
+| 命令 | 做什么 | 写入/运行边界 |
 | --- | --- | --- |
-| `parse <file>` | 节点/连线摘要 | 否 |
-| `validate <file>` | 结构校验（悬空线/重复 ID/CHKSM） | 否 |
-| `set-field <file> --node N --field I --value V` | 设置节点某个序列化字段 | 否 |
-| `add-node <file> --type T [--id N] [--pos X,Y]` | schema 驱动加节点（或 `--line` 整行插入） | 否 |
-| `connect <file> --from SRC:port --to DST:port` | 连线（from=输出端，to=输入端） | 否 |
-| `disconnect <file> --from SRC:port --to DST:port` | 删连线 | 否 |
-| `remove-node <file> --node N` | 删节点；外部源码仍引用的 Property 默认拒删 | 否 |
-| `graph-audit <file>` | 查找不通向输出的节点，区分真正候选与 Custom GUI/HLSL 外部消费者 | 否 |
-| `layout <file> [--gap-x] [--gap-y]` | 自动整理节点布局 | 否 |
-| `gui-support <project> [--runtime-probe] [--write]` | 检测原生 MZGUI；DLL/源码不确定时用目标 Editor 反射确认；确认缺失后安全安装内置支持 | 反射确认/安装后重编译需要 |
-| `custom-gui <file> [--spec JSON] [--property P --group/--tooltip/--help-box T]` | 查询、批量排序或修改 CustomEditor/MZGUI | 写元数据否；生效需重编译 |
-| `comment-group <file> [--nodes IDS --title T]` | 查询、创建或用 `--check-bounds`/`--fit` 校正 ASE 原生 Comment 框 | 精确边界检查/校正需要 |
-| `fix-checksum <file> [--write]` | 重算 `//CHKSM`（默认预览；写入保留 `.bak`） | 否 |
-| `create <out> --from TPL [--name N] [--graph-from D]` | 从编译壳克隆新 shader | 否 |
-| `create <out> --backend editor --spec GRAPH.json` | 用受控 ASE Editor API 创建不存在的新 shader | **是** |
-| `recompile <file> [--mcp-url U] [--allow-remote-mcp]` | 触发 Unity 内 ASE 重新生成并保存 | **是** |
+| `parse <file>` | 输出 ASE 图版本、节点数、连线数及节点摘要。 | 只读。 |
+| `validate <file>` | 检查悬空连线、重复 ID、输入多来源、Local Var 一致性和 CHKSM。 | 只读；有 error 时返回退出码 2。 |
+| `graph-audit <file>` | 从 Master 反向分析未参与输出的节点，区分 `unused_candidates` 与外部消费者。 | 只读；Property 的源码/HLSL/GUI 引用不会被误报为可删。 |
+| `set-field <file> --node N --field I --value V [--write]` | 修改一个已知节点的绝对序列化字段。 | 默认预演；`--write` 后写入。不要用它猜写 Master 或未知版本尾部。 |
+| `add-node <file> --type T [--id N] [--pos X,Y] [--write]` | 按 schema 创建可写节点与默认参数。 | 默认预演；未知、opaque 或版本不兼容节点会拒绝。`--line` 是复用真实序列化行的专家入口。 |
+| `connect <file> --from A:P --to B:P [--write]` | 将来源节点输出端接到目标节点输入端。 | 默认预演；`--from` 是数据源，`--to` 是消费者。 |
+| `disconnect <file> --from A:P --to B:P [--write]` | 删除一条精确连线。 | 默认预演；找不到该连线会失败。 |
+| `remove-node <file> --node N [--force-external] [--write]` | 删除节点及附属连线。 | 默认预演；外部源码仍引用的 Property 默认拒删。`--force-external` 只用于已迁移消费者的明确操作。 |
+| `fix-checksum <file> [--write]` | 重算 `//CHKSM`，并报告旧值、实际值和是否已有效。 | 默认预演；`--write` 后写入并备份原文件。 |
+| `layout <file> [--gap-x X] [--gap-y Y] [--write]` | 按左到右数据流排列节点，保持连线和非位置字段不变。 | 默认预演；只改坐标。真实画布的节点宽高和贝塞尔线仍需 Editor 验收。 |
+| `gui-support <project> [--write]` | 检查或安装固定路径的 ASECLI ShaderGUI。 | 默认只检查；`--write` 仅在目标缺失时安装，目标内容冲突时拒绝覆盖，随后需 Editor 重编译。 |
+| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；为属性设置或清除 Foldout、Tooltip、HelpBox；也可原子应用 JSON 规范与排序。 | 默认预演；写入后需 `validate` 和 `recompile`。 |
+| `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
+| `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；已有目标必须显式 `--force`。文本后端不需要 Unity。 |
+| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v1` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；目标必须位于 `Assets/` 且不存在，禁止 `--force`。 |
+| `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，并报告 `changed`。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。 |
+
+### 推荐使用流程
+
+#### 1. 只读检查与结构编辑
+
+```bash
+# 先建立基线：读图、校验、审计
+asecli parse Assets/Example.shader
+asecli validate Assets/Example.shader
+asecli graph-audit Assets/Example.shader
+
+# 每一步先预演；确认 JSON 中 written=false 的结果后才落盘
+asecli add-node Assets/Example.shader \
+  --type AmplifyShaderEditor.SaturateNode --id 99 --pos -320,0
+asecli add-node Assets/Example.shader \
+  --type AmplifyShaderEditor.SaturateNode --id 99 --pos -320,0 --write
+asecli connect Assets/Example.shader --from 99:0 --to 6:0 --write
+asecli validate Assets/Example.shader
+```
+
+若文件在读取后被 Unity、另一个 Agent 或人工修改，写入会以 `WRITE_CONFLICT` 停止，而非覆盖对方变更。先重新 `parse` / 比较差异，再重新预演。
+
+#### 2. 整理材质 Inspector
+
+```bash
+# 先确认 ASECLI GUI 的固定安装路径状态
+asecli gui-support /path/to/UnityProject
+
+# 仅在 provider=missing 时，预演结果会给出 would_write=true；确认后安装
+asecli gui-support /path/to/UnityProject --write
+
+# 查询属性，再以属性名进行预演和写入
+asecli custom-gui Assets/Example.shader
+asecli custom-gui Assets/Example.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --property _PaintColor \
+  --group "固有色" --tooltip "车身基础漆色。" \
+  --help-box "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。" --write
+asecli validate Assets/Example.shader
+asecli recompile Assets/Example.shader
+```
+
+批量整理时使用 `--spec`，一次预演、一次备份、一次写入；不要逐项反复落盘：
+
+```json
+{
+  "editor": "ASECLI.MaterialGUI.ASECLIMaterialGUI",
+  "reorder": true,
+  "properties": [
+    {
+      "name": "_PaintColor",
+      "group": "固有色",
+      "tooltip": "车身基础漆色。",
+      "help": "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。"
+    },
+    {
+      "name": "_Contrast",
+      "help": "控制车身明暗对比度；数值越大，对比越弱。"
+    }
+  ]
+}
+```
+
+```bash
+asecli custom-gui Assets/Example.shader --spec material-gui.json
+asecli custom-gui Assets/Example.shader --spec material-gui.json --write
+asecli validate Assets/Example.shader
+asecli recompile Assets/Example.shader
+```
+
+`editor` 必须采用 `gui-support` 输出中的 `recommended_editor`（唯一值为 `ASECLI.MaterialGUI.ASECLIMaterialGUI`）。`target_conflict` 必须人工处理，工具不会覆盖。旧 MZGUI 标记可读取，但 CLI 不会选择或写入原生 MZGUI。
+
+#### 3. 整理图布局、Local Var 与 Comment
+
+```bash
+# layout 只移动 x/y，不改参数或连线
+asecli layout Assets/Example.shader --gap-x 280 --gap-y 120
+asecli layout Assets/Example.shader --gap-x 280 --gap-y 120 --write
+
+# 先离线预演 Comment，再在连接的 Editor 中以真实尺寸验收/收框
+asecli comment-group Assets/Example.shader --nodes 1212,1218 \
+  --title "明度越高，强度越小"
+asecli comment-group Assets/Example.shader --nodes 1212,1218 \
+  --title "明度越高，强度越小" --write
+asecli comment-group Assets/Example.shader --check-bounds
+asecli comment-group Assets/Example.shader --fit --padding 30 --write
+```
+
+当一个中间结果被多个分散消费者复用、跨 Comment 组或形成长距离交叉线时，在生产者右侧使用一个 `Register Local Var`，并在每个消费者输入侧使用 `Get Local Var`。一次性、同组、相邻结果保持直连；不要为“看起来整齐”重复计算或重复 Register。普通 schema 不会猜造动态 `RegisterLocalVarNode`，应通过真实 ASE 创建或复用同版本、同类型的真实序列化样本。
+
+#### 4. 创建与编译
+
+```bash
+# 文本后端：立即新建目标；可从 donor 仅注入节点图
+asecli create Assets/NewShader.shader --from Assets/Template.shader \
+  --name "Vehicle/NewShader" --graph-from Assets/Donor.shader
+
+# Editor 后端：严格 JSON 规格，目标必须尚不存在且在 Assets/ 中
+asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
+
+# auto 在有 --spec 时路由到 editor；无 spec 时仍走 text
+asecli create Assets/NewEditorShader.shader --backend auto --spec graph.json
+```
+
+Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口。成功会返回模板、Shader 名、节点/端口/连线 manifest；随后仍须在新 Editor 进程重开目标并完成材质、平台编译和渲染画面验收。
 
 ### Editor API 创建
 
@@ -154,7 +292,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 {"ok": false, "error": {"code": "NOT_FOUND", "message": "..."}}
 ```
 
-错误码：`PARSE_ERROR` `NOT_FOUND` `USAGE_ERROR` `SCHEMA_UNAVAILABLE` `CUSTOM_GUI_ERROR` `COMMENT_GROUP_ERROR` `EXTERNAL_REFERENCE` `BRIDGE_ERROR` `INTERNAL`
+常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`EXTERNAL_REFERENCE`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
 退出码：`0` 成功 · `2` 用法/校验/解析错误 · `3` 桥接错误
 
 ## ASE 格式备忘（Agent 必读）
@@ -163,17 +301,26 @@ stdout 恒为单行 JSON，agent 可直接解析：
 2. `WireConnection;<入节点>;<入端口>;<出节点>;<出端口>` —— **目的地在前，来源在后**
 3. `//CHKSM=` = 整个文件（`//CHKSM=` 之前部分）的 SHA1 大写 hex；校验失败**不阻断** ASE 加载
 4. Master 节点（TemplateMultiPassMasterNode 等）序列化布局为 opaque：用 `--line` 整行替换或 `layout` 移动
-5. 当前真实版本矩阵仅允许图版本 `19109` 读取/同步主 Master `CustomEditor`，图版本 `19602` 读写 MZGUI PropertyNode 尾部。请用 `custom-gui`，不要用通用 `set-field` 猜这些结构；任何未登记版本即使字段数量相似或以数字 `0` 结尾，也会在备份/写盘前失败关闭
+5. 当前真实版本矩阵仅允许图版本 `19109` 读取/同步主 Master `CustomEditor`，图版本 `19602` 读写 ASECLI PropertyNode 元数据尾部。请用 `custom-gui`，不要用通用 `set-field` 猜这些结构；任何未登记版本即使字段数量相似或以数字 `0` 结尾，也会在备份/写盘前失败关闭
 
 ### 自定义 GUI 分组规则
 
 - 公开属性默认使用中文显示名。新 Property 通过 EditorGraphSpec 的 `inspector_name` 写入；已有属性先用 `custom-gui` 查看 `display_name`，再由 ASE Editor 或确认过的节点字段修改，不要只编辑重编译后会被覆盖的 ShaderLab `Properties` 行。
-- `--group` 会给目标属性写入 `FoldoutMzgui`。目标属性成为分组首项，后续属性一直归入该组，直到下一个带非空分组标题的属性；因此应选择材质面板中该组的第一个 PropertyNode。
+- `--group` 会给目标属性写入 `ASECLIFoldout`；`--tooltip` 与 `--help-box` 分别写 `ASECLITooltip` 和 `ASECLIHelpBox`。目标属性成为分组首项，后续属性一直归入该组，直到下一个带非空分组标题的属性；因此应选择材质面板中该组的第一个 PropertyNode。
 - `--property _PaintColor` 可替代节点 ID；批量整理使用 `--spec`。`reorder=true` 按 `properties` 数组重写 PropertyNode 的 `m_orderIndex`，未列属性保持原相对顺序并追加。
-- 原生 MZGUI 和 ASECLI 内置 GUI 都会在 Tooltip 中自动追加准确变量名与默认基线；内置 GUI 通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值。`--tooltip` 只写可选的额外悬浮说明，不再人工复制变量名和默认值。
-- `--help-box` 是属性下方的常驻中文说明，应写清用途、通道/单位和“调大/调小”的结果，不重复变量名和默认值。中文、换行和 emoji 会按 MZGUI 的 UTF-16 `#XXXX` 规则编码。
-- 先运行 `gui-support <project>`：原生 MZGUI 存在时使用返回的 `MZGUI.MZGUI`；确认缺失时用 `--write` 安装固定资源，再使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。若返回 `provider=unknown`，必须连接同一目标工程并执行 `--runtime-probe`；若返回 `multiple`，人工移除固定内置资源并等待重编译。工具不会把“静态未发现”冒充“已证明不存在”，也不会猜选提供者。
+- ASECLI GUI 会在 Tooltip 中自动追加准确变量名与默认基线，并通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值。`--tooltip` 只写可选的额外悬浮说明，不再人工复制变量名和默认值。
+- `--help-box` 是属性下方的常驻中文说明，应写清用途、通道/单位和“调大/调小”的结果，不重复变量名和默认值。中文、换行和 emoji 按已验证的 UTF-16 `#XXXX` 规则编码。
+- 先运行 `gui-support <project>`，确认 `recommended_editor` 后使用 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。旧 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 只读取兼容；同语义写入或对应 clear 会迁移该属性，工具不扫描、选择或写入原生 MZGUI。
 - `custom-gui --write` 会同步图内主 Master 与编译区 `CustomEditor`、重算 `CHKSM` 并保留 `.bak`；Property 属性声明由 ASE 生成，因此随后必须执行 `validate` 和 `recompile`。
+
+### GUI Editor 支持边界
+
+| Editor / API 条件 | 当前结论 | 证据 |
+| --- | --- | --- |
+| 团结引擎 `2022.3.61t9`，具备 `ShaderUtil.GetShaderPropertyAttributes` | 支持当前 ASECLI 三标记与旧三标记的读取；可读取默认值 | 隔离工程 `tests/test_material_gui_e2e.py` BatchMode 实测通过 |
+| 缺少该 `ShaderUtil` 方法、仅依赖 `MaterialPropertyHandler` fallback 的版本 | 代码提供 legacy decorator fallback，但尚无实机验证；不纳入已发布兼容矩阵 | 需要在目标版本补跑同一隔离测试后才可宣称支持 |
+
+BatchMode 只验证编译与元数据，不替代实际 Inspector 中的 Tooltip 悬停、Foldout 点击和 HelpBox 视觉验收。
 
 批量规范示例（`editor` 必须使用 `gui-support` 返回的 `recommended_editor`）：
 
@@ -249,12 +396,78 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 ## 测试
 
 ```bash
-uv run pytest -q                # 全量（桥接测试无环境时自动跳过）
-ASECLI_TEST_SHADER=Assets/xxx.shader uv run pytest -m bridge   # 桥接端到端
+uv lock --check
+uv run --frozen pytest -q                # 全量（桥接测试无环境时自动跳过）
+ASECLI_TEST_SHADER=Assets/xxx.shader uv run --frozen pytest -m bridge   # 桥接端到端
 ASECLI_EDITOR_CREATE_PROJECT=/path/to/isolated-project \
 ASECLI_TUANJIE_PATH=/path/to/Tuanjie \
-uv run pytest -q -m bridge tests/test_editor_create_e2e.py     # 真实 Editor 创建/新进程重载
+uv run --frozen pytest -q -m bridge tests/test_editor_create_e2e.py     # 真实 Editor 创建/新进程重载
 ```
+
+## 开发、质量与交付治理
+
+本项目的治理不是额外的项目管理流程，而是让 CLI 行为、文档、回归与交付证据保持可追溯的最小约束。详细来源分别是 [项目章程](docs/00-governance/project-charter.md)、[交付协议](docs/00-governance/delivery-protocol.md)、[回归目录](docs/03-quality/regression-catalog.md)、[供应链策略](docs/00-governance/supply-chain-policy.md) 和 [追溯表](docs/00-governance/traceability.csv)。
+
+### 日常变更规则
+
+| 变更类型 | 开始前 | 实现与验收要求 |
+| --- | --- | --- |
+| 一般实现或文档任务 | 在 `task/<task-id>-<slug>` 分支工作；任务至少一次提交，提交信息以 `TASK-xxxx:` 开头。 | 提交前全量测试通过；不要顺带重构、升级依赖或修改无关 Shader。 |
+| 新功能 / 需求变更（FR/CR） | 先更新需求基线 `ARCH-REQ-0001` 与 `traceability.csv`，再修改代码。 | 关联模块、任务与回归，保持 `FR → MOD → TASK → REG` 双向可追溯。 |
+| 缺陷修复 | 先在回归目录登记能复现失败的 `REG-*`。 | 做最小修复；验证修复前失败场景与修复后回归。 |
+| 公共 CLI 契约变更 | 先建立 CR；命令名、JSON 字段、错误码和退出码都属于兼容性边界。 | 更新 `MOD-CLI` 契约、README、SKILL 与相关回归，不以“内部重构”名义静默改变调用方行为。 |
+| Unity / MCP / GUI 改动 | 先锁定目标工程与 ASE 版本，避免生产工程作为试验环境。 | 纯 Python 通过后，补隔离 Editor、目标 Inspector 或目标渲染验收；不得用 mock 替代真实界面结论。 |
+
+完成一个有任务卡的工作时，在 `docs/00-governance/timeline.md` 追加时间线，并把验收命令输出/证据回写到任务卡。没有代码行为或公开契约变化的纯 README 校正，不应伪造 FR、CR 或发布记录。
+
+### 本地提交门禁
+
+最小提交前检查如下；应按本次改动风险补充相关的定向测试，而不是只依赖格式检查。
+
+```bash
+git diff --check
+uv lock --check
+uv sync --frozen --python 3.10
+uv run --frozen --python 3.10 pytest -q
+uv run --frozen --python 3.10 python tools/check_ci_governance.py
+uv run --frozen --python 3.10 python tools/check_regression_catalog.py
+
+uv sync --frozen --python 3.12
+uv run --frozen --python 3.12 pytest -q
+uv run --frozen --python 3.12 python tools/check_ci_governance.py
+uv run --frozen --python 3.12 python tools/check_regression_catalog.py
+```
+
+如果改动触及 bridge、Editor 创建、材质 GUI、Comment 可视边界或最终渲染，以上自动测试仍不足够：应在隔离工程或目标工程补跑对应 `pytest -m bridge`、Inspector 交互/视觉、平台编译和画面验收，并在交付记录中注明实际环境。
+
+### CI、构建与发布门禁
+
+`.github/workflows/ci.yml` 在 push 到 `main`、PR 和手动触发时执行：
+
+1. Python 3.10 与 3.12：`uv lock --check`、冻结同步、全量 pytest、治理检查、回归目录收集检查。
+2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
+3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
+
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。
+
+### 供应链、许可证与密钥
+
+- 当前许可证为 `LicenseRef-ASECLI-Proprietary`；未经书面批准不得公开发布、转授权或上传公共包仓。
+- 当前生产运行时依赖为 0；新增运行时依赖、改许可证或改分发方式均是单独 CR，必须完成许可证与漏洞评估。
+- `uv.lock` 固定开发依赖的来源、版本和 SHA-256；CI 中所有 GitHub Actions 必须固定为 40 位 commit SHA。
+- `tools/supply_chain_check.py` 会检查 lock、Action pin、常见高置信密钥模式与许可证；`tools/generate_sbom.py` 生成 artifact 清单。离线检查不等同于真实漏洞数据库或 Dependabot 状态。
+- MCP 实例 token 只能由 `ASECLI_MCP_INSTANCE_TOKEN` 环境变量提供，严禁放进 argv、仓库、文档示例、日志、截图或 artifact；远端 MCP 必须显式 `--allow-remote-mcp`。
+
+### 证据边界
+
+| 证据 | 可以证明 | 不能替代 |
+| --- | --- | --- |
+| `pytest` / mock | 文本解析、写入不变量、CLI JSON、MCP 响应处理和安全契约。 | 真实 Editor API、材质 Inspector 交互、目标平台或渲染画面。 |
+| 隔离 Unity/Tuanjie bridge | 特定编辑器版本、MCP 会话与隔离资产上的编译/创建链路。 | 用户目标工程的材质绑定、平台编译和最终效果。 |
+| 本地双构建/安装 | 可重复构建流程与包内容。 | 远端 CI、Release 上传或下载 artifact 完整性。 |
+| GitHub Actions 运行记录 | 该 commit 的远端 CI 结果与 artifact 生成。 | 真实 GUI 视觉、目标 DCC/平台运行时验收。 |
+
+报告时必须把已运行、未运行和受环境限制跳过的门禁分别说明；不要把“可静态验证”写成“最终用户画面已验收”。
 
 ## 架构与文档
 

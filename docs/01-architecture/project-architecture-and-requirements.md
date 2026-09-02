@@ -2,10 +2,10 @@
 id: ARCH-REQ-0001
 type: project-architecture-and-requirements
 status: 已确认
-version: 1.6.0
+version: 1.7.0
 created_at: 2026-08-31T23:25:00+08:00
 owner: long
-related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, FR-0009, FR-0010, FR-0011, AUD-20260901]
+related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, FR-0009, FR-0010, FR-0011, AUD-20260901]
 supersedes: 无（首次启动）
 evidence: [ASE 源码分析; MCP for Unity 桥接实验; 2026-09-01 标准审计与整改]
 kickoff_completion: complete
@@ -33,7 +33,7 @@ kickoff_completion: complete
 - MVP / 首个核心垂直切片：对项目内一个已有 ASE shader，Agent 完成"改一个属性值 → 校验 → 触发重新编译 → HLSL 更新"全链路。
 - 本期包含：FR-0001～FR-0011；图修改、材质 GUI 批量规范、节点 Comment 分组、文本创建/编译链路可用，Editor API 动态节点创建按 CR-0008 实施。
 - 本期不包含：CLI-Anything Hub 发布（ADR-0004 后置）、可视化界面、ASE 功能替代、通用 schema 覆盖 100% 节点（未知节点 passthrough）。
-- 成功指标：既有 REG-0001～REG-0029 保持全绿；REG-0030 覆盖 GUI 提供者检测、安全安装、双 CustomEditor 契约与真实 Editor 编译/attribute/default-value 读取；ASE 1.9.6.2 MZGUI_Test 与 CommentaryNode 真实序列化样本可读写；1000 个附加节点单轮 <1s（REG-0011）。
+- 成功指标：既有 REG-0001～REG-0029 保持全绿；REG-0030 覆盖 ASECLI GUI 的安全安装、唯一推荐 CustomEditor、旧三标记读取兼容与资源契约；ASE 1.9.6.2 MZGUI_Test 与 CommentaryNode 真实序列化样本可读；1000 个附加节点单轮 <1s（REG-0011）。
 
 ## 需求整理与验收
 
@@ -47,7 +47,7 @@ kickoff_completion: complete
 | FR-0006 | 功能 | Agent 技能文档 SKILL.md：格式说明+三链路手册+错误处理 | Agent 按文档完成一次全流程 | REG-0010 | 已确认 |
 | FR-0007 | 功能 | CLI JSON 输出契约：stdout 恒为合法 JSON（含 ok 字段），统一错误码 | 所有子命令契约测试通过 | REG-0007 | 已确认 |
 | FR-0008 | 功能 | 节点精排：按数据流拓扑从左向右分层递进，同阶段严格列对齐、同列等距、重复分支复用同一模板，Master 最右；保持连线与参数不变 | 布局后连线集合不变；同输入确定性输出；仅 x/y 字段变化；DAG 边向右推进；给定间距下列/行网格精确；真实 ASE 画布具备人工精排感 | REG-0012 | 已确认 |
-| FR-0009 | 功能 | 操作自定义材质 GUI：查询/同步 Shader `CustomEditor`，对已识别的 PropertyNode 尾部增删分组、悬停提示和帮助框；目标工程没有原生 MZGUI 时安装与 ASE 解耦的内置 GUI | 原生/内置提供者检测正确；不覆盖冲突文件；两个 CustomEditor 均可承载同一属性协议；内置 Tooltip 自动读取变量名和 Shader 默认值；未知尾部失败关闭 | REG-0022 REG-0030 | 已确认 |
+| FR-0009 | 功能 | 操作自定义材质 GUI：查询/同步 Shader `CustomEditor`，对已识别的 PropertyNode 尾部增删分组、悬停提示和帮助框；安装唯一的 ASECLI 内置 GUI | 新写入仅为 `ASECLIFoldout`、`ASECLITooltip`、`ASECLIHelpBox`；不覆盖冲突文件；旧三标记可读取并在同语义写入/清理时迁移；内置 Tooltip 自动读取变量名和 Shader 默认值；未知尾部失败关闭 | REG-0022 REG-0030 REG-0035 | 已确认 |
 | FR-0010 | 功能 | 按参考规范整理材质属性与 ASE 图：公开属性使用中文显示名，Tooltip 展示准确变量名与 Shader 默认值，HelpBox 解释用途/调节结果，并按 ShaderLab 属性名批量排序和中文分组；用原生 Comment 框形成“外层功能、内层因果”的嵌套分组；跨区或多消费者结果用 Register/Get Local Var 治理复用；Master / Output 上方基础设置默认保持，下方功能开关按需选择 | JSON 规范原子应用且未列属性稳定追加；显示名、变量名、默认值与说明在真实 Inspector 一致；Comment 不移动节点/连线；同层或无父子关系的组不重叠，父子组仅允许完整包含；复用结果形成一个语义 Register/多个就近 Get，一次性相邻链路保持直连；Master 设置以最大平台兼容性和最小充分计算为准，目标平台未验证时明确标记；失败可恢复 | REG-0010 REG-0023 REG-0024 | 已确认 |
 | FR-0011 | 功能 | 通过受控 ASE Editor API 创建包含动态/不透明节点的新 Shader；声明式规格只允许白名单节点/字段，ASE 自己生成 ShaderLab/HLSL/ASEBEGIN | Caster-like Sampler→Master 与 Receiver-like Property+CustomExpression 保存重载后 manifest 一致；不支持版本/字段零写入；失败无目标半写或暂存残留 | REG-0026 REG-0027 REG-0028 REG-0029 | 已验证（结构；目标画面待验） |
 | NFR-0001 | 非功能 | Roundtrip 保真：未修改字段逐字节不变 | roundtrip 测试断言 | REG-0001 | 已确认 |
@@ -83,24 +83,24 @@ kickoff_completion: complete
 | MOD-CLI | src/asecli/cli | 命令入口与 JSON 输出契约；组合根；create 后端路由 | `asecli <command>` | 允许 core/schema/check/bridge | FR-0007 FR-0011 CR-0008 ADR-0001 ADR-0012 | long |
 | MOD-SKILL | skills/asecli | Agent 技能、节点精排、材质属性呈现与 Master / Output 设置规范（文档资产） | `SKILL.md`；`references/layout-standard.md`；`references/material-property-standard.md`；`references/master-output-settings-standard.md` | 无代码依赖 | FR-0006 FR-0008 FR-0009 FR-0010 CR-0007 ADR-0001 ADR-0010 ADR-0011 | long |
 | MOD-LAYOUT | src/asecli/core/layout.py | 节点布局算法（左到右分层递进 + 严格列/行网格 + 交叉减少）；布局结果所有权 | `layout_positions(graph) -> dict[id, (x, y)]` | 允许依赖 core 模型；禁止依赖 schema/bridge/cli | FR-0008 ADR-0005 | long |
-| MOD-CUSTOM-GUI | src/asecli/core/custom_gui.py; material_gui_spec.py | ASE 1.9.6.2 CustomEditor/MZGUI 解析、原生文本编码、属性名定位与声明式批量写回 | `inspect_custom_gui` / `resolve_property_node` / `apply_material_gui_spec` | 仅依赖 core model/标准库；CLI 只能走公开 API | FR-0009 FR-0010 ADR-0010 ADR-0011 | long |
-| MOD-GUI-SUPPORT | src/asecli/bridge/gui_support.py; bridge/resources/asecli_material_gui.cs.txt | 检测原生 MZGUI；安全安装 clean-room ShaderGUI；解释 Foldout/Tooltip/HelpBox 并动态生成技术 Tooltip | `inspect_gui_support` / `install_gui_support`; `ASECLI.MaterialGUI.ASECLIMaterialGUI` | Python 仅标准库；C# 仅 UnityEditor/UnityEngine；禁止依赖 ASE API | FR-0009 ADR-0013 | long |
+| MOD-CUSTOM-GUI | src/asecli/core/custom_gui.py; material_gui_spec.py | ASE 1.9.6.2 CustomEditor/ASECLI 元数据解析、UTF-16 文本编码、属性名定位与声明式批量写回 | `inspect_custom_gui` / `resolve_property_node` / `apply_material_gui_spec` | 仅依赖 core model/标准库；CLI 只能走公开 API | FR-0009 FR-0010 ADR-0010 ADR-0011 ADR-0014 CR-0010 | long |
+| MOD-GUI-SUPPORT | src/asecli/bridge/gui_support.py; bridge/resources/asecli_material_gui.cs.txt | 安全安装 clean-room ASECLI ShaderGUI；解释三类 ASECLI 元数据并读取旧三标记；动态生成技术 Tooltip | `inspect_gui_support` / `install_gui_support`; `ASECLI.MaterialGUI.ASECLIMaterialGUI` | Python 仅标准库；C# 仅 UnityEditor/UnityEngine；禁止依赖 ASE API | FR-0009 ADR-0014 CR-0010 | long |
 | MOD-COMMENTARY | src/asecli/core/commentary.py | ASE CommentaryNode 可变长序列化、成员树与自动包围框 | `inspect_comment_groups` / `create_comment_group` | 仅依赖 core model/graph_ops；禁止依赖 check/bridge/cli | FR-0010 ADR-0011 | long |
 
 ### FR-0009 影响分析与兼容边界
 
-- 受影响模块：新增 MOD-CUSTOM-GUI 与 MOD-GUI-SUPPORT；MOD-CLI 增加 additive `custom-gui`、`gui-support` 命令；MOD-SKILL 增加提供者选择和分组/提示路径；MOD-CHECK 复用现有结构与 CHKSM 门禁，不改变其契约。
-- 数据/格式：Unity Inspector 层只解释编译后的 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`，不依赖 ASE API。版本矩阵精确限定：`19109/19602` 可读写 CustomEditor，只有真实 `19602` 可读写 `<count>;<attributes...>` 尾部；其他版本只保留通用解析能力，custom-gui 写入失败关闭。
-- 安全：自定义类名仅接受命名空间限定的 C# 标识符；禁止分号、引号、换行注入；MZGUI 只允许导出的 `Property` 节点；无法确定唯一主 Master 或尾部时失败关闭。
-- 兼容/迁移：原生 `MZGUI.MZGUI` 存在时不安装兼容层；静态 DLL/源码不确定时返回 `unknown` 并阻止写入，可由同一目标 Editor 反射确认；确认缺失才创建固定资源，内容冲突拒绝覆盖。新增命令不改变既有默认语义；零运行时 Python 依赖、零批量迁移。
-- 运行边界：CLI 同步 ShaderLab `CustomEditor`，但不直接猜写编译区 Properties 属性；MZGUI 元数据写入后必须经 `recompile` 由真实 ASE 生成。内置 C# 的编译和属性读取可在隔离 Editor 自动验证，真实 Foldout/悬停/HelpBox 外观仍需目标平台 UI 验收。
-- 呈现规范：中文 `display_name` 属于 PropertyNode/Editor 创建职责；`custom-gui` 负责可选 Tooltip、HelpBox、Foldout 和排序。原生/内置 GUI 在显示时追加变量名与默认基线；内置层从默认 `Material(shader)` 读取，不把技术信息硬编码进节点尾部。
+- 受影响模块：MOD-CUSTOM-GUI、MOD-GUI-SUPPORT、MOD-CLI 与 MOD-SKILL；`gui-support` 保留安全安装职责，但删除原生提供者检测和 MCP runtime probe 的公共选项。
+- 数据/格式：新写入只生成 `ASECLIFoldout`、`ASECLITooltip`、`ASECLIHelpBox`。旧 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 仅由读取路径解释；写同一语义或执行对应 clear 时会移除旧标记。版本矩阵精确限定：`19109/19602` 可读写 CustomEditor，只有真实 `19602` 可读写 `<count>;<attributes...>` 尾部；其他版本失败关闭。
+- 安全：自定义类名仅接受命名空间限定的 C# 标识符；禁止分号、引号、换行注入；元数据只允许导出的 `Property` 节点；原始专家入口只接受三种 ASECLI 标记；无法确定唯一主 Master 或尾部时失败关闭。
+- 兼容/迁移：唯一推荐 Editor 为 `ASECLI.MaterialGUI.ASECLIMaterialGUI`；固定安装路径冲突仍拒绝覆盖。旧 Shader 不批量修改；要写入新元数据时，用户在同一命令显式指定该 Editor 后才迁移。零运行时 Python 依赖、零批量迁移。
+- 运行边界：CLI 同步 ShaderLab `CustomEditor`，但不直接猜写编译区 Properties 属性；元数据写入后必须经 `recompile` 由真实 ASE 生成。内置 C# 的编译和属性读取需隔离 Editor 验证，真实 Foldout/悬停/HelpBox 外观仍需目标平台 UI 验收。
+- 呈现规范：中文 `display_name` 属于 PropertyNode/Editor 创建职责；`custom-gui` 负责可选 Tooltip、HelpBox、Foldout 和排序。ASECLI GUI 在显示时追加变量名与默认基线，并从默认 `Material(shader)` 读取，不把技术信息硬编码进节点尾部。
 
 ### FR-0010 影响分析与兼容边界
 
 - 受影响模块：MOD-CUSTOM-GUI 增加声明式批量规范；新增 MOD-COMMENTARY；MOD-CLI 增加 additive `comment-group`；MOD-SKILL 固化截图中的属性说明和 Comment 层级规范。
 - 数据/格式：属性排序仅改 PropertyNode 字段 9；Comment 使用 ASE 1.9.6.2 原生 `<width>;<height>;<note>;<count>;<members...>;<title>;<color>;0;0`，不引入旁路注释文件。
-- 安全/失败：JSON 未知键、重复属性、错误类型、非 MZGUI 新增、Comment 重复归属/缺失成员/注入字符均在写盘前失败；一个命令最多一次原子写入和一个 `.bak`。
+- 安全/失败：JSON 未知键、重复属性、错误类型、非 ASECLI 元数据新增、Comment 重复归属/缺失成员/注入字符均在写盘前失败；一个命令最多一次原子写入和一个 `.bak`。
 - 运行边界：普通节点尺寸不在 ASE 文本中序列化，Comment 自动框采用保守 `200x120` 估计；结构、成员和 CHKSM 可自动验证，真实边距与 Inspector 视觉仍需目标编辑器验收。
 - 操作顺序：先识别复用结果和算法边界；跨区/多消费者结果以一个语义 Register 和多个就近 Get 收敛长线；再布局节点并从内到外建立 Comment。现有全图 `layout` 不维护 Comment 层级，打组后禁止再次全图布局。
 - 视觉规范：严格对齐与阶段递进优先于机械追求零交叉。线与线可在空白通道中少量、简洁地交叉，但不得穿过无关节点；重复分支必须保持相同列、行距和内部模板，最终精排感必须由真实 ASE 画布验收。

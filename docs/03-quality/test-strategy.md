@@ -10,8 +10,8 @@
 6. **安全契约**：MCP URL、token、重定向、tool error、SSE/JSON 请求 ID 一一关联与脱敏使用纯本地 mock；真实 loopback 另行验收。
 7. **性能**：1000 个附加节点、精确 1007 节点、5 轮 parse+layout+serialize+roundtrip；每轮 <1s。
 8. **节点精排**：同阶段 x 严格一致、相邻阶段间距等于 `gap_x`、同列行距等于 `gap_y`、DAG 数据边向右推进、重复分支共用列/行模板、Master 最右；同时保持确定性、连线和非位置字段不变。
-9. **自定义 GUI**：真实 `19109` 仅验证 CustomEditor；ASE 1.9.6.2 图版本 `19602` 验证七类 PropertyNode 尾部；未知未来版本/尾随数字歧义写前拒绝。`gui-support` 覆盖全限定/global/alias 源码、DLL unknown、目标 Editor 反射、内置层安装/幂等/冲突和资源哈希。
-10. **批量材质规范**：属性名/节点 ID 唯一定位；字段 9 排序；未列属性稳定追加；中文 `inspector_name` 可经 EditorGraphSpec 保存；JSON 重复、未知键、错误类型和非 MZGUI 全量失败且零写盘。
+9. **自定义 GUI**：真实 `19109` 仅验证 CustomEditor；ASE 1.9.6.2 图版本 `19602` 验证 ASECLI 三标记、旧三标记读取兼容、触碰迁移与未知未来版本/尾随数字歧义写前拒绝。`gui-support` 覆盖唯一资源的 dry-run、安装/幂等、冲突、符号链接、并发竞争、资源哈希和已存在原生 MZGUI 文件不阻断安装；当团结缺少 `GetShaderPropertyAttributes` 且项目已有同名旧 drawer 时，fallback 必须从 `Assets/` Shader 源文件只读补齐旧标记元数据。真实编译和 Inspector 只使用团结引擎，不以 Unity 2021 结果作为 CR-0010 验收。
+10. **批量材质规范**：属性名/节点 ID 唯一定位；字段 9 排序；未列属性稳定追加；中文 `inspector_name` 可经 EditorGraphSpec 保存；JSON 重复、未知键、错误类型和非 ASECLI 元数据全量失败且零写盘。
 11. **Comment 分组**：真实 CommentaryNode 行解码；自动边界、嵌套成员树、无关组重叠拒绝与检查、父子完整包含、非法标题/重复归属/缺失节点、dry-run、备份、CHKSM、roundtrip 与 CLI 单行 JSON。
 12. **Local Var 图治理**：Agent 设计审查检查“多处/跨区复用才注册、一个语义 Register/多个就近 Get、同组一次性链路直连、命名唯一明确”；当前以真实参考静态证据与 Skill 契约为准，下一个目标 Shader 任务补实际图验收。
 13. **Editor API 创建**：纯 Python 覆盖 `EditorGraphSpec v1` 白名单、端口方向/类型、属性唯一性、后端路由、参数编码、Shader/模板身份、MCP 结果与失败事务；提交后后验失败及路径替换必须保留目标并返回 nonce/hash。隔离团结工程分别创建 Caster-like 和 Receiver-like 图，关闭后由第二进程重载 manifest。
@@ -30,8 +30,8 @@
 
 - 真实样本：从 `/Users/long/Documents/Tuanjie/Genesis` 工程收集 5+ 个不同复杂度 ASE shader（脱敏路径后入 `tests/fixtures/`）。
 - 函数样本：ASE 自带 ShaderFunction `.asset`（m_functionInfo 提取）。
-- MZGUI 样本：ASE 1.9.6.2 自带 `Examples/MZGUI_Test.shader` 只读采证；仓库回归保留其真实 Foldout 节点行并使用最小合成 Shader 覆盖写入，不分发第三方完整示例。
-- 内置 GUI 样本：仓库只分发 clean-room `ASECLIMaterialGUI.cs` 资源。隔离 Unity 2021.3 空工程编译该资源，并用最小 Shader 验证三种 attribute 的真实装饰器实例和值、以及 `_Value=1.25` 的默认 Material 读取。
+- MZGUI 样本：ASE 1.9.6.2 自带 `Examples/MZGUI_Test.shader` 只读采证；仓库回归保留真实旧 Foldout 节点行作为读取兼容夹具，不分发第三方完整示例，也不以其标记做新写入。
+- 内置 GUI 样本：仓库只分发 clean-room `ASECLIMaterialGUI.cs` 资源。隔离团结引擎 `2022.3.61t9` 空工程编译该资源，并用最小 Shader 验证三种 ASECLI attribute 的真实装饰器实例和值、旧三标记读取，以及 `_Value=1.25` 的默认 Material 读取。执行入口为 `tests/test_material_gui_e2e.py`，必须显式传入带 `.asecli-gui-e2e-isolated` 标记的临时工程和团结可执行文件。
 - Commentary 样本：ASE 1.9.6.2 `CommentaryNode.cs` 与 `/Users/long/GitHub/ShaderOpt/原生ASE文件.shader` 只读采证；仓库仅保留最小合成图和单行序列化回归，不修改或分发参考工程。
 
 ## 证据边界
@@ -40,7 +40,7 @@
 - `@pytest.mark.bridge` 只有在隔离工程、真实编辑器和实际 MCP 会话中运行后才能标为目标平台通过；当前证据为 `1 passed, 79 deselected`，测试 shader 前后 SHA-256 不同且最终 validate 0 errors。
 - 本地构建/安装/回滚只证明可复制交付流程；GitHub Actions run 33510909955 已完成双 Python、可复现构建、SPDX、供应链、隔离安装与下载 artifact 复验，但 GitHub Release/PyPI 仍未执行。
 - REG-0022 的纯文本读写只证明 ASE 元数据与编译指令正确；材质 Inspector 中折叠、悬停和帮助框的真实视觉/交互效果，必须在写回并重编译后的目标 Tuanjie/Unity 工程单独验收。
-- REG-0030 的 Python 测试证明检测、安装和资源契约；隔离 Unity E2E 证明 C# 编译、attribute 实例化和 Shader 默认值读取。BatchMode 没有执行真实 Inspector 的鼠标悬停与折叠点击，因此仍不能宣称目标 GUI 视觉验收通过。
+- REG-0030 的 Python 测试证明 ASECLI 安装、冲突保护和资源契约；隔离团结 `2022.3.61t9` 已通过当前 C# 资源编译、三种 ASECLI attribute 实例化、旧标记读取和 Shader 默认值读取（`1 passed`）。同版本当前运行实例还确认了原生同名旧 drawer 冲突、fallback 源读取、新/旧 HelpBox 与标题点击的展开/收起。用户提供的实机截图还确认实际悬停浮层显示变量名 `_BaseColor` 和默认值 `RGBA(1.000, 1.000, 1.000, 1.000)`；桌面自动化不具备独立鼠标停留 API，但不再将 Tooltip 视觉列为未验收。
 - REG-0023/0024 自动测试证明规范的原子文本行为和原生 Comment 结构，不证明普通节点默认尺寸估计后的视觉边距；目标 ASE 编辑器仍需检查折叠顺序、说明可读性、框边距和连线可读性。
 - REG-0012 自动测试证明精确网格、左到右递进和重复分支模板，不证明真实节点宽高、端口锚点、贝塞尔曲线路径或整体“精排感”；线与线少量交叉是否简洁仍需在真实 ASE 画布验收。
 - CR-0007 当前只证明真实参考中 Register/Get 序列化与复用模式存在，以及 Agent Skill 已固化规则；尚未在用户指定的新目标 Shader 上执行 Local Var 改造，因此不宣称目标图已消除蜘蛛网。

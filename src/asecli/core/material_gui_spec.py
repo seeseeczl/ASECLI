@@ -1,4 +1,4 @@
-"""Declarative, atomic material-property ordering and MZGUI annotation specs."""
+"""Declarative, atomic material-property ordering and ASECLI metadata specs."""
 
 from __future__ import annotations
 
@@ -6,21 +6,21 @@ from .custom_gui import (
     SUPPORTED_GUI_EDITORS,
     graph_custom_editor,
     is_material_property_node,
-    remove_mzgui_attribute,
+    remove_property_metadata_attribute,
     semantic_attribute,
     set_custom_editor,
-    set_mzgui_attribute,
+    set_property_metadata_attribute,
 )
-from .custom_gui_versions import require_mzgui_tail_version
+from .custom_gui_versions import require_property_metadata_tail_version
 from .model import AseFile, AseGraph, NodeLine
 
 
 _TOP_KEYS = {"editor", "reorder", "properties"}
 _PROPERTY_KEYS = {"name", "node", "group", "help", "tooltip"}
 _SEMANTIC_TYPES = {
-    "group": "FoldoutMzgui",
-    "help": "HelpBoxMzgui",
-    "tooltip": "TooltipMzgui",
+    "group": "ASECLIFoldout",
+    "help": "ASECLIHelpBox",
+    "tooltip": "ASECLITooltip",
 }
 
 
@@ -102,11 +102,11 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
     active_editor = graph_custom_editor(ase_file.graph)
     if has_additions and active_editor not in SUPPORTED_GUI_EDITORS:
         supported = ", ".join(sorted(SUPPORTED_GUI_EDITORS))
-        raise ValueError(f"material GUI annotations require a supported editor: {supported}")
+        raise ValueError(f"ASECLI property metadata requires the ASECLI material GUI: {supported}")
     if reorder and not resolved:
         raise ValueError("reorder=true requires at least one property entry")
     if reorder:
-        require_mzgui_tail_version(ase_file.graph)
+        require_property_metadata_tail_version(ase_file.graph)
         changes.extend(_reorder_properties(ase_file.graph, [node for node, _ in resolved]))
 
     for node, entry in resolved:
@@ -115,10 +115,10 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
                 continue
             value = entry[key]
             if value is None:
-                changes.append(remove_mzgui_attribute(ase_file.graph, node.node_id, type_name))
+                changes.append(remove_property_metadata_attribute(ase_file.graph, node.node_id, type_name))
             elif isinstance(value, str):
                 changes.append(
-                    set_mzgui_attribute(ase_file.graph, node.node_id, semantic_attribute(type_name, value))
+                    set_property_metadata_attribute(ase_file.graph, node.node_id, semantic_attribute(type_name, value))
                 )
             else:
                 raise ValueError(f"property {node.raw_fields[7]} field {key!r} must be string or null")
