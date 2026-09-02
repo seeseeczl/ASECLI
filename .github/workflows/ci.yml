@@ -45,6 +45,7 @@ jobs:
           cache-dependency-glob: uv.lock
       - name: Configure build paths outside the checkout
         run: |
+          echo "ASECLI_VERSION=$(uv version --short)" >> "$GITHUB_ENV"
           echo "ASECLI_BUILD_A=$RUNNER_TEMP/asecli-build-a" >> "$GITHUB_ENV"
           echo "ASECLI_BUILD_B=$RUNNER_TEMP/asecli-build-b" >> "$GITHUB_ENV"
           echo "ASECLI_REPRO_REPORT=$RUNNER_TEMP/asecli-reproducibility.json" >> "$GITHUB_ENV"
@@ -75,10 +76,10 @@ jobs:
           if-no-files-found: error
       - run: mkdir dist && cp "$ASECLI_BUILD_A"/* dist/
       - run: shasum -a 256 dist/*.whl dist/*.tar.gz > dist/SHA256SUMS
-      - run: uv run --frozen python tools/generate_sbom.py --dist dist --output dist/asecli-0.1.0.spdx.json
+      - run: uv run --frozen python tools/generate_sbom.py --dist dist --output "dist/asecli-$ASECLI_VERSION.spdx.json"
       - run: uv run --frozen python tools/supply_chain_check.py --output dist/supply-chain-check.json
       - run: uv venv .artifact-venv --python 3.12
-      - run: uv pip install --python .artifact-venv/bin/python dist/asecli-0.1.0-py3-none-any.whl
+      - run: uv pip install --python .artifact-venv/bin/python "dist/asecli-$ASECLI_VERSION-py3-none-any.whl"
       - run: .artifact-venv/bin/asecli parse tests/fixtures/step-antialiasing.function.txt
       - name: Smoke test packaged GUI installer
         run: |
@@ -88,6 +89,6 @@ jobs:
           test -f "$test_project/Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: asecli-0.1.0-python-${{ runner.arch }}
+          name: asecli-${{ env.ASECLI_VERSION }}-python-${{ runner.arch }}
           path: dist/
           if-no-files-found: error

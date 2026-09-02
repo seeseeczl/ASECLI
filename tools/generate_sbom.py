@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[1]
 
     locked = PACKAGE_RE.findall((root / "uv.lock").read_text(encoding="utf-8"))
+    project_versions = [version for name, version in locked if name == "asecli"]
+    if len(project_versions) != 1:
+        raise SystemExit("uv.lock must contain exactly one asecli package version")
+    project_version = project_versions[0]
     artifacts = sorted(path for path in args.dist.iterdir() if path.is_file() and path != args.output)
     digest_seed = "".join(f"{path.name}:{sha256(path)}" for path in artifacts).encode()
     namespace_id = hashlib.sha256(digest_seed).hexdigest()[:16]
@@ -36,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     packages = [{
         "SPDXID": "SPDXRef-Package-asecli",
         "name": "asecli",
-        "versionInfo": "0.1.0",
+        "versionInfo": project_version,
         "downloadLocation": "NOASSERTION",
         "filesAnalyzed": False,
         "licenseConcluded": "LicenseRef-ASECLI-Proprietary",
@@ -66,8 +70,8 @@ def main(argv: list[str] | None = None) -> int:
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "name": "asecli-0.1.0",
-        "documentNamespace": f"https://spdx.org/spdxdocs/asecli-0.1.0-{namespace_id}",
+        "name": f"asecli-{project_version}",
+        "documentNamespace": f"https://spdx.org/spdxdocs/asecli-{project_version}-{namespace_id}",
         "creationInfo": {"created": created, "creators": ["Tool: asecli-generate-sbom"]},
         "packages": packages,
         "relationships": [{

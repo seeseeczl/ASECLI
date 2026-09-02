@@ -32,6 +32,11 @@ def main() -> int:
         if private_core_import.search(path.read_text(encoding="utf-8")):
             findings.append(f"private core import: {path.relative_to(root)}")
 
+    hardcoded_artifact_version = re.compile(r"asecli-\d+\.\d+\.\d+")
+    for path in (root / ".github/workflows").glob("*.yml"):
+        if hardcoded_artifact_version.search(path.read_text(encoding="utf-8")):
+            findings.append(f"hard-coded asecli artifact version: {path.relative_to(root)}")
+
     print(json.dumps({"ok": not findings, "findings": findings}, ensure_ascii=False))
     return 0 if not findings else 1
 

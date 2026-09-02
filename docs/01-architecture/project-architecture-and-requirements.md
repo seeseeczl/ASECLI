@@ -5,7 +5,7 @@ status: 已确认
 version: 1.9.0
 created_at: 2026-08-31T23:25:00+08:00
 owner: long
-related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, BUG-0015, FR-0009, FR-0010, FR-0011, AUD-20260901]
+related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, BUG-0015, BUG-0017, FR-0009, FR-0010, FR-0011, AUD-20260901]
 supersedes: 无（首次启动）
 evidence: [ASE 源码分析; MCP for Unity 桥接实验; 2026-09-01 标准审计与整改]
 kickoff_completion: complete
@@ -49,7 +49,7 @@ kickoff_completion: complete
 | FR-0008 | 功能 | 节点精排：按数据流拓扑从左向右分层递进，同阶段严格列对齐、同列等距、重复分支复用同一模板，Master 最右；保持连线与参数不变 | 布局后连线集合不变；同输入确定性输出；仅 x/y 字段变化；DAG 边向右推进；给定间距下列/行网格精确；真实 ASE 画布具备人工精排感 | REG-0012 | 已确认 |
 | FR-0009 | 功能 | 操作自定义材质 GUI：查询/同步 Shader `CustomEditor`，对已识别的 PropertyNode 尾部增删分组、悬停提示和常驻说明；安装唯一的 ASECLI 内置 GUI | 新写入仅为 `ASECLIFoldout`、`ASECLITooltip`、`ASECLIHelpBox`；不覆盖冲突文件；旧三标记可读取并在同语义写入/清理时迁移；内置 Tooltip 自动读取变量名和 Shader 默认值；说明条遵循可查询、写前强制的 `asecli.inline-help.v1` 呈现契约；未知尾部或失效内置资源失败关闭 | REG-0022 REG-0030 REG-0035 REG-0036 | 已确认 |
 | FR-0010 | 功能 | 按参考规范整理材质属性与 ASE 图：每个导出属性强制使用中文显示名，Tooltip 自动展示英文变量名与 Shader 默认值，属性下方强制提供中文用途/调节说明，并按 ShaderLab 属性名批量排序和中文分组；用原生 Comment 框形成“外层功能、内层因果”的嵌套分组；跨区或多消费者结果用 Register/Get Local Var 治理复用；Master / Output 上方基础设置默认保持，下方功能开关按需选择 | `asecli.property-presentation.v1` 可查询且写前强制；JSON 可原子治理显示名/说明并保持未列属性；显示名、变量名、默认值与说明在真实 Inspector 一致；Comment 不移动节点/连线；同层或无父子关系的组不重叠，父子组仅允许完整包含；复用结果形成一个语义 Register/多个就近 Get，一次性相邻链路保持直连；失败可恢复 | REG-0010 REG-0023 REG-0024 REG-0037 | 已确认 |
-| FR-0011 | 功能 | 通过受控 ASE Editor API 创建包含动态/不透明节点的新 Shader；声明式规格只允许白名单节点/字段，ASE 自己生成 ShaderLab/HLSL/ASEBEGIN | CLI 使用 EditorGraphSpec v2，所有 Property/Sampler 必填中文显示名与中文说明；Caster-like/Receiver-like 保存重载 manifest 一致；不支持版本/字段零写入；失败无目标半写或暂存残留 | REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 | 已验证（v1 双进程结构；v2 当前团结创建/重编译及 Inspector 现场通过；验证资产已清理；新进程重开按用户约束未执行） |
+| FR-0011 | 功能 | 通过受控 ASE Editor API 创建包含动态/不透明节点的新 Shader；声明式规格只允许白名单节点/字段，ASE 自己生成 ShaderLab/HLSL/ASEBEGIN | CLI 使用 EditorGraphSpec v2，所有 Property/Sampler 必填中文显示名与中文说明；Caster-like/Receiver-like 保存重载 manifest 一致；不支持版本/字段零写入；失败无目标半写或暂存残留 | REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 | 已验证（v1 双进程结构；v2 当前团结创建/重编译及 Inspector 现场通过；验证资产已清理；CI 包版本路径已补强；新进程重开按用户约束未执行） |
 | NFR-0001 | 非功能 | Roundtrip 保真：未修改字段逐字节不变 | roundtrip 测试断言 | REG-0001 | 已确认 |
 | NFR-0002 | 非功能 | 未知节点 passthrough：schema 未覆盖时保真透传 | 混合样本测试 | REG-0002 | 已确认 |
 | NFR-0003 | 非功能 | 性能：千节点级文件单命令 <1s | perf 基线测试 | REG-0011 | 已确认 |
@@ -80,7 +80,7 @@ kickoff_completion: complete
 | MOD-SCHEMA | src/asecli/schema | 节点参数 schema 库与提取工具；schema JSON 产物所有权 | schema_for | 允许依赖 core 类型；禁止 bridge/cli | FR-0002 ADR-0003 | long |
 | MOD-CHECK | src/asecli/checks | 结构校验与 CHKSM 修复 | validate/fix_checksum | 允许 core；禁止 bridge/cli | FR-0003 ADR-0003 | long |
 | MOD-BRIDGE | src/asecli/bridge | MCP 传输、URL/token 信任边界、tool result、重编译、受控 Editor 图创建与 GUI 支持安装 | `McpClient` / `recompile_via_mcp` / `create_shader_via_mcp` / `inspect_gui_support` / `install_gui_support` | 标准库；禁止依赖 cli | FR-0004 FR-0009 FR-0011 CR-0008 CR-0012 ADR-0002 ADR-0007 ADR-0012 ADR-0013 ADR-0015 | long |
-| MOD-CLI | src/asecli/cli | 命令入口与 JSON 输出契约；组合根；create 后端路由与属性呈现写入门禁 | `asecli <command>` | 允许 core/schema/check/bridge | FR-0007 FR-0010 FR-0011 CR-0008 CR-0012 ADR-0001 ADR-0012 ADR-0015 | long |
+| MOD-CLI | src/asecli/cli | 命令入口与 JSON 输出契约；组合根；create 后端路由、属性呈现写入门禁与版本化 CI 打包 | `asecli <command>` | 允许 core/schema/check/bridge | FR-0007 FR-0010 FR-0011 CR-0008 CR-0012 BUG-0017 ADR-0001 ADR-0009 ADR-0012 ADR-0015 | long |
 | MOD-SKILL | skills/asecli | Agent 技能、节点精排、材质属性呈现与 Master / Output 设置规范（文档资产） | `SKILL.md`；`references/layout-standard.md`；`references/material-property-standard.md`；`references/master-output-settings-standard.md` | 无代码依赖 | FR-0006 FR-0008 FR-0009 FR-0010 CR-0007 ADR-0001 ADR-0010 ADR-0011 | long |
 | MOD-LAYOUT | src/asecli/core/layout.py | 节点布局算法（左到右分层递进 + 严格列/行网格 + 交叉减少）；布局结果所有权 | `layout_positions(graph) -> dict[id, (x, y)]` | 允许依赖 core 模型；禁止依赖 schema/bridge/cli | FR-0008 ADR-0005 | long |
 | MOD-CUSTOM-GUI | src/asecli/core/custom_gui.py; material_gui_spec.py; property_presentation.py | ASE 1.9.6.2 CustomEditor/ASECLI 元数据解析、UTF-16 文本编码、显示名/属性定位、声明式批量写回与属性呈现契约 | `inspect_custom_gui` / `resolve_property_node` / `apply_material_gui_spec` / `require_property_presentation` | 仅依赖 core model/标准库；CLI 只能走公开 API | FR-0009 FR-0010 ADR-0010 ADR-0011 ADR-0014 ADR-0015 CR-0010 CR-0012 | long |

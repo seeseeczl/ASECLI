@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from asecli import __version__
+
 
 ROOT = Path(__file__).parents[1]
 
@@ -36,4 +38,7 @@ def test_spdx_sbom_contains_artifact_checksum(tmp_path):
     sbom = json.loads(output.read_text(encoding="utf-8"))
     assert sbom["spdxVersion"] == "SPDX-2.3"
     assert "sha256:" in sbom["annotations"][0]["comment"]
-    assert any(package["name"] == "asecli" for package in sbom["packages"])
+    package = next(package for package in sbom["packages"] if package["name"] == "asecli")
+    assert package["versionInfo"] == __version__
+    assert sbom["name"] == f"asecli-{__version__}"
+    assert f"/asecli-{__version__}-" in sbom["documentNamespace"]

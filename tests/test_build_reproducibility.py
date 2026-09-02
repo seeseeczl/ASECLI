@@ -75,6 +75,11 @@ def test_ci_build_outputs_live_outside_checkout_and_backend_is_locked():
     assert "ASECLI_BUILD_A=$RUNNER_TEMP/asecli-build-a" in workflow
     assert "ASECLI_BUILD_B=$RUNNER_TEMP/asecli-build-b" in workflow
     assert '>> "$GITHUB_ENV"' in workflow
+    assert "ASECLI_VERSION=$(uv version --short)" in workflow
     assert "compare_build_artifacts.py" in workflow
     assert "--no-build-isolation" in workflow
+    assert 'dist/asecli-$ASECLI_VERSION-py3-none-any.whl' in workflow
+    assert 'dist/asecli-$ASECLI_VERSION.spdx.json' in workflow
+    assert "name: asecli-${{ env.ASECLI_VERSION }}-python-${{ runner.arch }}" in workflow
+    assert "dist/asecli-0.1.0" not in workflow
     assert 'requires = ["hatchling==1.32.0"]' in project

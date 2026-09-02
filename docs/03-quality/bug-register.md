@@ -5,7 +5,7 @@ status: verified
 version: 1.1.0
 created_at: 2026-09-01T12:54:38+08:00
 owner: long
-related: [AUD-20260901, CR-0002, CR-0003, CR-0004, CR-0005, CR-0011, CR-0012, BUG-0015, BUG-0016]
+related: [AUD-20260901, CR-0002, CR-0003, CR-0004, CR-0005, CR-0011, CR-0012, BUG-0015, BUG-0016, BUG-0017]
 supersedes: []
 evidence: [tests, docs/03-quality/regression-catalog.md]
 ---
@@ -30,3 +30,4 @@ evidence: [tests, docs/03-quality/regression-catalog.md]
 | BUG-0014 | AA-COMPAT-001 | 全限定基类或预编译程序集中的原生 MZGUI 被静态漏检 | REG-0035 | 扩展源码检测；二进制不确定时阻止写入并支持 Editor 反射确认 | 自动已验证；真实反射待目标 Editor |
 | BUG-0015 | 用户当前团结实例截图对照 | ASECLI 把目标轻量说明条渲染成原生 Info HelpBox，出现大图标、描边和过高容器，功能存在但视觉规范不一致 | REG-0036 | 固定 `asecli.inline-help.v1`，由 `gui-support` 报告契约并在内置资源失效时拒绝安装；C# 改为轻量自绘 | 自动回归与当前团结 `2022.3.61t9` Inspector 已验证；Console 0 error |
 | BUG-0016 | CR-0012 当前团结 v2 创建实测 | MCP for Unity 3.4.7 把 C# 返回值包在 `data.result`，默认安全扫描拦截固定事务执行器的 `DeleteAsset`，提交后的第二次图重载又可能在协议返回前触发插件重连，导致目标已创建但 CLI 报 `BRIDGE_ERROR` | REG-0038 | 兼容裸文本/JSON envelope；`success=false` 失败关闭；仅固定 nonce 事务执行器关闭该次模式扫描；暂存 Save/Load+manifest 后提交并只核对目标 Shader 身份，完整目标图重载交给紧随其后的独立 `recompile` | 自动回归通过；当前团结 `2022.3.61t9`、MCP 3.4.7 的 v2 创建与再次重编译通过，无 `ASECLI-Temp-*` 残留；Inspector 视觉和 Tooltip 已由用户现场确认，验证资产已精确清理 |
+| BUG-0017 | `0.2.0` 首次推送后的 GitHub Actions run 33623943475 | package job 已生成 `0.2.0` wheel，但 CI 安装、SPDX 输出和 artifact 名仍硬编码 `0.1.0`；隔离安装步骤找不到旧文件并使远端门禁失败 | REG-0039 | CI 从 `uv version --short` 注入单一版本变量；安装、SPDX 和 artifact 名统一引用该变量；SBOM 从 `uv.lock` 读取项目版本；治理检查拒绝工作流中的硬编码版本 | Python 3.10/3.12 verify 已通过；本地失败优先与修复后回归通过，等待修复提交的远端 package 复验 |
