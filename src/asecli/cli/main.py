@@ -145,6 +145,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--padding", type=float, help="frame padding in canvas units; defaults to 50")
     s.add_argument("--id", type=int, help="explicit Comment node id; defaults to the next free id")
     s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    s.add_argument(
+        "--unity-instance",
+        help="target Name@hash when multiple Unity/Tuanjie instances are connected",
+    )
     s.add_argument("--allow-remote-mcp", action="store_true")
     s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
     s.add_argument("--write", action="store_true")

@@ -2,10 +2,10 @@
 id: PLAN-0001
 type: project-plan-task-charter
 status: 已确认
-version: 1.8.0
+version: 1.9.0
 created_at: 2026-08-31T23:30:00+08:00
 owner: long
-related: [ARCH-REQ-0001, PRJ-ASECLI, FR-0009, FR-0010, FR-0011, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, CR-0013, BUG-0015, BUG-0017, BUG-0018, AUD-20260901]
+related: [ARCH-REQ-0001, PRJ-ASECLI, FR-0008, FR-0009, FR-0010, FR-0011, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, CR-0013, BUG-0015, BUG-0017, BUG-0018, BUG-0019, BUG-0020, AUD-20260901, AUD-FLOW-002, AUD-FLOW-003, AUD-UI-001, AUD-CI-001]
 supersedes: 无（首次启动）
 evidence: [ARCH-REQ-0001 需求基线; 第一性原理计划书; 2026-09-01 标准审计与整改]
 kickoff_completion: complete
@@ -35,6 +35,7 @@ kickoff_completion: complete
 | MS-9 ASECLI GUI 协议迁移 | ASECLI 三标记、唯一内置 GUI、旧标记读取兼容与文档治理同步 | TASK-0030 | MS-6 | 定向 67 passed/1 skipped、Python 3.10/3.12 全量均 203 passed/3 skipped、双构建通过；当前团结 2022.3.61t9 验证新/旧 metadata、HelpBox、默认值和标题点击折叠；用户实机截图确认 Tooltip 悬停；`v0.1.0@fbd9941` CI、私有 Release 五项载荷哈希和清单摘要、隔离安装与回滚通过 | long | 2026-09-02 | 2026-09-02 | 已发布（REL-0002） |
 | MS-10 说明条呈现契约 | `asecli.inline-help.v1` 可查询、可阻断安装，并以真实团结 Inspector 为最终视觉证据 | TASK-0031 | MS-9 | REG-0036；旧实现先失败；全量 208 passed/3 skipped；REG/CI governance/供应链/diff 通过；当前团结实例视觉对照与 Console 0 error；strict 仅复现 HEAD 的 29 项历史问题 | long | 2026-09-02 | 2026-09-02 | 已验证（待后续发布） |
 | MS-11 属性呈现强制契约 | `asecli.property-presentation.v1` 可查询、可原子治理，并阻断所有不合规的 CLI 创建与 ASECLI-managed 写入 | TASK-0032 | MS-10 | REG-0037/0038/0039/0040；新用例先失败 5 项；双 Python 223 passed/3 skipped；REG/CI governance/供应链/Skill/可复现构建通过；两个真实 Shader 共 7 属性零违规；当前团结 v2 创建与独立重编译后两属性零差异；Inspector 中文显示名/说明与 Tooltip 现场通过；验证资产已清理；CI 包路径、SBOM 和下载校验清单已去除历史版本/工作区路径耦合；`v0.2.0` 私有正式 Release 已发布 | long | 2026-09-02 | 2026-09-02 | 已发布（REL-0003；新进程重开未执行） |
+| MS-12 发布后成熟度整改 | 指定 ASE v2 双进程、治理事实源、真实画布、Inspector 矩阵、C# 例外清零/升级恢复和 Node 24 远程门禁闭环 | TASK-0033 TASK-0034 TASK-0035 TASK-0036 TASK-0037 TASK-0038 TASK-0039 TASK-0040 | MS-11 | REG-0038/0041/0042/0043/0044/0045；Project Architect strict、全量 pytest、可复现构建、真实团结和 Node 24 远程 run | long | 2026-09-03 | 2026-09-03 | 本地 C#/升级/实机已验证；远程 CI 待推送 |
 
 ## 原子任务卡
 
@@ -72,6 +73,14 @@ kickoff_completion: complete
 | TASK-0030 | CR-0010 FR-0009 | 将新写入迁移为 ASECLI 自有三标记和唯一内置 GUI；旧三标记只读兼容；移除原生提供者选择 | 用户 2026-09-02 批准；TASK-0029 | core/custom_gui*；bridge/gui_support.py；C# resource；CLI；tests；README/SKILL/治理 | 批量修改用户 Shader；恢复原生扫描/反射；新增依赖；宣称未跑的 Tooltip 悬停已通过 | long/2026-09-02 | REG-0022 REG-0023 REG-0030 REG-0032 REG-0035；定向 67 passed/1 skipped、Python 3.10/3.12 全量均 203 passed/3 skipped、双构建通过；团结 `2022.3.61t9` 当前实例验证原生同名旧 drawer fallback、新/旧 HelpBox/默认值/标题点击折叠；用户截图确认 Tooltip 悬停；`v0.1.0@fbd9941` 的 run `33594698477` 全绿，私有 Release 五项载荷哈希和清单摘要、正式 wheel 隔离安装与回滚通过 | C# 编译或安全门禁失败时停止 | CR-0010 ADR-0014 REL-0002；未创建 PyPI/CLI Hub 或公开分发 | 已发布（内部正式 CLI） |
 | TASK-0031 | FR-0009 CR-0011 BUG-0015 | 将轻量说明条样式固化为 CLI 可报告、可失败关闭的呈现契约 | 用户当前团结实例两张截图对照；TASK-0030 | bridge/gui_presentation.py；bridge/gui_support.py；C# resource；tests/test_gui_support.py；README 与治理增量 | 修改用户 Shader/材质参数；依赖 Agent 记忆或规则；用静态测试冒充最终视觉 | TASK-0030/long/2026-09-02 | REG-0036；`uv run pytest -q`、治理/供应链/diff；当前团结 `2022.3.61t9` Inspector 与 Console | 呈现契约无效、C# error 或真实界面未对照时停止 | 先失败 2 项；全量 208 passed/3 skipped；REG/CI governance/供应链/diff 通过；当前实例视觉通过；strict 同 HEAD 复现 29 项历史问题；尚未提交或发布 | 已验证（待后续发布） |
 | TASK-0032 | FR-0005 FR-0010 FR-0011 CR-0012 CR-0013 BUG-0016 BUG-0017 BUG-0018 | 将中文显示名、自动变量名/默认值 Tooltip 和中文说明固化为所有 CLI 创建文件的强制契约，并闭合当前 MCP v2 创建回执及 0.2.0 CI 打包/校验路径 | 用户 2026-09-02 明确要求；TASK-0031 | core/property_presentation.py；custom_gui/material spec；EditorGraphSpec；create/写入门禁；CI/SBOM/SHA256SUMS；tests；README/治理 | 自动编造中文语义；修改生产 Shader；把 v1 真实 Editor 证据冒充 v2；依赖 Agent 规则；透传任意 C#；在 CI 硬编码历史包版本或工作区路径 | TASK-0031/long/2026-09-02 | REG-0037 REG-0038 REG-0039 REG-0040；双 Python全量、REG/CI governance/供应链/Skill/构建；当前团结 v2 创建/recompile/Inspector；远端 package 与下载 artifact 校验 | 契约可被绕过、MCP 失败被误报成功、非合规 create 能落盘、历史非 ASECLI 文件无法维护、CI 安装错误版本或下载清单不可直接校验时停止 | 新用例先失败 5 项；双 Python 223 passed/3 skipped；REG 36 条、CI governance、供应链、Skill、可复现 0.2.0 构建与隔离安装/回滚通过；Caster 1 属性/Receiver 6 属性零违规；当前团结 v2 创建与 recompile 后两属性零差异；Inspector 中文显示名/说明可见，用户现场确认 Tooltip 正常；验证资产已清理；create JSON 区分暂存重载与目标图重载；packed C# 执行器已具名 LOC 豁免；strict 历史项已校准；首次推送依次暴露旧版本硬编码和 SHA256SUMS 路径前缀，均已最小修复并等待最终远端 artifact 复验；新进程重开按用户约束未执行；0.2.0 已作为私有正式 Release 发布 | 已发布（REL-0003；限当前实例，新进程重开未执行） |
+| TASK-0033 | FR-0011 CR-0012 CR-0013 AUD-FLOW-002 AUD-FE-001 | 在精确 ASE 1.9.6.2 上完成 EditorGraphSpec v2 创建进程与全新重开进程的 manifest/presentation 对账 | v0.2.0；团结 2022.3.61t9；隔离工程 | tests/test_editor_create_e2e.py；bridge/create 契约；系统临时证据 | Unity 2021；生产工程写入；以同进程 reload 冒充重开 | TASK-0032/long/2026-09-03 | REG-0038；真实 bridge E2E；0 Shader/CS error；0 staging 残留 | 版本不精确、MCP 完成状态未知或原工程 hash 变化时停止 | 两进程一致；原工程未变化；隔离资产最终清理 | 已验证 |
+| TASK-0034 | AUD-GOV-002 AUD-GOV-003 AUD-SIZE-001 | 使 release-record、安全版本、FM/LOC 事实源和有期限 C# 例外通过完整治理门禁 | 最新增量审计；TASK-0033 | SECURITY；三份 REL；`.project-architect.json`；audit supplement；governance tests/docs | 改远端 Release；删除历史 ID；永久豁免；放宽 LOC | TASK-0033/long/2026-09-03 | REG-0020；Project Architect `--check-release --strict`；CI governance；连续 collect/coverage | 历史发布事实不一致或例外超过 30 天时停止 | release finding 清零；14 FM/15 FE 稳定；例外带退出条件 | 已验证 |
+| TASK-0035 | FR-0008 FR-0010 AUD-FLOW-003 AUD-FE-002 | 固化小/中/复杂 ASE 图的结构不变与正常缩放真实画布验收 | TASK-0033；隔离画布样本 | layout/comment-group；REG-0041 证据；tests | 修改计算图；写生产 Shader；用结构 JSON 冒充视觉通过 | TASK-0033/long/2026-09-03 | REG-0041；语义 diff、TruePosition、截图人工清单 | wire/非布局字段变化或连线穿无关节点时停止 | `docs/03-quality/evidence/REG-0041/`；原工程 hash 一致 | 已验证 |
+| TASK-0036 | FR-0009 FR-0010 CR-0010 CR-0012 BUG-0019 BUG-0020 AUD-UI-001 | 完成 Material Inspector 窄宽/主题/缩放/交互状态矩阵并修复长中文截断和浮点噪声 | TASK-0033；隔离 Inspector fixture | C# GUI 资源；tests/test_gui_support.py；REG-0042 证据 | 改 Shader 属性/材质值；重新设计 UI；覆盖未知旧 GUI | TASK-0035/long/2026-09-03 | REG-0042；定向 pytest；团结编译；真实截图矩阵 | C# error、属性值变化或任一必测组合不可读时停止 | `docs/03-quality/evidence/REG-0042/`；主题恢复；旧 GUI 升级另行设计 | 已验证 |
+| TASK-0037 | CR-0006 AUD-CI-001 | 将三个 GitHub Action 升级到官方 Node 24 版本并以固定 SHA allowlist 防回退 | 官方 tag/API 只读核对；TASK-0034 | `.github/workflows/ci.yml`；tools/check_ci_governance.py；tests/test_governance.py；supply-chain-policy | 升级 Python 依赖；改变 job；推送或重发 Release | TASK-0034/long/2026-09-03 | REG-0043；CI governance/供应链/pytest；获准推送后真实 run | runner 不满足 `>=2.327.1` 或 artifact 行为改变时回退 | 本地门禁通过；远程 run 未推送，保持未验证 | 本地已验证 |
+| TASK-0038 | CR-0014 BUG-0021 AUD-SIZE-001 | 将 Editor executor 拆为确定性片段并保持单 payload/单 nonce/单回滚边界，修复干净隔离目录 E2E | TASK-0033 TASK-0034；旧/当前资源 SHA | resource_text.py；editor_create.py；editor_create.part00/01；test_editor_create_e2e.py | 改 ASE 事务语义；多次 execute_code；使用 Unity 2021；写生产工程 | TASK-0034/long/2026-09-03 | REG-0044 REG-0045；拼装 hash、事务结构、团结双进程 | 字节变化、多个回滚边界或真实重载失败时恢复单资源 | `52fce4c…6cc4` 不变；干净隔离工程 1 passed/39.86s | 已验证 |
+| TASK-0039 | CR-0014 AUD-SIZE-001 | 将 MaterialGUI 拆为确定性片段并删除两项 LOC 例外 | TASK-0038；REG-0042 | resource_text.py；gui_support.py；asecli_material_gui.part00/01 | 改 Inspector 行为/文本；新增 LOC 豁免；改变安装目标 | TASK-0038/long/2026-09-03 | REG-0044；片段 LOC、拼装/安装 hash、wheel 成员、治理 0 finding | 拼装 hash 或 Inspector 回归变化时恢复单资源 | `9541c54…c5b7a` 不变；片段 300/283；loc_exemptions 为空 | 已验证 |
+| TASK-0040 | CR-0014 AUD-SIZE-001 | 为已知旧 GUI 建立 dry-run、可恢复备份、复核和原子替换协议 | TASK-0039；v0.2.0-original SHA | gui_support.py；_gui_project.py；_gui_resource_store.py；_gui_resource_upgrade.py | 覆盖未知内容；删除旧备份；批量改用户工程；创建 Tag/Release | TASK-0039/long/2026-09-03 | REG-0045；未知/符号链接/冲突/并发/替换失败；真实团结编译 | 任一失败路径覆盖目标、备份不可恢复或 C# error 时回退 | 自动失败恢复通过；真实升级 C# `1 passed/26.15s` | 已验证 |
 
 ## 验证、风险与回滚
 
@@ -83,6 +92,6 @@ kickoff_completion: complete
 ## 启动完成确认
 
 - [x] 上游架构文档已确认且本计划仅从其派生
-- [x] 32 张原子任务卡全部可执行；历史 strict 31 项与 HEAD 一致，本次新增 BUG/REG 双向链接完整
+- [x] 40 张原子任务卡全部可执行；本次新增 CR/BUG/REG 双向链接完整
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立

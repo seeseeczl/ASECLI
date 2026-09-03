@@ -2,6 +2,7 @@
 
 from asecli.core import AseFile
 from asecli.core.layout import layout_positions, tidy
+from asecli.cli.main import app
 
 from pathlib import Path
 
@@ -127,3 +128,16 @@ def test_every_dag_wire_advances_left_to_right_and_master_is_rightmost():
     master_x = pos["0"][0]
     assert master_x == max(x for x, _ in pos.values())
     assert all(x < master_x for node_id, (x, _) in pos.items() if node_id != "0")
+
+
+def test_layout_cli_separates_structural_and_visual_validation(tmp_path, capsys):
+    path = tmp_path / "layout.shader"
+    path.write_text(
+        (FIXTURES / "step-antialiasing.function.txt").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    assert app(["layout", str(path)]) == 0
+    payload = __import__("json").loads(capsys.readouterr().out)
+    assert payload["data"]["structural_validation"] == "passed"
+    assert payload["data"]["visual_validation"] == "pending"

@@ -73,6 +73,7 @@
 - 可复现实现：Hatchling 版本进入 dev lock，CI 使用 `--no-build-isolation`；两次构建输出写入 runner 临时目录，禁止第一次产物进入第二个 sdist。比较失败时保存 hash、gzip header 与 tar 成员元数据/内容差异，但正式 dist 仍阻塞。
 - 安全：离线高置信 secret、Action pin、lock hash 门禁；生产依赖为 0。在线漏洞数据库必须用真实 CI/Dependabot 证据单独解除“未验证”。
 - 发布：本地 REL draft 不等于远程 Release；没有 push/run/artifact 链接时不得标 released。
+- 2026-09-03 运行时维护：checkout v5.0.1、setup-uv v7.1.6、upload-artifact v6.0.0 采用官方 Node 24 tag 对应的完整 commit SHA；`tools/check_ci_governance.py` 维护唯一 allowlist 并拒绝回退。`upload-artifact` v6 要求 Runner `>=2.327.1`，当前只使用 GitHub 托管 `ubuntu-latest`；若引入 self-hosted runner 必须重新评估。
 
 ### ADR-0010 自定义材质 GUI 采用语义命令与图元数据事实源
 
@@ -91,6 +92,7 @@
 - 安全：整份 JSON 先验证后一次写盘；未列属性稳定追加；Comment 禁止重复直属、祖孙同时选中、缺失 ID、分号和换行。两条命令均默认 dry-run，显式写入保留 `.bak` 并重算 CHKSM。
 - 取舍：普通节点真实宽高不在序列化中，自动框使用保守默认尺寸并把真实编辑器边距列为视觉验收边界；不新增 Unity 插件或旁路元数据格式。
 - 回滚：恢复同名 `.bak`；材质侧随后重新编译，Comment 侧重新加载 ASE 图。禁用新增命令不影响既有图计算和材质结果。
+- 视觉证据边界：`layout` 与 `comment-group` 的机器结果只能报告结构通过、视觉待验；真实画布通过必须绑定指定 ASE 版本、正常缩放截图和人工清单。REG-0041 是当前四类金样的签收记录。
 
 #### CR-0007：以 Local Var 作为算法模块间的数据接口
 
@@ -126,7 +128,8 @@
 - 决策：新写入只使用 `[ASECLIFoldout(...)]`、`[ASECLITooltip(...)]`、`[ASECLIHelpBox(...)]`，唯一推荐 `CustomEditor` 为 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。`gui-support` 只检查和安装固定 ASECLI 资源，移除原生提供者探测、优先级与 `--runtime-probe`。C# 正常属性读取与 Python inspection 仍识别旧三标记；同语义写入或 clear 时只迁移被触碰的属性。
 - 兼容与迁移：不批量修改用户 Shader，不写入或选择 `MZGUI.MZGUI`。含旧属性的 Shader 可查询和由内置 GUI 读取；要开始新写入，用户必须显式把主 Master/编译指令改为 ASECLI Editor。原始专家入口仅接受三种 ASECLI 类型。
 - 安全与回滚：固定目标路径的内容冲突和符号链接仍拒绝覆盖；安装使用创建时排他写入。回滚本变更仅恢复上一版 CLI/资源，不自动更改用户 Shader 或删除内置安装资源。
-- 验收边界：Python 回归证明协议写入、旧属性读取、触碰迁移、安装、冲突与 CLI 契约；新的 C# 资源尚需隔离 Unity/Tuanjie 编译和目标 Inspector 的视觉/交互验收。
+- 响应式呈现：长中文标签不缩写、不裁切；超过当前 Inspector 可用标签区时自动换行并独占一行，字段在下一行使用完整宽度。Tooltip 默认值使用 invariant、最多六位小数的稳定格式，避免暴露 Unity `float` 的二进制噪声；变量名、默认值语义和 Material 值不变。
+- 验收边界：Python 回归证明协议写入、旧属性读取、触碰迁移、安装、冲突与 CLI 契约；REG-0042 已在团结 `2022.3.61t9`、ASE `1.9.6.2`、Retina 下完成深/浅色、300/480px、Foldout、mixed、disabled 与焦点导航矩阵。
 
 ### ADR-0015 ASECLI 创建采用强制属性呈现契约
 
@@ -135,3 +138,12 @@
 - 决策：新增 `asecli.property-presentation.v1` 文件级契约。每个导出 Property 必须使用含中文的显示名、合法英文 Shader 属性标识符，并具有恰好一条含中文的 `ASECLIHelpBox`；ASECLI GUI 继续从默认 `Material(shader)` 自动生成属性名和 Shader 默认值 Tooltip。`custom-gui` 公开逐属性检查结果，已声明 ASECLI GUI 的文件在任何相关写入后必须继续合规。
 - 创建与兼容：文本 `create` 对模板壳与 donor 图组合后的最终文件执行写前门禁。正式 Editor CLI 创建要求 EditorGraphSpec v2，每个 Property/Sampler 必填中文 `inspector_name` 和中文 `help`；固定 ASE Editor 执行协议仍为 v1，v2 的说明在 ASE Save/Load 成功后由 CLI 原子写入并再次验收。EditorGraphSpec v1 保留底层解析/桥接兼容，但 CLI 不再接受它创建新文件。
 - 修复与回滚：既有文件可通过 `custom-gui --spec` 的 `display_name`/`help` 一次性治理；显示名同时写入图字段和编译 Properties，说明同步至图尾部和编译属性。写入前保留原始文件，失败不落盘；Editor 已提交后的后验失败仍保留目标与 `.meta` 供诊断。回滚 CLI 不自动迁移或删除已生成文件。
+
+### ADR-0016 打包 C# 资源采用确定性片段拼装并关闭临时例外
+
+- 状态：已修订并验证（2026-09-03，CR-0014 / AUD-SIZE-001）
+- 背景：原 `asecli_material_gui.cs.txt` 与 `editor_create.cs.txt` 分别为 583/410 行，超过 400 行硬上限；Editor executor 同时必须维持单 payload、单 nonce、单回滚边界，GUI 安装必须能安全处理已知旧版。
+- 决策：资源改为显式有序片段，Python `compose_resource_text` 在包内逐段拼接。MaterialGUI 两段 300/283 行，Editor executor 两段 205/205 行；拼装结果 SHA-256 仍分别为 `9541c54…c5b7a` 与 `52fce4c…6cc4`，因此运行时接口、单事务和安装文件逐字节不变。EXC-0001/EXC-0002 已从唯一事实源删除。
+- 升级协议：只识别登记的旧 SHA-256；dry-run 报告来源与备份路径，写入时使用目录描述符拒绝符号链接，先落盘并 fsync 备份，再复核目标 digest/inode，最后以同目录临时文件原子替换。未知目标、冲突备份、并发变化和替换失败均保留原内容并失败关闭。
+- 验证：REG-0044/0045 覆盖片段顺序、字节哈希、单 placeholder/单 catch/finally、包内容、幂等/冲突/并发/失败恢复；团结 `2022.3.61t9` 完成已知旧 GUI 升级后 C# 编译，ASE `1.9.6.2` 完成创建进程与全新重开进程回归。
+- 回滚：恢复单资源读取与上一已验证资源；若升级中断，从确定性备份恢复。不得用重新加入长期例外替代修复。

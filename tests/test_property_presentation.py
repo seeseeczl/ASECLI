@@ -17,6 +17,7 @@ from asecli.core import (
     AseFile,
     inspect_custom_gui,
 )
+from asecli.core.compiled_metadata import hide_known_template_compiled_only_properties
 
 
 ROOT = Path(__file__).parents[1]
@@ -82,6 +83,28 @@ def test_custom_gui_reports_complete_property_presentation_contract():
         "property_name",
         "shader_default_value",
     ]
+
+
+def test_known_template_compiled_only_properties_are_hidden_without_hiding_unknowns():
+    text = managed_shader().replace(
+        "\t}\n\tSubShader",
+        '\t\t_TessValue("Max Tessellation", Range(1, 32)) = 16\n'
+        '\t\t_UserOwned("User Owned", Float) = 1\n'
+        "\t}\n\tSubShader",
+        1,
+    )
+    shader = AseFile.from_text(fix_checksum(text))
+
+    changes = hide_known_template_compiled_only_properties(
+        shader, "2992e84f91cbeb14eab234972e07ea9d"
+    )
+
+    assert [change["property_name"] for change in changes] == ["_TessValue"]
+    assert '[HideInInspector] _TessValue("Max Tessellation"' in shader.prefix
+    assert '[HideInInspector] _UserOwned' not in shader.prefix
+    presentation = inspect_custom_gui(shader)["property_presentation"]
+    assert presentation["reconciliation"]["compiled_only"] == ["_UserOwned"]
+    assert presentation["valid"] is False
 
 
 def test_managed_file_reports_missing_chinese_display_name_and_help():

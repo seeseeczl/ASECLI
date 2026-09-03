@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from importlib import resources
 import json
 from pathlib import Path
 import secrets
 
 from .editor_spec import EditorGraphSpec, SUPPORTED_ASE_VERSIONS
 from .mcp_client import McpClient, McpError, redact, tool_text
+from .resource_text import compose_resource_text
 
 
-EDITOR_CREATE_SNIPPET = (
-    resources.files("asecli.bridge").joinpath("resources/editor_create.cs.txt").read_text(encoding="utf-8")
+EDITOR_CREATE_RESOURCE_PARTS = (
+    "editor_create.part00.cs.txt",
+    "editor_create.part01.cs.txt",
+)
+EDITOR_CREATE_SNIPPET = compose_resource_text(
+    "asecli.bridge", "resources", EDITOR_CREATE_RESOURCE_PARTS
 )
 _RESULT_MARKER = "ASECLI_EDITOR_CREATE_V1:"
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,7 @@ import pytest
 
 from asecli.bridge.gui_support import (
     GUI_SUPPORT_ASSET_PATH,
+    GUI_SUPPORT_RESOURCE_PARTS,
     GUI_SUPPORT_SHA256,
     GUI_SUPPORT_SOURCE,
     inspect_gui_support,
@@ -71,6 +73,17 @@ def test_packaged_source_defines_asecli_metadata_and_legacy_read_compatibility()
     assert "AmplifyShaderEditor" not in GUI_SUPPORT_SOURCE
 
 
+def test_gui_resource_fragments_are_bounded_and_compose_byte_stably():
+    resources = ROOT / "src/asecli/bridge/resources"
+    parts = [resources / name for name in GUI_SUPPORT_RESOURCE_PARTS]
+    assert all(path.is_file() for path in parts)
+    assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 300 for path in parts)
+    assert "".join(path.read_text(encoding="utf-8") for path in parts) == GUI_SUPPORT_SOURCE
+    assert hashlib.sha256(GUI_SUPPORT_SOURCE.encode("utf-8")).hexdigest() == (
+        "9541c541628b8404c66ca2c36e80af25f69960d6e1a07deabad53fd6233c5b7a"
+    )
+
+
 def test_packaged_source_draws_lightweight_inline_help_style():
     assert "DrawInlineHelp(metadata.Help)" in GUI_SUPPORT_SOURCE
     assert "EditorGUILayout.HelpBox(metadata.Help, MessageType.Info)" not in GUI_SUPPORT_SOURCE
@@ -80,6 +93,19 @@ def test_packaged_source_draws_lightweight_inline_help_style():
     assert "Rect accentRect" in GUI_SUPPORT_SOURCE
     assert "EditorGUI.DrawRect(backgroundRect" in GUI_SUPPORT_SOURCE
     assert "EditorGUI.DrawRect(accentRect" in GUI_SUPPORT_SOURCE
+
+
+def test_packaged_source_wraps_long_property_labels_without_truncation():
+    assert "ShouldWrapPropertyLabel" in GUI_SUPPORT_SOURCE
+    assert "DrawWrappedProperty" in GUI_SUPPORT_SOURCE
+    assert "wrappedLabel.wordWrap = true" in GUI_SUPPORT_SOURCE
+    assert "materialEditor.ShaderProperty(position, property, GUIContent.none)" in GUI_SUPPORT_SOURCE
+
+
+def test_packaged_source_formats_tooltip_defaults_without_float_noise():
+    assert 'ToString("0.######", CultureInfo.InvariantCulture)' in GUI_SUPPORT_SOURCE
+    assert 'ToString("G7", CultureInfo.InvariantCulture)' not in GUI_SUPPORT_SOURCE
+    assert 'ToString("G9", CultureInfo.InvariantCulture)' not in GUI_SUPPORT_SOURCE
 
 
 def test_inspection_reports_the_inline_help_presentation_contract(tmp_path):

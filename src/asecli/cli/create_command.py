@@ -144,22 +144,7 @@ def _cmd_create_editor(args, spec) -> dict:
             },
         )
     try:
-        presentation_spec = {
-            "editor": ASECLI_GUI_EDITOR,
-            "properties": [
-                {
-                    "name": node.property_name,
-                    "display_name": node.inspector_name,
-                    "help": node.help,
-                }
-                for node in spec.nodes
-                if node.property_name is not None
-            ],
-        }
-        apply_material_gui_spec(created, presentation_spec)
-        sync_compiled_property_metadata(created)
-        presentation = require_property_presentation(created)
-        output = fix_checksum(created.serialize())
+        output, presentation = _finalize_editor_property_presentation(created, spec)
         _commit_text(args.out, output, created.source_digest)
         result["shader_sha256"] = file_digest(args.out)
     except (OSError, UnicodeError, ValueError) as exc:
@@ -174,6 +159,29 @@ def _cmd_create_editor(args, spec) -> dict:
         "property_presentation": presentation,
         **result,
     }
+
+
+def _finalize_editor_property_presentation(created: AseFile, spec) -> tuple[str, dict]:
+    """Apply the same v2 presentation contract after ASE commits an Editor graph."""
+    presentation_spec = {
+        "editor": ASECLI_GUI_EDITOR,
+        "properties": [
+            {
+                "name": node.property_name,
+                "display_name": node.inspector_name,
+                "help": node.help,
+            }
+            for node in spec.nodes
+            if node.property_name is not None
+        ],
+    }
+    apply_material_gui_spec(created, presentation_spec)
+    sync_compiled_property_metadata(created)
+    from asecli.core.compiled_metadata import hide_known_template_compiled_only_properties
+
+    hide_known_template_compiled_only_properties(created, spec.template.guid)
+    presentation = require_property_presentation(created)
+    return fix_checksum(created.serialize()), presentation
 
 
 def _preserved_editor_asset_details(path: str, result: dict) -> dict:

@@ -130,6 +130,8 @@ def test_cli_comment_group_dry_run_then_write_backup_checksum_and_query(tmp_path
     args = ("comment-group", str(path), "--nodes", "1,2", "--title", "颜色关联")
     code, payload = run_cli(*args)
     assert code == 0 and payload["data"]["written"] is False
+    assert payload["data"]["structural_validation"] == "passed"
+    assert payload["data"]["visual_validation"] == "pending"
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
     assert not path.with_suffix(".shader.bak").exists()
 
@@ -140,6 +142,8 @@ def test_cli_comment_group_dry_run_then_write_backup_checksum_and_query(tmp_path
     assert AseFile.from_path(path).serialize() == path.read_text(encoding="utf-8")
     code, payload = run_cli("comment-group", str(path))
     assert code == 0 and payload["data"]["groups"][0]["title"] == "颜色关联"
+    assert payload["data"]["structural_validation"] == "passed"
+    assert payload["data"]["visual_validation"] == "pending"
     code, payload = run_cli("validate", str(path))
     assert code == 0 and payload["data"]["error_count"] == 0
 

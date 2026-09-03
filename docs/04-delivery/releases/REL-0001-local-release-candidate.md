@@ -1,25 +1,32 @@
 ---
 id: REL-0001
-type: release
+type: release-record
 status: verified
 version: 0.1.0-rc.local.1
 created_at: 2026-09-01T13:02:00+08:00
 owner: long
-related: [CR-0002, CR-0003, CR-0004, CR-0005, CR-0006, AUD-OPS-001, AUD-SUPPLY-001]
+related: [FR-0004, FR-0005, FR-0006, CR-0001, CR-0002, CR-0003, CR-0004, CR-0005, CR-0006, BUG-0002, BUG-0005, AUD-OPS-001, AUD-SUPPLY-001]
 supersedes: []
 evidence: [dist/SHA256SUMS, dist/asecli-0.1.0.spdx.json, dist/supply-chain-check.json, docs/05-audits/2026-09-01-132548-project-audit-report.md]
 ---
 
 # REL-0001 — 本地发布候选与回滚演练
 
-## 范围与边界
+## 变更集合
 
+- FR/CR/BUG/ADR：FR-0004、FR-0005、FR-0006；CR-0001～CR-0006；BUG-0002、BUG-0005；ADR-0002、ADR-0006～ADR-0009。
+- 版本/提交/PR：`0.1.0-rc.local.1`；基线 `main@8883425`；本地候选，无 PR、Tag 或远端 Release。
+- 兼容性说明：只增加 CLI、桥接和治理能力；无数据库、API 破坏性迁移或用户 Shader 批量改写。
 - 来源：2026-09-01 标准审计的 P1.1～P1.11、P2.1～P2.2 整改。
 - 基线：`main@8883425` 上的当前未提交整改工作树；最终 commit 待本轮全部门禁后回填。
 - 分发：内部本地候选，不是 GitHub Release/PyPI/Hub 发布；没有远程 CI run 或可下载链接。
 - 数据/配置：无数据库、迁移或持久配置；MCP token 仅来自进程环境，不进入 artifact。
 
-## 构建与验证
+## 验证与风险
+
+- 测试/构建/审计证据：下表的双 Python、可复现构建、strict、REG catalog、供应链和隔离团结/MCP 证据。
+- 已知风险与监控：远程 CI、Release、Windows/Linux 和在线漏洞库当时未验证；观察本地 hash、隔离安装、Editor 非目标写入和凭证泄漏信号。
+- Go / No-Go 决定与负责人：负责人 long；本地候选 Go，任何 hash、REG、strict、隔离安装或 Editor 写入门禁失败即 No-Go。
 
 环境：macOS arm64、uv 0.11.14、CPython 3.10.20/3.12.11、`SOURCE_DATE_EPOCH=1788220800`。
 
@@ -60,8 +67,11 @@ evidence: [dist/SHA256SUMS, dist/asecli-0.1.0.spdx.json, dist/supply-chain-check
 
 当前没有更早的正式 wheel，因此本次验证的是“移除候选并恢复到已校验 0.1.0 wheel”的恢复机制，不宣称跨版本数据回滚。目标恢复时间实测低于 2 秒；artifact 无数据兼容风险。
 
-## 观察、停止与回滚
+## 回滚
 
+- 触发条件：hash 不一致、隔离安装失败、REG/strict 失败、真实 Editor 写入非目标文件或敏感值进入输出。
+- 步骤：停止分发并卸载候选；按 SHA256SUMS 验证后重装最后已验证 wheel；测试文件仅从副本或 `.bak` 恢复。
+- 验证：重新执行 `asecli parse`、`asecli validate`、包版本检查和 hash 校验；目标恢复时间实测低于 2 秒。
 - 观察窗口：本地候选已完成隔离 Tuanjie 验收并进入 verified；push 后仍需至少观察一轮真实双 Python CI 才能进入远程 released。
 - 停止条件：hash 不一致、隔离安装失败、REG/strict 失败、真实 Editor 写入非目标文件、token 出现在输出。
 - 回滚：停止分发，卸载候选，按 SHA256SUMS 验证并重装最后已验证 wheel；恢复测试文件只使用副本或 `.bak`。

@@ -1,27 +1,33 @@
 ---
 id: REL-0002
-type: delivery-evidence
+type: release-record
 status: released
 version: 0.1.0
 created_at: 2026-09-02T13:30:00+08:00
 owner: long
-related: [CR-0010, TASK-0030, REG-0030]
+related: [FR-0009, CR-0006, CR-0010, TASK-0030, REG-0030]
 supersedes: []
 evidence: [GitHub Actions run 33594698477, GitHub Release v0.1.0, release asset SHA256SUMS]
 ---
 
 # REL-0002 — ASECLI v0.1.0 私有正式发布
 
-## 范围
+## 变更集合
 
+- FR/CR/BUG/ADR：FR-0009、CR-0006、CR-0010、ADR-0014；交付任务 TASK-0030、回归 REG-0030。
+- 版本/提交/PR：`v0.1.0`；提交 `fbd994125398bae5562028c869453ea367e9c3ea`；直接推送私有仓库，无 PR。
+- 兼容性说明：新写入迁移为 ASECLI 自有三标记和唯一内置 GUI；旧 MZGUI 标记只读兼容，不批量迁移用户 Shader。
 - 发布提交：`fbd994125398bae5562028c869453ea367e9c3ea`（`main`）。
 - 正式标签：`v0.1.0`，固定指向上述发布提交。
 - 发布对象：[ASECLI v0.1.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.1.0)，状态为非 Draft、非 Prerelease。
 - 分发形式：私有 GitHub Release 中的 Python wheel；不上传 PyPI、CLI Hub 或其他公开包仓。
 - GUI 验收：团结 `2022.3.61t9` 的当前实例完成新旧标记、HelpBox、默认值和折叠交互；用户提供的实机截图确认 Tooltip 显示变量名 `_BaseColor` 与默认值 `RGBA(1.000, 1.000, 1.000, 1.000)`。
 
-## 正式发布门禁
+## 验证与风险
 
+- 测试/构建/审计证据：GitHub Actions run 33594698477、Release 资产摘要、SHA256SUMS、SBOM、供应链/漏洞扫描和隔离安装。
+- 已知风险与监控：专有项目不在 PyPI 漏洞库；公开分发、签名和未知 ASE 版本不在本次范围，持续监控 CI、资产摘要和安装 smoke。
+- Go / No-Go 决定与负责人：负责人 long；六项资产上传并复下载校验、三个 CI job 和隔离安装均通过后 Go，否则 No-Go 并停止发布。
 - [GitHub Actions run 33594698477](https://github.com/seeseeczl/ASECLI/actions/runs/33594698477)：发布提交的 Python 3.10、Python 3.12、package 三个 job 全绿。
 - 发布前对最终 wheel 的隔离环境执行在线 `pip-audit`：运行时依赖为 0，未发现依赖漏洞；专有 `asecli` 本身不在 PyPI 漏洞数据库中，因此按工具语义跳过，不把跳过项误报为已扫描。
 - Release 上传完成后重新下载全部六个资产；`SHA256SUMS` 中登记的五个载荷资产执行 `shasum -a 256 -c SHA256SUMS` 全部通过，清单文件自身再与 GitHub 返回的资产摘要核对。
@@ -53,8 +59,11 @@ uv tool install ./asecli-0.1.0-py3-none-any.whl
 asecli --help
 ```
 
-## 隔离回滚观察
+## 回滚
 
+- 触发条件：Release 资产 hash、安装 smoke、GUI 兼容或供应链门禁任一失败。
+- 步骤：停止分发并卸载当前 wheel；按已校验摘要重装上一版 `main@2b4d76c` artifact；不修改用户 Shader 或团结工程。
+- 验证：确认包版本、`asecli parse` 的 7 nodes/7 wires 结果和 wheel SHA-256；上一版→当前→上一版三段演练均通过。
 正式发布前，在临时 CPython 3.12 环境中先校验上一版 `main@2b4d76c` artifact 的 wheel SHA-256（`6b92cfb4287c5d46a288966ca11fb92d52bf706201a1615a8cc413f158cb6446`），随后执行：
 
 1. 安装上一版 wheel，`asecli parse tests/fixtures/step-antialiasing.function.txt` 成功（7 nodes / 7 wires）。

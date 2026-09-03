@@ -1,0 +1,283 @@
+
+        private static Dictionary<string, PropertyMetadata> ReadMetadata(Shader shader)
+        {
+            Dictionary<string, PropertyMetadata> result =
+                new Dictionary<string, PropertyMetadata>(StringComparer.Ordinal);
+            try
+            {
+                MethodInfo countMethod = FindShaderUtilMethod("GetPropertyCount", typeof(Shader));
+                if (countMethod == null)
+                    countMethod = FindShaderUtilMethod("GetShaderPropertyCount", typeof(Shader));
+                MethodInfo nameMethod = FindShaderUtilMethod("GetPropertyName", typeof(Shader), typeof(int));
+                MethodInfo attributesMethod = FindShaderUtilMethod(
+                    "GetShaderPropertyAttributes", typeof(Shader), typeof(int));
+                Type handlerType = typeof(MaterialEditor).Assembly.GetType("UnityEditor.MaterialPropertyHandler");
+                MethodInfo handlerMethod = handlerType != null
+                    ? handlerType.GetMethod(
+                        "GetHandler",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                        null,
+                        new[] { typeof(Shader), typeof(string) },
+                        null
+                    )
+                    : null;
+                FieldInfo decoratorsField = handlerType != null
+                    ? handlerType.GetField(
+                        "m_DecoratorDrawers",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+                    )
+                    : null;
+                if (countMethod == null || nameMethod == null ||
+                    (attributesMethod == null && (handlerMethod == null || decoratorsField == null)))
+                    throw new MissingMethodException("ShaderUtil property metadata API is unavailable");
+
+                int count = Convert.ToInt32(countMethod.Invoke(null, new object[] { shader }));
+                for (int index = 0; index < count; index++)
+                {
+                    string name = nameMethod.Invoke(null, new object[] { shader, index }) as string;
+                    if (String.IsNullOrEmpty(name))
+                        continue;
+                    PropertyMetadata metadata = new PropertyMetadata();
+                    if (attributesMethod != null)
+                    {
+                        string[] attributes = attributesMethod.Invoke(
+                            null, new object[] { shader, index }) as string[];
+                        if (attributes != null)
+                        {
+                            foreach (string attribute in attributes)
+                                ApplyAttribute(metadata, attribute);
+                        }
+                    }
+                    else
+                    {
+                        object handler = handlerMethod.Invoke(null, new object[] { shader, name });
+                        IEnumerable decorators = handler != null
+                            ? decoratorsField.GetValue(handler) as IEnumerable
+                            : null;
+                        if (decorators != null)
+                        {
+                            foreach (object drawer in decorators)
+                            {
+                                IASECLIMetadataDecorator decorator = drawer as IASECLIMetadataDecorator;
+                                if (decorator != null)
+                                    ApplyMetadata(metadata, decorator.MetadataType, decorator.MetadataValue);
+                            }
+                        }
+
+                        // Tuanjie 2022.3 has no ShaderUtil.GetShaderPropertyAttributes.
+                        // Its MaterialPropertyHandler can resolve a historical marker to
+                        // another package's drawer with the same unqualified type name.
+                        // In that case the drawer does not implement our private interface,
+                        // so recover only missing ASECLI/legacy metadata from this shader's
+                        // source asset. This is input-only compatibility, never a writer.
+                        PropertyMetadata sourceMetadata;
+                        if (TryReadSourceMetadata(shader, name, out sourceMetadata))
+                            MergeMissingMetadata(metadata, sourceMetadata);
+                    }
+                    result[name] = metadata;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (!metadataWarningLogged)
+                {
+                    metadataWarningLogged = true;
+                    Debug.LogWarning("ASECLI Material GUI could not read shader attributes: " + exception.Message);
+                }
+            }
+            return result;
+        }
+
+        private static bool TryReadSourceMetadata(
+            Shader shader,
+            string propertyName,
+            out PropertyMetadata metadata)
+        {
+            metadata = new PropertyMetadata();
+            string assetPath = AssetDatabase.GetAssetPath(shader);
+            if (String.IsNullOrEmpty(assetPath) ||
+                !assetPath.StartsWith("Assets/", StringComparison.Ordinal))
+                return false;
+
+            try
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                string fullPath = Path.Combine(projectRoot, assetPath);
+                if (!File.Exists(fullPath))
+                    return false;
+
+                string escapedPropertyName = Regex.Escape(propertyName);
+                Regex declarationPattern = new Regex(
+                    @"(?m)^[\t ]*(?<attributes>(?:\[[^\]\r\n]*\][\t ]*)*)" +
+                    escapedPropertyName +
+                    @"[\t ]*\(",
+                    RegexOptions.CultureInvariant
+                );
+                Match declaration = declarationPattern.Match(File.ReadAllText(fullPath));
+                if (!declaration.Success)
+                    return false;
+
+                foreach (Match attribute in RawPropertyAttributePattern.Matches(
+                    declaration.Groups["attributes"].Value))
+                    ApplyAttribute(metadata, attribute.Value);
+                return !String.IsNullOrEmpty(metadata.Foldout) ||
+                    !String.IsNullOrEmpty(metadata.Tooltip) ||
+                    !String.IsNullOrEmpty(metadata.Help);
+            }
+            catch (Exception exception)
+            {
+                if (!metadataWarningLogged)
+                {
+                    metadataWarningLogged = true;
+                    Debug.LogWarning("ASECLI Material GUI could not read shader source metadata: " +
+                        exception.Message);
+                }
+                return false;
+            }
+        }
+
+        private static void MergeMissingMetadata(
+            PropertyMetadata target,
+            PropertyMetadata source)
+        {
+            if (String.IsNullOrEmpty(target.Foldout))
+                target.Foldout = source.Foldout;
+            if (String.IsNullOrEmpty(target.Tooltip))
+                target.Tooltip = source.Tooltip;
+            if (String.IsNullOrEmpty(target.Help))
+                target.Help = source.Help;
+        }
+
+        private static MethodInfo FindShaderUtilMethod(string name, params Type[] parameterTypes)
+        {
+            return typeof(ShaderUtil).GetMethod(
+                name,
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                null,
+                parameterTypes,
+                null
+            );
+        }
+
+        private static void ApplyAttribute(PropertyMetadata metadata, string rawAttribute)
+        {
+            if (String.IsNullOrEmpty(rawAttribute))
+                return;
+            string value = rawAttribute.Trim();
+            if (value.StartsWith("[", StringComparison.Ordinal) &&
+                value.EndsWith("]", StringComparison.Ordinal))
+                value = value.Substring(1, value.Length - 2).Trim();
+
+            int open = value.IndexOf('(');
+            string typeName = open >= 0 ? value.Substring(0, open).Trim() : value;
+            string arguments = String.Empty;
+            if (open >= 0 && value.EndsWith(")", StringComparison.Ordinal))
+                arguments = value.Substring(open + 1, value.Length - open - 2);
+
+            ApplyMetadata(metadata, typeName, arguments);
+        }
+
+        private static void ApplyMetadata(PropertyMetadata metadata, string typeName, string arguments)
+        {
+            if (String.Equals(typeName, "ASECLIFoldout", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(typeName, "FoldoutMzgui", StringComparison.OrdinalIgnoreCase))
+                metadata.Foldout = DecodeFoldout(arguments);
+            else if (String.Equals(typeName, "ASECLITooltip", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(typeName, "TooltipMzgui", StringComparison.OrdinalIgnoreCase))
+                metadata.Tooltip = AppendLine(metadata.Tooltip, DecodeCustomUnicode(arguments));
+            else if (String.Equals(typeName, "ASECLIHelpBox", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(typeName, "HelpBoxMzgui", StringComparison.OrdinalIgnoreCase))
+                metadata.Help = AppendLine(metadata.Help, DecodeCustomUnicode(arguments));
+        }
+
+        private static string DecodeFoldout(string value)
+        {
+            return CustomUnicodePattern.Replace(
+                value,
+                match => ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString()
+            );
+        }
+
+        private static string DecodeCustomUnicode(string value)
+        {
+            MatchCollection matches = CustomUnicodePattern.Matches(value);
+            if (matches.Count == 0)
+                return value;
+            char[] decoded = new char[matches.Count];
+            for (int index = 0; index < matches.Count; index++)
+                decoded[index] = (char)Convert.ToInt32(matches[index].Groups[1].Value, 16);
+            return new string(decoded);
+        }
+
+        private static string AppendLine(string current, string addition)
+        {
+            if (String.IsNullOrEmpty(addition))
+                return current;
+            return String.IsNullOrEmpty(current) ? addition : current + "\n" + addition;
+        }
+
+        private static Dictionary<string, string> ReadDefaultValues(Shader shader)
+        {
+            Dictionary<string, string> result =
+                new Dictionary<string, string>(StringComparer.Ordinal);
+            Material defaultMaterial = new Material(shader);
+            defaultMaterial.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                MaterialProperty[] defaultProperties = MaterialEditor.GetMaterialProperties(
+                    new UnityEngine.Object[] { defaultMaterial }
+                );
+                foreach (MaterialProperty property in defaultProperties)
+                    result[property.name] = FormatDefaultValue(property);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(defaultMaterial);
+            }
+            return result;
+        }
+
+        private static string FormatDefaultValue(MaterialProperty property)
+        {
+            if (property.type == MaterialProperty.PropType.Color)
+            {
+                Color value = property.colorValue;
+                return Tuple(value.r, value.g, value.b, value.a);
+            }
+            if (property.type == MaterialProperty.PropType.Vector)
+            {
+                Vector4 value = property.vectorValue;
+                return Tuple(value.x, value.y, value.z, value.w);
+            }
+            if (property.type == MaterialProperty.PropType.Texture)
+                return property.textureValue != null ? property.textureValue.name : "None";
+            if (String.Equals(property.type.ToString(), "Int", StringComparison.Ordinal))
+            {
+                PropertyInfo intValueProperty = typeof(MaterialProperty).GetProperty(
+                    "intValue", BindingFlags.Public | BindingFlags.Instance);
+                if (intValueProperty != null)
+                    return Convert.ToInt32(intValueProperty.GetValue(property, null))
+                        .ToString(CultureInfo.InvariantCulture);
+                return Math.Round(property.floatValue).ToString(CultureInfo.InvariantCulture);
+            }
+            return Number(property.floatValue);
+        }
+
+        private static string Tuple(float x, float y, float z, float w)
+        {
+            return "(" + Number(x) + ", " + Number(y) + ", " + Number(z) + ", " + Number(w) + ")";
+        }
+
+        private static string Number(float value)
+        {
+            return value.ToString("0.######", CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildTooltip(string customText, string propertyName, string defaultValue)
+        {
+            string technical = "变量名: " + propertyName + "\n默认值: " + defaultValue;
+            return String.IsNullOrEmpty(customText) ? technical : customText + "\n\n" + technical;
+        }
+    }
+}
+#endif

@@ -73,6 +73,7 @@ def measure_node_bounds_via_mcp(
     *,
     mcp_url: str = "http://127.0.0.1:8080/mcp",
     instance_token: str | None = None,
+    unity_instance: str | None = None,
     allow_remote_mcp: bool = False,
 ) -> dict[str, tuple[float, float, float, float]]:
     """Load a fresh hidden ASE window and return each node's runtime TruePosition."""
@@ -87,15 +88,30 @@ def measure_node_bounds_via_mcp(
         allow_remote=allow_remote_mcp,
     )
     client.connect()
-    result = client.call_tool(
-        "execute_code",
-        {"action": "execute", "code": BOUNDS_SNIPPET.format(asset_path=json.dumps(asset_path))},
-    )
+    arguments = {
+        "action": "execute",
+        "code": BOUNDS_SNIPPET.format(asset_path=json.dumps(asset_path)),
+    }
+    if unity_instance is not None:
+        arguments["unity_instance"] = unity_instance
+    result = client.call_tool("execute_code", arguments)
     envelope_text = tool_text(result, instance_token)
     try:
         envelope = json.loads(envelope_text)
+    except json.JSONDecodeError as exc:
+        raise McpError("MCP node-bounds result has an unexpected envelope") from exc
+    if not isinstance(envelope, dict):
+        raise McpError("MCP node-bounds result has an unexpected envelope")
+    if envelope.get("success") is False:
+        data = envelope.get("data") if isinstance(envelope.get("data"), dict) else {}
+        detail = envelope.get("message") or data.get("reason") or "Unity execution failed"
+        available = data.get("available_instances")
+        if isinstance(available, list) and available:
+            detail = f"{detail}; available instances: {', '.join(str(item) for item in available)}"
+        raise McpError(str(detail))
+    try:
         payload = envelope["data"]["result"]
-    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+    except (KeyError, TypeError) as exc:
         raise McpError("MCP node-bounds result has an unexpected envelope") from exc
     if not isinstance(payload, str) or not payload.startswith("ASECLI_BOUNDS_V1\n"):
         raise McpError("MCP node-bounds result has an unexpected payload")

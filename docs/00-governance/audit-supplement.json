@@ -1,0 +1,90 @@
+{
+  "frontend_entries": [],
+  "functional_modules": [
+    {
+      "id": "FM-0E60A4DD1B",
+      "name": "parse-serialize",
+      "path": "src/asecli/core/model.py",
+      "evidence_paths": ["src/asecli/core/model.py", "tests/test_roundtrip.py"]
+    },
+    {
+      "id": "FM-9040886B90",
+      "name": "graph-mutation",
+      "path": "src/asecli/core/graph_ops.py",
+      "evidence_paths": ["src/asecli/core/graph_ops.py", "tests/test_mutate.py"]
+    },
+    {
+      "id": "FM-8ADC52C2A4",
+      "name": "schema-library",
+      "path": "src/asecli/schema",
+      "evidence_paths": ["src/asecli/schema/data/schemas.json", "tests/test_schema_add.py"]
+    },
+    {
+      "id": "FM-C73F236CD5",
+      "name": "validation-checksum",
+      "path": "src/asecli/checks",
+      "evidence_paths": ["src/asecli/checks/validate.py", "src/asecli/checks/checksum.py"]
+    },
+    {
+      "id": "FM-F03DFA9A41",
+      "name": "layout",
+      "path": "src/asecli/core/layout.py",
+      "evidence_paths": ["src/asecli/core/layout.py", "tests/test_layout.py"]
+    },
+    {
+      "id": "FM-3537DE9938",
+      "name": "create-from-template",
+      "path": "src/asecli/cli/create_command.py",
+      "evidence_paths": ["src/asecli/cli/create_command.py", "tests/test_create.py"]
+    },
+    {
+      "id": "FM-DF0669A019",
+      "name": "recompile-bridge",
+      "path": "src/asecli/bridge/recompile.py",
+      "evidence_paths": ["src/asecli/bridge/recompile.py", "tests/test_bridge_recompile.py"]
+    },
+    {
+      "id": "FM-1DB3E4EA8B",
+      "name": "cli-contract",
+      "path": "src/asecli/cli/main.py",
+      "evidence_paths": ["src/asecli/cli/main.py", "tests/test_cli_contract.py"]
+    },
+    {
+      "id": "FM-25E63BD4F6",
+      "name": "agent-skill",
+      "path": "skills/asecli/SKILL.md",
+      "evidence_paths": ["skills/asecli/SKILL.md", "tests/test_smoke.py"]
+    },
+    {
+      "id": "FM-2E47AA5409",
+      "name": "graph-audit",
+      "path": "src/asecli/checks/usage.py",
+      "evidence_paths": ["src/asecli/checks/usage.py", "tests/test_usage_audit.py"]
+    },
+    {
+      "id": "FM-35114E2780",
+      "name": "custom-gui-property-presentation",
+      "path": "src/asecli/core/custom_gui.py",
+      "evidence_paths": ["src/asecli/core/custom_gui.py", "tests/test_property_presentation.py"]
+    },
+    {
+      "id": "FM-DB13C6D6D8",
+      "name": "gui-support-material-inspector",
+      "path": "src/asecli/bridge/gui_support.py",
+      "evidence_paths": ["src/asecli/bridge/gui_support.py", "tests/test_gui_support.py"]
+    },
+    {
+      "id": "FM-3EEC4BD8D5",
+      "name": "comment-group",
+      "path": "src/asecli/core/commentary.py",
+      "evidence_paths": ["src/asecli/core/commentary.py", "tests/test_commentary.py"]
+    },
+    {
+      "id": "FM-14E9E4031E",
+      "name": "editor-api-create",
+      "path": "src/asecli/bridge/editor_create.py",
+      "evidence_paths": ["src/asecli/bridge/editor_create.py", "tests/test_editor_create_e2e.py"]
+    }
+  ],
+  "exclude_functional_module_ids": []
+}

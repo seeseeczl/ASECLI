@@ -6,7 +6,7 @@ import pytest
 
 from asecli.bridge.mcp_client import McpClient, McpError
 from asecli.bridge.recompile import RECOMPILE_SNIPPET, recompile_via_mcp
-from asecli.bridge.graph_inspect import BOUNDS_SNIPPET
+from asecli.bridge.graph_inspect import BOUNDS_SNIPPET, measure_node_bounds_via_mcp
 
 
 def _shader_project(tmp_path):
@@ -44,6 +44,53 @@ def test_bounds_probe_uses_true_position_inside_real_gui_event_and_closes_window
     assert "AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow" in BOUNDS_SNIPPET
     assert "win.Close()" in BOUNDS_SNIPPET
     assert "DestroyImmediate(win)" in BOUNDS_SNIPPET
+
+
+def test_bounds_probe_routes_to_explicit_unity_instance(tmp_path, monkeypatch):
+    shader = _shader_project(tmp_path)
+    seen = {}
+
+    class SuccessClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            seen.update(arguments)
+            envelope = {"success": True, "data": {"result": "ASECLI_BOUNDS_V1\n1|0|0|100|50\n"}}
+            return {"content": [{"type": "text", "text": json.dumps(envelope)}]}
+
+    monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", SuccessClient)
+    bounds = measure_node_bounds_via_mcp(str(shader), unity_instance="Project@abc123")
+    assert seen["unity_instance"] == "Project@abc123"
+    assert bounds == {"1": (0.0, 0.0, 100.0, 50.0)}
+
+
+def test_bounds_probe_surfaces_multiple_instance_refusal(tmp_path, monkeypatch):
+    shader = _shader_project(tmp_path)
+
+    class RefusingClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            envelope = {
+                "success": False,
+                "data": {
+                    "reason": "instance_selection_required",
+                    "available_instances": ["A@111", "B@222"],
+                },
+            }
+            return {"content": [{"type": "text", "text": json.dumps(envelope)}]}
+
+    monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", RefusingClient)
+    with pytest.raises(McpError, match="available instances: A@111, B@222"):
+        measure_node_bounds_via_mcp(str(shader))
 
 
 def test_json_rpc_error_is_bridge_failure(monkeypatch):

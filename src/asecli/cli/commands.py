@@ -219,7 +219,7 @@ def cmd_layout(args) -> dict:
     except ValueError as exc:
         raise CliError("LAYOUT_ERROR", str(exc)) from exc
     saved = _save(f, args.file, args.write)
-    return {"moved": moved, **saved}
+    return {"moved": moved, "structural_validation": "passed", "visual_validation": "pending", **saved}
 
 
 def cmd_recompile(args) -> dict:

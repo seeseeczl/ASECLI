@@ -41,8 +41,9 @@ resource require a real Unity/Tuanjie Editor gate and are reported separately.
 - Skill validation: passed with the bundled `quick_validate.py`.
 - REG catalog: 26 documented pytest commands collected successfully.
 - CI governance: passed with no findings.
-- Packaging: wheel contains `gui_support.py` and
-  `asecli_material_gui.cs.txt`; packaged/resource SHA-256 both equal
+- Packaging: wheel contains `gui_support.py`, the ordered
+  `asecli_material_gui.part*.cs.txt` fragments and `editor_create.part*.cs.txt`;
+  composed/installed GUI SHA-256 both equal
   `827ed7b91df1761a62eac6780066d162a73fd22e005bf64c5d9516b864841879`;
   the wheel installed into an isolated Python 3.12 environment and its real
   `asecli gui-support` entry point detected the installed resource successfully.

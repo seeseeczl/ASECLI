@@ -14,7 +14,8 @@ import pytest
 from asecli.bridge.editor_create import EDITOR_CREATE_SNIPPET
 from asecli.bridge.editor_spec import EditorGraphSpec
 from asecli.checks import validate_file
-from asecli.core import AseFile
+from asecli.cli.create_command import _finalize_editor_property_presentation
+from asecli.core import AseFile, require_property_presentation
 
 
 TEMPLATE_GUID = "2992e84f91cbeb14eab234972e07ea9d"
@@ -24,41 +25,51 @@ EDITOR_ENV = "ASECLI_TUANJIE_PATH"
 
 def _specs() -> tuple[EditorGraphSpec, EditorGraphSpec]:
     caster = {
-        "version": 1,
+        "version": 2,
         "template": {"guid": TEMPLATE_GUID, "shader_name": "ASECLI/E2E/Caster"},
-        "nodes": [{
-            "alias": "mask", "kind": "sampler", "position": [-520, 20],
-            "property_name": "_CasterMask", "inspector_name": "Caster Mask", "parameter_type": "Property",
-        }],
-        "connections": [{"from": {"node": "mask", "port": 1}, "to": {"node": "master", "port": 2}}],
+        "nodes": [
+            {"alias": "world", "kind": "node", "type": "WorldPosInputsNode", "position": [-420, -180]},
+            {
+                "alias": "mask", "kind": "sampler", "position": [-720, 20],
+                "property_name": "_AuditMask", "inspector_name": "验证遮罩",
+                "help": "用于验证动态纹理属性能够跨进程重新加载。", "parameter_type": "Property",
+            },
+            {
+                "alias": "strength", "kind": "property", "type": "RangedFloatNode",
+                "position": [-420, 20], "property_name": "_AuditStrength", "inspector_name": "验证强度",
+                "help": "用于验证数值属性能够跨进程重新加载。", "parameter_type": "Property",
+            },
+        ],
+        "connections": [
+            {"from": {"node": "world", "port": 0}, "to": {"node": "master", "port": 2}},
+            {"from": {"node": "strength", "port": 0}, "to": {"node": "master", "port": 3}},
+        ],
     }
     receiver = {
-        "version": 1,
+        "version": 2,
         "template": {"guid": TEMPLATE_GUID, "shader_name": "ASECLI/E2E/Receiver"},
         "nodes": [
             {"alias": "world", "kind": "node", "type": "WorldPosInputsNode", "position": [-850, -80]},
             {
                 "alias": "ground_mask", "kind": "property", "type": "TexturePropertyNode",
-                "position": [-930, 300], "property_name": "_GroundMask", "inspector_name": "Ground Mask",
-                "parameter_type": "Property",
+                "position": [-930, 300], "property_name": "_GroundMask", "inspector_name": "地面遮罩",
+                "help": "控制局部阴影接收区域的遮罩纹理。", "parameter_type": "Property",
             },
             {"alias": "uv", "kind": "node", "type": "TextureCoordinatesNode", "position": [-930, 500]},
             {
                 "alias": "expr", "kind": "custom_expression", "position": [-430, 10],
                 "name": "Vehicle Local Shadow Core",
-                "code": "return float4(WorldPosition.x, GroundMaskUV.y, 0, tex2D(GroundMaskTex, GroundMaskUV).r);",
-                "output_type": "FLOAT4",
+                "code": "return float3(WorldPosition.x, GroundMaskUV.y, 0);",
+                "output_type": "FLOAT3",
                 "inputs": [
                     {"name": "WorldPosition", "type": "FLOAT3"},
-                    {"name": "GroundMaskTex", "type": "SAMPLER2D"},
                     {"name": "GroundMaskUV", "type": "FLOAT2"},
                 ],
             },
         ],
         "connections": [
             {"from": {"node": "world", "port": 0}, "to": {"node": "expr", "port": 0}},
-            {"from": {"node": "ground_mask", "port": 0}, "to": {"node": "expr", "port": 1}},
-            {"from": {"node": "uv", "port": 0}, "to": {"node": "expr", "port": 2}},
+            {"from": {"node": "uv", "port": 0}, "to": {"node": "expr", "port": 1}},
             {"from": {"node": "expr", "port": 0}, "to": {"node": "master", "port": 2}},
         ],
     }
@@ -84,6 +95,9 @@ def test_real_editor_create_then_new_process_reload():
     generated = project / "Assets" / "ASECLIE2E" / "Generated"
     editor_dir = project / "Assets" / "ASECLIE2E" / "Editor"
     generated.mkdir(parents=True, exist_ok=True)
+    # Tuanjie may remove a newly created empty Assets directory during its
+    # first refresh before ASE writes the nonce-scoped staging shader.
+    (generated / ".asecli-e2e-keep").write_text("keep\n", encoding="utf-8")
     editor_dir.mkdir(parents=True, exist_ok=True)
     caster_path = "Assets/ASECLIE2E/Generated/Caster.shader"
     receiver_path = "Assets/ASECLIE2E/Generated/Receiver.shader"
@@ -116,6 +130,13 @@ def test_real_editor_create_then_new_process_reload():
     assert caster_result["shader_name"] == "ASECLI/E2E/Caster"
     assert receiver_result["shader_name"] == "ASECLI/E2E/Receiver"
 
+    for spec, relative in ((caster, caster_path), (receiver, receiver_path)):
+        target = project / relative
+        created = AseFile.from_path(target)
+        output, presentation = _finalize_editor_property_presentation(created, spec)
+        target.write_text(output, encoding="utf-8")
+        assert presentation["valid"] is True
+
     reload_log = project / "asecli-editor-reload.log"
     _run_editor(editor, project, "ASECLIEditorCreateE2E.VerifyReload", reload_log)
     reload_result = json.loads((project / "asecli-editor-reload-result.json").read_text(encoding="utf-8"))
@@ -135,6 +156,7 @@ def test_real_editor_create_then_new_process_reload():
         errors = [issue for issue in validate_file(ase_file) if issue["severity"] == "error"]
         assert not errors
         assert ase_file.graph.nodes
+        assert require_property_presentation(ase_file)["valid"] is True
 
 
 def _shader_name(path: Path) -> str:
@@ -145,7 +167,7 @@ def _shader_name(path: Path) -> str:
 
 def _run_editor(editor: Path, project: Path, method: str, log: Path) -> None:
     proc = subprocess.run(
-        [str(editor), "-batchmode", "-projectPath", str(project), "-executeMethod", method,
+        [str(editor), "-projectPath", str(project), "-executeMethod", method,
          "-logFile", str(log)],
         capture_output=True,
         text=True,
@@ -269,7 +291,17 @@ public static class ASECLIEditorCreateE2E
             win = EditorWindow.CreateInstance<AmplifyShaderEditor.AmplifyShaderEditorWindow>();
             AmplifyShaderEditor.UIUtils.CurrentWindow = win;
             win.Show();
-            var loaded = win.LoadFromDisk(path, null);
+            AmplifyShaderEditor.ShaderLoadResult loaded;
+            var previousInhibitMessages = AmplifyShaderEditor.UIUtils.InhibitMessages;
+            try
+            {{
+                AmplifyShaderEditor.UIUtils.InhibitMessages = true;
+                loaded = win.LoadFromDisk(path, null);
+            }}
+            finally
+            {{
+                AmplifyShaderEditor.UIUtils.InhibitMessages = previousInhibitMessages;
+            }}
             if (loaded != AmplifyShaderEditor.ShaderLoadResult.LOADED &&
                 loaded != AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED) return false;
             var graph = win.CurrentGraph;
@@ -281,18 +313,27 @@ public static class ASECLIEditorCreateE2E
             if (caster)
             {{
                 var sampler = graph.AllNodes.Find(n => n is AmplifyShaderEditor.SamplerNode) as AmplifyShaderEditor.SamplerNode;
-                return sampler != null && sampler.PropertyName == "_CasterMask" &&
-                    graph.CurrentMasterNode.GetInputPortByUniqueId(2).IsConnectedTo(sampler.UniqueId, 1);
+                var strength = graph.AllNodes.Find(n => n is AmplifyShaderEditor.RangedFloatNode) as AmplifyShaderEditor.RangedFloatNode;
+                var casterWorld = graph.AllNodes.Find(n => n is AmplifyShaderEditor.WorldPosInputsNode);
+                return master.CurrentInspector == "ASECLI.MaterialGUI.ASECLIMaterialGUI" &&
+                    sampler != null && sampler.PropertyName == "_AuditMask" &&
+                    sampler.PropertyInspectorName == "验证遮罩" && sampler.AutoRegister &&
+                    strength != null && strength.PropertyName == "_AuditStrength" &&
+                    strength.PropertyInspectorName == "验证强度" &&
+                    casterWorld != null &&
+                    graph.CurrentMasterNode.GetInputPortByUniqueId(2).IsConnectedTo(casterWorld.UniqueId, 0) &&
+                    graph.CurrentMasterNode.GetInputPortByUniqueId(3).IsConnectedTo(strength.UniqueId, 0);
             }}
             var expression = graph.AllNodes.Find(n => n is AmplifyShaderEditor.CustomExpressionNode) as AmplifyShaderEditor.CustomExpressionNode;
             var world = graph.AllNodes.Find(n => n is AmplifyShaderEditor.WorldPosInputsNode);
             var texture = graph.AllNodes.Find(n => n is AmplifyShaderEditor.TexturePropertyNode) as AmplifyShaderEditor.TexturePropertyNode;
             var uv = graph.AllNodes.Find(n => n is AmplifyShaderEditor.TextureCoordinatesNode);
-            return expression != null && world != null && texture != null && uv != null &&
-                texture.PropertyName == "_GroundMask" && expression.InputPorts.Count == 3 &&
+            return master.CurrentInspector == "ASECLI.MaterialGUI.ASECLIMaterialGUI" &&
+                expression != null && world != null && texture != null && uv != null &&
+                texture.PropertyName == "_GroundMask" && texture.PropertyInspectorName == "地面遮罩" &&
+                expression.InputPorts.Count == 2 &&
                 expression.InputPorts[0].IsConnectedTo(world.UniqueId, 0) &&
-                expression.InputPorts[1].IsConnectedTo(texture.UniqueId, 0) &&
-                expression.InputPorts[2].IsConnectedTo(uv.UniqueId, 0) &&
+                expression.InputPorts[1].IsConnectedTo(uv.UniqueId, 0) &&
                 graph.CurrentMasterNode.GetInputPortByUniqueId(2).IsConnectedTo(expression.UniqueId, 0);
         }}
         finally

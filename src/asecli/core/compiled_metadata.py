@@ -10,6 +10,7 @@ from .custom_gui import (
     parse_property_metadata_attribute,
     read_property_metadata_tail,
 )
+from .compiled_properties import inspect_compiled_properties
 from .model import AseFile
 
 
@@ -17,6 +18,66 @@ _LEGACY_ATTRIBUTE_TYPES = ("FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui")
 _MANAGED_ATTRIBUTE_TYPES = frozenset(
     (*PROPERTY_METADATA_ATTRIBUTE_TYPES, *_LEGACY_ATTRIBUTE_TYPES)
 )
+_KNOWN_TEMPLATE_COMPILED_ONLY_PROPERTIES = {
+    "2992e84f91cbeb14eab234972e07ea9d": frozenset({
+        "_TessPhongStrength",
+        "_TessValue",
+        "_TessMin",
+        "_TessMax",
+        "_TessEdgeLength",
+        "_TessMaxDisp",
+    }),
+}
+
+
+def hide_known_template_compiled_only_properties(
+    ase_file: AseFile, template_guid: str
+) -> list[dict]:
+    """Hide exact, versioned template controls that have no graph PropertyNode.
+
+    Unknown compiled-only properties remain visible so the presentation
+    contract can reject them instead of silently hiding user-owned data.
+    """
+    compiled, error = inspect_compiled_properties(ase_file.prefix)
+    if error is not None:
+        raise ValueError(f"compiled ShaderLab properties are unavailable: {error}")
+    known = _KNOWN_TEMPLATE_COMPILED_ONLY_PROPERTIES.get(template_guid, frozenset())
+    graph_names = {
+        node.raw_fields[7]
+        for node in ase_file.graph.nodes
+        if is_material_property_node(node)
+    }
+    changes: list[dict] = []
+    prefix = ase_file.prefix
+    for prop in compiled:
+        property_name = prop["property_name"]
+        if prop["hidden"] or property_name in graph_names or property_name not in known:
+            continue
+        pattern = re.compile(
+            rf"(?m)^(?P<indent>[ \t]*)(?P<attributes>(?:\[[^\]\r\n]*\][ \t]*)*)"
+            rf"(?P<name>{re.escape(property_name)})(?P<suffix>[ \t]*\()"
+        )
+        matches = list(pattern.finditer(prefix))
+        if len(matches) != 1:
+            raise ValueError(
+                f"expected one compiled ShaderLab declaration for {property_name!r}, found {len(matches)}"
+            )
+        match = matches[0]
+        replacement = (
+            match.group("indent")
+            + "[HideInInspector] "
+            + match.group("attributes")
+            + match.group("name")
+            + match.group("suffix")
+        )
+        prefix = prefix[: match.start()] + replacement + prefix[match.end() :]
+        changes.append({
+            "kind": "compiled_template_property_hidden",
+            "property_name": property_name,
+            "template_guid": template_guid,
+        })
+    ase_file.prefix = prefix
+    return changes
 
 
 def sync_compiled_property_metadata(ase_file: AseFile) -> list[dict]:

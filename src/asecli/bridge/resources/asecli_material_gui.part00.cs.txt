@@ -1,0 +1,300 @@
+// ASECLI clean-room material GUI.
+// Implements ASECLIFoldout, ASECLITooltip, and ASECLIHelpBox metadata for
+// ASECLI-generated shaders, and reads the three historical MZGUI names.
+
+#if UNITY_EDITOR
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEngine;
+
+namespace ASECLI.MaterialGUI
+{
+    internal interface IASECLIMetadataDecorator
+    {
+        string MetadataType { get; }
+        string MetadataValue { get; }
+    }
+
+    // These zero-height decorators let Unity retain its normal property/drawer path
+    // while ASECLIMaterialGUI interprets their metadata at the ShaderGUI layer.
+    public sealed class ASECLIFoldoutDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "ASECLIFoldout"; } }
+        public string MetadataValue { get; private set; }
+        public ASECLIFoldoutDecorator() : this(String.Empty) { }
+        public ASECLIFoldoutDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class ASECLITooltipDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "ASECLITooltip"; } }
+        public string MetadataValue { get; private set; }
+        public ASECLITooltipDecorator() : this(String.Empty) { }
+        public ASECLITooltipDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class ASECLIHelpBoxDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "ASECLIHelpBox"; } }
+        public string MetadataValue { get; private set; }
+        public ASECLIHelpBoxDecorator() : this(String.Empty) { }
+        public ASECLIHelpBoxDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    // Input-only shims for the historical serialized attributes. They are only
+    // needed by the MaterialPropertyHandler fallback when ShaderUtil cannot
+    // return raw property attributes; ASECLI never writes these names.
+    public sealed class FoldoutMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "FoldoutMzgui"; } }
+        public string MetadataValue { get; private set; }
+        public FoldoutMzguiDecorator() : this(String.Empty) { }
+        public FoldoutMzguiDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class TooltipMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "TooltipMzgui"; } }
+        public string MetadataValue { get; private set; }
+        public TooltipMzguiDecorator() : this(String.Empty) { }
+        public TooltipMzguiDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class HelpBoxMzguiDecorator : MaterialPropertyDrawer, IASECLIMetadataDecorator
+    {
+        public string MetadataType { get { return "HelpBoxMzgui"; } }
+        public string MetadataValue { get; private set; }
+        public HelpBoxMzguiDecorator() : this(String.Empty) { }
+        public HelpBoxMzguiDecorator(string value) { MetadataValue = value ?? String.Empty; }
+        public override float GetPropertyHeight(MaterialProperty prop, string label, MaterialEditor editor) { return 0f; }
+        public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor) { }
+    }
+
+    public sealed class ASECLIMaterialGUI : ShaderGUI
+    {
+        private sealed class PropertyMetadata
+        {
+            public string Foldout = String.Empty;
+            public string Tooltip = String.Empty;
+            public string Help = String.Empty;
+        }
+
+        private static readonly Regex CustomUnicodePattern =
+            new Regex("#([0-9A-Fa-f]{4})", RegexOptions.Compiled);
+        private static readonly Regex RawPropertyAttributePattern =
+            new Regex("\\[(?<attribute>[^\\]\\r\\n]*)\\]", RegexOptions.Compiled);
+        private static bool metadataWarningLogged;
+
+        // ShaderGUI instances can be recreated between IMGUI Layout and Repaint
+        // passes. Foldout state therefore must outlive one inspector instance,
+        // otherwise a click changes the arrow but leaves the previous layout.
+        private static readonly Dictionary<string, bool> foldoutStates =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
+        private Shader cachedShader;
+        private Hash128 cachedDependencyHash;
+        private bool hasCachedDependencyHash;
+        private Dictionary<string, PropertyMetadata> cachedMetadata;
+        private Dictionary<string, string> cachedDefaultValues;
+
+        public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
+        {
+            Material material = materialEditor != null ? materialEditor.target as Material : null;
+            Shader shader = material != null ? material.shader : null;
+            if (materialEditor == null || shader == null || properties == null)
+            {
+                base.OnGUI(materialEditor, properties);
+                return;
+            }
+
+            EnsureCache(shader);
+            bool insideFoldout = false;
+            bool currentFoldoutOpen = true;
+
+            foreach (MaterialProperty property in properties)
+            {
+                PropertyMetadata metadata;
+                if (!cachedMetadata.TryGetValue(property.name, out metadata))
+                    metadata = new PropertyMetadata();
+
+                if (!String.IsNullOrEmpty(metadata.Foldout))
+                {
+                    insideFoldout = true;
+                    currentFoldoutOpen = DrawFoldout(
+                        shader,
+                        property,
+                        metadata.Foldout,
+                        materialEditor
+                    );
+                }
+
+                if (insideFoldout && !currentFoldoutOpen)
+                    continue;
+                if ((property.flags & MaterialProperty.PropFlags.HideInInspector) != 0)
+                    continue;
+
+                string defaultValue;
+                if (!cachedDefaultValues.TryGetValue(property.name, out defaultValue))
+                    defaultValue = "Unknown";
+                GUIContent label = new GUIContent(
+                    property.displayName,
+                    BuildTooltip(metadata.Tooltip, property.name, defaultValue)
+                );
+                DrawProperty(materialEditor, property, label);
+
+                if (!String.IsNullOrEmpty(metadata.Help))
+                    DrawInlineHelp(metadata.Help);
+            }
+
+            EditorGUILayout.Space();
+            materialEditor.RenderQueueField();
+            materialEditor.EnableInstancingField();
+            materialEditor.DoubleSidedGIField();
+        }
+
+        private static void DrawProperty(
+            MaterialEditor materialEditor,
+            MaterialProperty property,
+            GUIContent label)
+        {
+            if (ShouldWrapPropertyLabel(label))
+            {
+                DrawWrappedProperty(materialEditor, property, label);
+                return;
+            }
+
+            float height = materialEditor.GetPropertyHeight(property, label.text);
+            Rect position = EditorGUILayout.GetControlRect(true, height);
+            materialEditor.ShaderProperty(position, property, label);
+        }
+
+        private static bool ShouldWrapPropertyLabel(GUIContent label)
+        {
+            float availableWidth = Mathf.Max(
+                80f,
+                (EditorGUIUtility.currentViewWidth * 0.45f) -
+                    24f - (EditorGUI.indentLevel * 15f)
+            );
+            return EditorStyles.label.CalcSize(label).x > availableWidth;
+        }
+
+        private static void DrawWrappedProperty(
+            MaterialEditor materialEditor,
+            MaterialProperty property,
+            GUIContent label)
+        {
+            GUIStyle wrappedLabel = new GUIStyle(EditorStyles.label);
+            wrappedLabel.wordWrap = true;
+            float labelWidth = Mathf.Max(
+                1f,
+                EditorGUIUtility.currentViewWidth - 40f -
+                    (EditorGUI.indentLevel * 15f)
+            );
+            float labelHeight = wrappedLabel.CalcHeight(label, labelWidth);
+            Rect labelPosition = EditorGUI.IndentedRect(
+                EditorGUILayout.GetControlRect(false, labelHeight)
+            );
+            EditorGUI.LabelField(labelPosition, label, wrappedLabel);
+
+            float height = materialEditor.GetPropertyHeight(property, String.Empty);
+            Rect position = EditorGUILayout.GetControlRect(true, height);
+            materialEditor.ShaderProperty(position, property, GUIContent.none);
+        }
+
+        private static void DrawInlineHelp(string text)
+        {
+            GUIContent content = new GUIContent(text);
+            GUIStyle style = new GUIStyle(EditorStyles.miniLabel);
+            style.fontStyle = FontStyle.Italic;
+            style.wordWrap = true;
+
+            float textWidth = Mathf.Max(
+                1f,
+                EditorGUIUtility.currentViewWidth - 64f - (EditorGUI.indentLevel * 15f)
+            );
+            float textHeight = style.CalcHeight(content, textWidth);
+            Rect row = EditorGUI.IndentedRect(
+                EditorGUILayout.GetControlRect(false, textHeight + 8f)
+            );
+
+            Rect backgroundRect = new Rect(row.x, row.y - 2f, row.width, row.height + 4f);
+            EditorGUI.DrawRect(backgroundRect, new Color(0f, 0f, 0f, 0.1f));
+
+            Rect accentRect = new Rect(
+                backgroundRect.x + 6f,
+                backgroundRect.y + 6f,
+                3f,
+                Mathf.Max(1f, backgroundRect.height - 12f)
+            );
+            EditorGUI.DrawRect(accentRect, new Color(1f, 1f, 1f, 0.3f));
+
+            Rect textRect = new Rect(
+                row.x + 16f,
+                row.y + 4f,
+                Mathf.Max(1f, row.width - 32f),
+                textHeight
+            );
+            Color previousColor = GUI.color;
+            GUI.color = EditorGUIUtility.isProSkin
+                ? new Color(1f, 1f, 1f, 0.4f)
+                : new Color(0f, 0f, 0f, 0.55f);
+            GUI.Label(textRect, content, style);
+            GUI.color = previousColor;
+            EditorGUILayout.Space(2f);
+        }
+
+        private bool DrawFoldout(
+            Shader shader,
+            MaterialProperty property,
+            string title,
+            MaterialEditor materialEditor)
+        {
+            string key = shader.name + "\n" + property.name;
+            bool state;
+            if (!foldoutStates.TryGetValue(key, out state))
+                state = true;
+            bool previousState = state;
+#if UNITY_2019_3_OR_NEWER
+            state = EditorGUILayout.Foldout(state, title, true, EditorStyles.foldoutHeader);
+#else
+            state = EditorGUILayout.Foldout(state, title, true);
+#endif
+            foldoutStates[key] = state;
+            if (state != previousState && materialEditor != null)
+                materialEditor.Repaint();
+            return state;
+        }
+
+        private void EnsureCache(Shader shader)
+        {
+            string assetPath = AssetDatabase.GetAssetPath(shader);
+            bool hasDependencyHash = !String.IsNullOrEmpty(assetPath);
+            Hash128 dependencyHash = hasDependencyHash
+                ? AssetDatabase.GetAssetDependencyHash(assetPath)
+                : default(Hash128);
+            bool cacheIsCurrent = cachedShader == shader &&
+                cachedMetadata != null && cachedDefaultValues != null &&
+                (!hasDependencyHash || (hasCachedDependencyHash && dependencyHash == cachedDependencyHash));
+            if (cacheIsCurrent)
+                return;
+            cachedShader = shader;
+            cachedDependencyHash = dependencyHash;
+            hasCachedDependencyHash = hasDependencyHash;
+            cachedMetadata = ReadMetadata(shader);
+            cachedDefaultValues = ReadDefaultValues(shader);
+        }

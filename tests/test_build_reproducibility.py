@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tarfile
+import zipfile
 
 
 ROOT = Path(__file__).parents[1]
@@ -85,3 +86,33 @@ def test_ci_build_outputs_live_outside_checkout_and_backend_is_locked():
     assert "name: asecli-${{ env.ASECLI_VERSION }}-python-${{ runner.arch }}" in workflow
     assert "dist/asecli-0.1.0" not in workflow
     assert 'requires = ["hatchling==1.32.0"]' in project
+
+
+def test_wheel_contains_every_ordered_csharp_resource_fragment(tmp_path):
+    proc = subprocess.run(
+        [
+            "uv",
+            "build",
+            "--wheel",
+            "--out-dir",
+            str(tmp_path),
+            "--no-build-isolation",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    wheel = next(tmp_path.glob("asecli-*.whl"))
+    with zipfile.ZipFile(wheel) as archive:
+        names = set(archive.namelist())
+
+    resource_root = "asecli/bridge/resources/"
+    assert {
+        resource_root + "asecli_material_gui.part00.cs.txt",
+        resource_root + "asecli_material_gui.part01.cs.txt",
+        resource_root + "editor_create.part00.cs.txt",
+        resource_root + "editor_create.part01.cs.txt",
+    } <= names
+    assert resource_root + "asecli_material_gui.cs.txt" not in names
+    assert resource_root + "editor_create.cs.txt" not in names

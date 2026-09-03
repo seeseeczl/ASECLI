@@ -1,0 +1,205 @@
+    }
+
+    bool saved = win.SaveToDisk(false);
+    if (!saved) throw new System.Exception("ASE SaveToDisk returned false");
+    var loadResult = win.LoadFromDisk(temporaryAssetPath, null);
+    bool reloaded = loadResult == AmplifyShaderEditor.ShaderLoadResult.LOADED ||
+        loadResult == AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED;
+    if (!reloaded) throw new System.Exception("ASE temporary LoadFromDisk failed: " + loadResult);
+
+    graph = win.CurrentGraph;
+    var reloadedMaster = graph.CurrentMasterNode as AmplifyShaderEditor.TemplateMultiPassMasterNode;
+    var reloadedShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(temporaryAssetPath);
+    if (reloadedMaster == null || reloadedMaster.CurrentTemplate == null || reloadedShader == null ||
+        reloadedMaster.CurrentTemplate.GUID != templateGuid ||
+        reloadedMaster.ShaderName != shaderName || reloadedShader.name != shaderName)
+        throw new System.Exception("template or shader identity changed after temporary reload");
+    var manifestNodes = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)
+    {
+        string alias = (string)nodeSpec["alias"];
+        string kind = (string)nodeSpec["kind"];
+        var actualNode = graph.GetNode(aliasIds[alias]);
+        if (actualNode == null) throw new System.Exception("node missing after reload: " + alias);
+        string expectedType = kind == "sampler" ? "SamplerNode" :
+            kind == "custom_expression" ? "CustomExpressionNode" : (string)nodeSpec["type"];
+        if (actualNode.GetType().Name != expectedType)
+            throw new System.Exception("node type changed after reload: " + alias);
+        var manifestNode = new Newtonsoft.Json.Linq.JObject();
+        manifestNode["alias"] = alias;
+        manifestNode["kind"] = kind;
+        manifestNode["type"] = actualNode.GetType().Name;
+        if (kind == "sampler" || kind == "property")
+        {
+            var property = actualNode as AmplifyShaderEditor.PropertyNode;
+            if (property.PropertyName != (string)nodeSpec["property_name"] ||
+                property.PropertyInspectorName != (string)nodeSpec["inspector_name"] ||
+                property.CurrentParameterType.ToString() != (string)nodeSpec["parameter_type"])
+                throw new System.Exception("property changed after reload: " + alias);
+            manifestNode["property_name"] = property.PropertyName;
+            manifestNode["inspector_name"] = property.PropertyInspectorName;
+            manifestNode["parameter_type"] = property.CurrentParameterType.ToString();
+        }
+        else if (kind == "custom_expression")
+        {
+            var expression = actualNode as AmplifyShaderEditor.CustomExpressionNode;
+            string actualName = (string)expressionNameField.GetValue(expression);
+            string actualCode = (string)expressionCodeField.GetValue(expression);
+            string actualOutputType = expression.OutputPorts[0].DataType.ToString();
+            if (actualName != (string)nodeSpec["name"] || actualCode != (string)nodeSpec["code"] ||
+                actualOutputType != (string)nodeSpec["output_type"])
+                throw new System.Exception("custom expression changed after reload: " + alias);
+            manifestNode["name"] = actualName;
+            manifestNode["code"] = actualCode;
+            manifestNode["output_type"] = actualOutputType;
+            var manifestInputs = new Newtonsoft.Json.Linq.JArray();
+            var expectedInputs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
+            if (expression.InputPorts.Count != expectedInputs.Count)
+                throw new System.Exception("custom expression input count changed after reload: " + alias);
+            for (int inputIndex = 0; inputIndex < expectedInputs.Count; inputIndex++)
+            {
+                var expectedInput = (Newtonsoft.Json.Linq.JObject)expectedInputs[inputIndex];
+                var actualInput = expression.InputPorts[inputIndex];
+                if (actualInput.Name != (string)expectedInput["name"] ||
+                    actualInput.DataType.ToString() != (string)expectedInput["type"])
+                    throw new System.Exception("custom expression input changed after reload: " + alias);
+                var manifestInput = new Newtonsoft.Json.Linq.JObject();
+                manifestInput["name"] = actualInput.Name;
+                manifestInput["type"] = actualInput.DataType.ToString();
+                manifestInputs.Add(manifestInput);
+            }
+            manifestNode["inputs"] = manifestInputs;
+        }
+        manifestNodes.Add(manifestNode);
+    }
+
+    var manifestConnections = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
+    {
+        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
+        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
+        string sourceAlias = (string)sourceSpec["node"];
+        string destinationAlias = (string)destinationSpec["node"];
+        int sourceNodeId = aliasIds[sourceAlias];
+        int destinationNodeId = destinationAlias == "master" ? masterId : aliasIds[destinationAlias];
+        int sourcePortId = (int)sourceSpec["port"];
+        int destinationPortId = (int)destinationSpec["port"];
+        var destinationPort = graph.GetNode(destinationNodeId).GetInputPortByUniqueId(destinationPortId);
+        if (destinationPort == null || !destinationPort.IsConnectedTo(sourceNodeId, sourcePortId))
+            throw new System.Exception("connection missing after reload");
+        manifestConnections.Add(connectionSpec.DeepClone());
+    }
+
+    string moveError = UnityEditor.AssetDatabase.MoveAsset(temporaryAssetPath, assetPath);
+    if (!string.IsNullOrEmpty(moveError)) throw new System.Exception("asset commit failed: " + moveError);
+    committed = true;
+    var targetShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(assetPath);
+    if (targetShader == null || targetShader.name != shaderName)
+        throw new System.Exception("shader identity changed after asset commit");
+
+    var result = new Newtonsoft.Json.Linq.JObject();
+    result["protocol"] = "ASECLI_EDITOR_CREATE_V1";
+    result["ase_version"] = aseVersion;
+    result["asset_path"] = assetPath;
+    result["template_guid"] = reloadedMaster.CurrentTemplate.GUID;
+    result["shader_name"] = targetShader.name;
+    result["saved"] = saved;
+    result["reloaded"] = reloaded;
+    result["committed"] = committed;
+    var manifest = new Newtonsoft.Json.Linq.JObject();
+    var manifestTemplate = new Newtonsoft.Json.Linq.JObject();
+    manifestTemplate["guid"] = reloadedMaster.CurrentTemplate.GUID;
+    manifestTemplate["shader_name"] = targetShader.name;
+    manifest["template"] = manifestTemplate;
+    manifest["nodes"] = manifestNodes;
+    manifest["connections"] = manifestConnections;
+    result["manifest"] = manifest;
+
+    UnityEditor.Selection.activeObject = previousSelection;
+    AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+    stateRestored = true;
+    if (win != null && win != previousWindow)
+    {
+        var createdWindow = win;
+        createdWindow.Close();
+        UnityEngine.Object.DestroyImmediate(createdWindow);
+        win = null;
+    }
+    success = true;
+    return "ASECLI_EDITOR_CREATE_V1:" + result.ToString(Newtonsoft.Json.Formatting.None);
+}
+catch (System.Exception ex)
+{
+    failure = ex;
+    throw;
+}
+finally
+{
+    var cleanupErrors = new System.Collections.Generic.List<string>();
+    if (win == null && AmplifyShaderEditor.UIUtils.CurrentWindow != previousWindow)
+        win = AmplifyShaderEditor.UIUtils.CurrentWindow as AmplifyShaderEditor.AmplifyShaderEditorWindow;
+    if (!success)
+    {
+        try
+        {
+            if (committed && !UnityEditor.AssetDatabase.DeleteAsset(assetPath) &&
+                System.IO.File.Exists(System.IO.Path.GetFullPath(assetPath)))
+                cleanupErrors.Add("failed to roll back committed target asset");
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("target rollback threw: " + cleanupEx.Message);
+        }
+        try
+        {
+            if (!UnityEditor.AssetDatabase.DeleteAsset(temporaryAssetPath) &&
+                System.IO.File.Exists(System.IO.Path.GetFullPath(temporaryAssetPath)))
+                cleanupErrors.Add("failed to delete temporary asset");
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("temporary cleanup threw: " + cleanupEx.Message);
+        }
+        try { UnityEditor.AssetDatabase.Refresh(); }
+        catch (System.Exception cleanupEx) { cleanupErrors.Add("AssetDatabase.Refresh threw: " + cleanupEx.Message); }
+    }
+    if (!stateRestored)
+    {
+        try
+        {
+            UnityEditor.Selection.activeObject = previousSelection;
+            AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+            stateRestored = true;
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("Editor state restore threw: " + cleanupEx.Message);
+        }
+    }
+    if (win != null && win != previousWindow)
+    {
+        try
+        {
+            win.Close();
+            UnityEngine.Object.DestroyImmediate(win);
+            win = null;
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("window cleanup threw: " + cleanupEx.Message);
+        }
+    }
+    if (cleanupErrors.Count > 0)
+    {
+        string cleanupMessage = string.Join(" | ", cleanupErrors.ToArray());
+        if (failure != null)
+        {
+            failure.Data["ASECLI cleanup failures"] = cleanupMessage;
+            UnityEngine.Debug.LogError("ASECLI Editor create cleanup failures: " + cleanupMessage);
+        }
+        else
+        {
+            throw new System.Exception("ASECLI Editor create cleanup failed: " + cleanupMessage);
+        }
+    }
+}

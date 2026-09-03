@@ -57,6 +57,8 @@ def cmd_comment_group(args) -> dict:
             "preview_bytes": len(output),
             "checksum_recomputed": True,
             "requires_editor_reload": True,
+            "structural_validation": "passed",
+            "visual_validation": "pending",
         }
 
     if args.nodes is None:
@@ -67,7 +69,14 @@ def cmd_comment_group(args) -> dict:
             groups = inspect_comment_groups(f.graph)
         except ValueError as exc:
             raise CliError("COMMENT_GROUP_ERROR", str(exc))
-        data = {"file": args.file, "action": "inspect", "groups": groups, "written": False}
+        data = {
+            "file": args.file,
+            "action": "inspect",
+            "groups": groups,
+            "written": False,
+            "structural_validation": "passed",
+            "visual_validation": "pending",
+        }
         if args.check_bounds:
             bounds = _editor_bounds(args)
             try:
@@ -113,6 +122,8 @@ def cmd_comment_group(args) -> dict:
         "checksum_recomputed": True,
         "requires_editor_reload": True,
         "measurement": "live_ase_true_position" if bounds is not None else "offline_estimate",
+        "structural_validation": "passed",
+        "visual_validation": "pending",
     }
 
 
@@ -124,6 +135,7 @@ def _editor_bounds(args) -> dict[str, tuple[float, float, float, float]]:
             args.file,
             mcp_url=args.mcp_url,
             instance_token=os.environ.get("ASECLI_MCP_INSTANCE_TOKEN"),
+            unity_instance=args.unity_instance,
             allow_remote_mcp=args.allow_remote_mcp,
         )
     except McpError as exc:

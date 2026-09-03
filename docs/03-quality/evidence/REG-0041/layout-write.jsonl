@@ -1,0 +1,4 @@
+{"ok": true, "data": {"moved": 7, "structural_validation": "passed", "visual_validation": "pending", "written": true, "path": "/tmp/asecli-e2e-v2-gui.VW6VWe/Assets/ASECLIVisualAcceptance/Small/StepAntialiasing.asset"}}
+{"ok": true, "data": {"moved": 14, "structural_validation": "passed", "visual_validation": "pending", "written": true, "path": "/tmp/asecli-e2e-v2-gui.VW6VWe/Assets/ASECLIVisualAcceptance/Medium/Receiver.shader"}}
+{"ok": true, "data": {"moved": 11, "structural_validation": "passed", "visual_validation": "pending", "written": true, "path": "/tmp/asecli-e2e-v2-gui.VW6VWe/Assets/ASECLIVisualAcceptance/Complex/VehicleLocalShadowCaster.shader"}}
+{"ok": true, "data": {"moved": 10, "structural_validation": "passed", "visual_validation": "pending", "written": true, "path": "/tmp/asecli-e2e-v2-gui.VW6VWe/Assets/ASECLIVisualAcceptance/Complex/VehicleLocalShadowReceiver.shader"}}

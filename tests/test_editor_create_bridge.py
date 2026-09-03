@@ -5,15 +5,21 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
-from asecli.bridge.editor_create import EDITOR_CREATE_SNIPPET, create_shader_via_mcp
+from asecli.bridge.editor_create import (
+    EDITOR_CREATE_RESOURCE_PARTS,
+    EDITOR_CREATE_SNIPPET,
+    create_shader_via_mcp,
+)
 from asecli.bridge.editor_spec import EditorGraphSpec
 from asecli.bridge.mcp_client import McpError
 
 
 TEMPLATE_GUID = "2992e84f91cbeb14eab234972e07ea9d"
+ROOT = Path(__file__).parents[1]
 
 
 def caster_spec() -> dict:
@@ -81,6 +87,8 @@ def test_executor_is_fixed_version_gated_transactional_and_closes_windows():
         "CreateNewTemplateShader",
         "CreateNode",
         "CreateConnection",
+        "sampler.AutoRegister = true",
+        "property.AutoRegister = true",
         "SaveToDisk(false)",
         "LoadFromDisk",
         "AssetDatabase.MoveAsset",
@@ -100,6 +108,20 @@ def test_executor_is_fixed_version_gated_transactional_and_closes_windows():
     post_commit = EDITOR_CREATE_SNIPPET.split("AssetDatabase.MoveAsset", 1)[1].split("catch (System.Exception ex)", 1)[0]
     assert "AssetDatabase.Refresh" not in post_commit
     assert "LoadFromDisk(assetPath" not in post_commit
+
+
+def test_editor_executor_fragments_preserve_one_byte_stable_transaction_payload():
+    resources = ROOT / "src/asecli/bridge/resources"
+    parts = [resources / name for name in EDITOR_CREATE_RESOURCE_PARTS]
+    assert all(path.is_file() for path in parts)
+    assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 205 for path in parts)
+    assert "".join(path.read_text(encoding="utf-8") for path in parts) == EDITOR_CREATE_SNIPPET
+    assert hashlib.sha256(EDITOR_CREATE_SNIPPET.encode("utf-8")).hexdigest() == (
+        "52fce4c5596ac0cb0bdaae388c2bc2e68d8e2ad4d0d39e00b196856c4b216cc4"
+    )
+    assert EDITOR_CREATE_SNIPPET.count("{payload_base64}") == 1
+    assert EDITOR_CREATE_SNIPPET.count("catch (System.Exception ex)") == 1
+    assert EDITOR_CREATE_SNIPPET.count("finally\n{") == 1
 
 
 def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):

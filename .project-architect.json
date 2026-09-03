@@ -1,27 +1,13 @@
 {
   "project_id": "PRJ-ASECLI",
   "profiles": ["core", "ai-agent"],
-  "source_roots": ["src"],
-  "loc_thresholds": {
-    "source": {"warning": 250, "limit": 400},
-    "test": {"warning": 400, "limit": 600},
-    "config": {"warning": 160, "limit": 200}
-  },
+  "source_roots": ["src", "tests", "tools"],
   "thresholds": {
     "source": {"warning": 250, "limit": 400},
     "test": {"warning": 400, "limit": 600},
     "config": {"warning": 160, "limit": 200}
   },
-  "loc_exemptions": [
-    {
-      "path": "src/asecli/bridge/resources/asecli_material_gui.cs.txt",
-      "reason": "Packed Unity ShaderGUI executor kept as a single installable resource; not a Python source file and must not be renamed to .cs."
-    },
-    {
-      "path": "src/asecli/bridge/resources/editor_create.cs.txt",
-      "reason": "Packed nonce-scoped Editor create transaction executor; splitting it would break the fixed C# payload contract."
-    }
-  ],
+  "loc_exemptions": [],
   "module_roots": ["src/asecli"],
   "module_public_patterns": [
     "__init__.py",
@@ -29,5 +15,9 @@
   ],
   "module_import_aliases": {},
   "fitness": {"module_dependency_warning": 5, "module_dependency_limit": 8},
-  "audit": {"output_dir": "docs/05-audits", "reuse_legacy_history": false}
+  "audit": {
+    "output_dir": "docs/05-audits",
+    "reuse_legacy_history": false,
+    "supplement": "docs/00-governance/audit-supplement.json"
+  }
 }

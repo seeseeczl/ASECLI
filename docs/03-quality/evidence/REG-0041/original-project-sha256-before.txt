@@ -1,0 +1,2 @@
+6059eed60fce8312c8929f7a13c43210d8be2dcbca9fc8fbb0ae7ec4c364f81f  /Users/long/Tuanjie3D/FlymeAuto3Test/Assets/Art/VehicleLocalShadow/Runtime/Shaders/VehicleLocalShadowCaster.shader
+cae1e512bc2625bba29e2978e56009b477091e8c04d918da149041515548e571  /Users/long/Tuanjie3D/FlymeAuto3Test/Assets/Art/VehicleLocalShadow/Runtime/Shaders/VehicleLocalShadowReceiver.shader

@@ -23,6 +23,7 @@ packages = ["src/asecli"]
 # Release/audit records contain artifact evidence and are kept outside the
 # distributable source archive to avoid self-referential checksum drift.
 exclude = [
+  "/docs/03-quality/evidence",
   "/docs/04-delivery/releases",
   "/docs/05-audits",
 ]
