@@ -28,7 +28,7 @@
 - 最大阻塞：正确项目与 ASE 1.9.6.2 已在本机找到，但目前缺少可发现的团结 `2022.3.61t9` Editor 可执行文件、运行中的 MCP 会话和隔离副本，不能执行 P1.1 新进程重开。
 - 最大回归风险：v0.2.0 已发布，而 `target_graph_reloaded=false` 对应的全新 Editor 进程验证仍未完成；当前测试只能证明暂存重载、独立 recompile 和同实例检查。
 - 第一优先优化方向：先在这台电脑补齐团结 2022.3.61t9 可执行文件与隔离工程，完成 v2 双进程闭环；随后修复 23 项 release-record 门禁和 `SECURITY.md` 的版本错位。
-- 问题统计：S0=0，S1=0，S2=0，S3=1；P0=0，P1=0，P2=1（整改后）
+- 问题统计：S0=0，S1=0，S2=0，S3=0；P0=0，P1=0，P2=0（最终整改后）
 
 ### 整改执行回写（2026-09-03）
 
@@ -42,9 +42,9 @@
 | AUD-SIZE-001 | 已解决 | “例外缺完整治理字段”问题已解除：两个资源均有最长 30 天、字段完整、可自动过期失败的例外；资源未拆分的债务继续由例外退出条件跟踪 |
 | AUD-FLOW-003 / AUD-FE-002 | 已解决 | REG-0041 固化语义 diff、ASE TruePosition、正常缩放截图与人工视觉签收；CLI 仍诚实返回 visual pending |
 | AUD-UI-001 | 已解决 | REG-0042 覆盖深/浅色、300/480px、Retina、长中文、Foldout、mixed、disabled、focus/Tab；修复 BUG-0019/0020 |
-| AUD-CI-001 | 开放 | 三项 Action 已换为官方 Node 24 固定 SHA并有 allowlist；远程 run 需下一次获准推送后才能关闭 |
+| AUD-CI-001 | 已解决 | run 33714089230 三项 job 全绿且全日志无 Node 20/Node 弃用警告；下载 artifact 的 hash/SPDX/供应链/隔离安装与 GUI 升级通过 |
 
-整改后开放审计问题只有 P2 的 Node 24 远程 run；CR-0014 已用确定性拼装和已知旧 GUI 可恢复升级关闭 C# 例外，不再等待 2026-10-03 续期。具体目标 Shader 的运行时材质绑定/平台编译/最终渲染仍按具体 Shader 任务验收。P0/P1 阻塞已清零；当前统计为 S0=0、S1=0、S2=0、S3=1，P0=0、P1=0、P2=1。Node 24 推送前不宣称远程完成。
+整改后本次审计问题已全部关闭；CR-0014 已用确定性拼装和已知旧 GUI 可恢复升级关闭 C# 例外，不再等待 2026-10-03 续期。具体目标 Shader 的运行时材质绑定/平台编译/最终渲染仍按具体 Shader 任务验收，不属于本次成熟度整改门槛。当前开放统计为 S0=0、S1=0、S2=0、S3=0，P0=0、P1=0、P2=0。
 
 ## 项目简介与功能作用
 
@@ -464,8 +464,8 @@
 
 ### AUD-CI-001 Actions Node runtime 弃用告警
 
-- 状态：开放
-- 整改证据：REG-0043 / TASK-0037；远程 run 待推送
+- 状态：已解决
+- 整改证据：REG-0043 / TASK-0037；run 33714089230 与 artifact 9877900476
 - 证据状态：已验证
 - 严重程度：S3
 - 优先级：P2
@@ -502,21 +502,21 @@
 ## 遗留问题
 
 - P1.1 已在隔离团结 `2022.3.61t9` + ASE `1.9.6.2` 双进程解除；P1.5/P1.6 真实画布与 Inspector 证据见 REG-0041/0042。
-- AUD-CI-001 仅剩下一次获准推送后的 Node 24 真实 GitHub Actions run；本轮未提交、未推送。
+- AUD-CI-001 已由 setup-uv v10.0.1 的真实 Node 24 run 33714089230 和下载 artifact 复验关闭。
 - C# 资源已通过 CR-0014 确定性拆分，EXC-0001/0002 已删除；已知 `0.2.0-original` GUI 的备份/复核/原子升级纳入公共能力，未知内容继续 `target_conflict`。
 
 ## 整改后验证记录
 
 | 检查 | 结果 | 状态 |
 | --- | --- | --- |
-| 全量 pytest | `234 passed, 3 skipped` | 通过；3 项为条件 bridge，真实双进程/UI 另有本轮实机证据 |
+| 全量 pytest | Python 3.10/3.12 均 `243 passed, 3 skipped` | 通过；3 项为条件 bridge，真实双进程/UI 另有本轮实机证据 |
 | REG catalog | `39/39` | 通过 |
 | standard collect + coverage + audit validate | 14 FM、15 FE、未遗漏；报告/任务书有效 | 通过 |
 | Project Architect 完整 strict | kickoff/trace/release/fitness 全部 0 finding | 通过 |
 | CI governance / supply chain | Action Node 24 allowlist、C# 分片 LOC、lock/hash/secret/license 均 0 finding；loc_exemptions 为空 | 通过 |
 | 可复现构建 | 两次 wheel/sdist SHA-256 完全一致；质量截图不进入 sdist | 通过 |
 | Editor/画布/Inspector | REG-0038、REG-0041、REG-0042 | 通过；目标业务渲染不在本次范围 |
-| Node 24 远程 CI | 未推送 | 未验证，不冒充通过 |
+| Node 24 远程 CI | run 33714089230 三项 job 全绿；全日志零 Node 20/Node 弃用警告；artifact `9877900476` 下载复验通过 | 通过 |
 
 ## CR-0014 门槛清零补充（2026-09-03）
 
@@ -529,6 +529,12 @@
 
 - [run 33713836753](https://github.com/seeseeczl/ASECLI/actions/runs/33713836753) 的 Python 3.10、Python 3.12 和 package 三项 job 全绿，已使用 Node 24 action 固定 SHA，不再出现 Node 20 强制兼容警告。
 - 全日志仍出现 setup-uv v7.1.6 的 `DEP0040`（`punycode`）与 `DEP0169`（`url.parse()`）弃用警告，因此 AUD-CI-001/REG-0043 保持开放，不能把“CI 全绿”冒充“弃用门槛清零”。
-- 上游最新不可变 release 为 setup-uv v10.0.1，tag 提交 `20cfd1bf945f4377ade1205e4dbc17946fc9a30d` 经 GitHub 验证签名且 `action.yml` 声明 `node24`；已更新 CI 与唯一 allowlist，等待第二次真实 run。
+- 上游最新不可变 release 为 setup-uv v10.0.1，tag 提交 `20cfd1bf945f4377ade1205e4dbc17946fc9a30d` 经 GitHub 验证签名且 `action.yml` 声明 `node24`；据此更新 CI 与唯一 allowlist并进入第二次真实 run，最终结果见下节。
+
+## Node 24 最终远程复验补充（2026-09-03）
+
+- [run 33714089230](https://github.com/seeseeczl/ASECLI/actions/runs/33714089230) 在 setup-uv v10.0.1 下完成 Python 3.10、Python 3.12、package；两套 Python 均为 `243 passed, 3 skipped`，全日志搜索 Node 20、`DeprecationWarning`、强制兼容与 warning 均为零命中。
+- artifact `9877900476`（GitHub digest `sha256:64443d0cdceee29265af89595b96aee0f5e2abd27a93450a371ca593a536724d`）下载后清单校验通过：wheel `8fe52d366ad2958eb7107f03b799183d68f89356bef6c2817d7262fe5feb203d`，sdist `4b0bade4650a686254b925d79de602e3c30818ddc5f58f22d086e4af0b594947`。
+- SPDX 2.3（14 packages）、供应链 0 finding/0 runtime dependency、wheel/sdist C# 分片成员、隔离 Python 3.12 安装/parse、已知旧 GUI `cf45c7d…b41b8` 到 `9541c54…c5b7a` 的 dry-run/备份/升级全部通过。AUD-CI-001/REG-0043 关闭。
 
 Product Design 本轮不适用：视觉方向和目标样式已经由用户与既有规范确定，本次只做真实界面验证和两个阻塞性展示缺陷的最小修复；使用 Computer Use 留存真实团结截图，不进行重新设计。
