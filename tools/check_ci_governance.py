@@ -10,7 +10,7 @@ from pathlib import Path
 
 NODE24_ACTION_REFS = {
     "actions/checkout": "93cb6efe18208431cddfb8368fd83d5badbf9bfd",
-    "astral-sh/setup-uv": "681c641aba71e4a1c380be3ab5e12ad51f415867",
+    "astral-sh/setup-uv": "20cfd1bf945f4377ade1205e4dbc17946fc9a30d",
     "actions/upload-artifact": "b7c566a772e6b6bfb58ed0dc250532a479d7789f",
 }
 

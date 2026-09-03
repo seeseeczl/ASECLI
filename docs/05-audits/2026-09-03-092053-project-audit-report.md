@@ -525,4 +525,10 @@
 - Editor：ASE `1.9.6.2` 从干净隔离 Assets 创建并完全退出，再由新进程重载，`1 passed/39.86s`。首次重载的包源 DNS 超时与随后暴露的空目录夹具缺陷均单独记录；BUG-0021 修复后以完整命令复验。
 - 证据：`docs/03-quality/evidence/REG-0044/`、`docs/03-quality/evidence/REG-0045/`。未使用 Unity 2021，未写生产工程。
 
+## Node 24 首次远程复验补充（2026-09-03）
+
+- [run 33713836753](https://github.com/seeseeczl/ASECLI/actions/runs/33713836753) 的 Python 3.10、Python 3.12 和 package 三项 job 全绿，已使用 Node 24 action 固定 SHA，不再出现 Node 20 强制兼容警告。
+- 全日志仍出现 setup-uv v7.1.6 的 `DEP0040`（`punycode`）与 `DEP0169`（`url.parse()`）弃用警告，因此 AUD-CI-001/REG-0043 保持开放，不能把“CI 全绿”冒充“弃用门槛清零”。
+- 上游最新不可变 release 为 setup-uv v10.0.1，tag 提交 `20cfd1bf945f4377ade1205e4dbc17946fc9a30d` 经 GitHub 验证签名且 `action.yml` 声明 `node24`；已更新 CI 与唯一 allowlist，等待第二次真实 run。
+
 Product Design 本轮不适用：视觉方向和目标样式已经由用户与既有规范确定，本次只做真实界面验证和两个阻塞性展示缺陷的最小修复；使用 Computer Use 留存真实团结截图，不进行重新设计。

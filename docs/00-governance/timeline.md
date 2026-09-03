@@ -49,3 +49,4 @@
 | 2026-09-03 | CI 治理 | checkout v5.0.1、setup-uv v7.1.6、upload-artifact v6.0.0 切换至官方 Node 24 固定 SHA；治理 allowlist 与回退测试通过。未提交/未推送，真实 GitHub run 保持未验证 | TASK-0037 REG-0043 AUD-CI-001 |
 | 2026-09-03 | 需求变更/治理 | CR-0014 将 583/410 行 C# 资源拆为确定性有序片段，拼装 SHA-256 和 Editor 单事务边界不变；EXC-0001/0002 删除。已知 `0.2.0-original` GUI 新增 dry-run、备份、复核和原子替换，未知/并发/符号链接仍拒绝 | CR-0014 ADR-0016 TASK-0038 TASK-0039 TASK-0040 REG-0044 REG-0045 AUD-SIZE-001 |
 | 2026-09-03 | 实机验证/缺陷 | 旧 GUI 升级后团结 `2022.3.61t9` C# 编译与元数据读取 `1 passed/26.15s`；ASE `1.9.6.2` 从干净 Assets 创建后全新进程重载先暴露空 Generated 目录被刷新移除，BUG-0021 修复后完整命令 `1 passed/39.86s`。包源 DNS 临时失败单独记录，不冒充代码失败或通过 | CR-0014 BUG-0021 REG-0045 TASK-0038 TASK-0040 |
+| 2026-09-03 | 远程 CI 复验 | [run 33713836753](https://github.com/seeseeczl/ASECLI/actions/runs/33713836753) 的 Python 3.10、3.12、package 全绿且不再有 Node 20 强制兼容警告；日志审计仍发现 setup-uv v7.1.6 输出 `DEP0040`/`DEP0169`，因此 REG-0043 未关闭并继续升级到官方不可变 v10.0.1 | TASK-0037 REG-0043 AUD-CI-001 |

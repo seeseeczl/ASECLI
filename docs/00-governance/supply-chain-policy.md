@@ -37,7 +37,7 @@ evidence: [uv.lock, LICENSE, SECURITY.md, tools/supply_chain_check.py, tools/gen
 | --- | --- | --- |
 | uv | 0.11.14 / astral-sh | lock、双 Python、构建、隔离安装 |
 | actions/checkout | v5.0.1 / `93cb6efe18208431cddfb8368fd83d5badbf9bfd` / Node 24 | CI checkout |
-| astral-sh/setup-uv | v7.1.6 / `681c641aba71e4a1c380be3ab5e12ad51f415867` / Node 24 | CI uv/Python |
+| astral-sh/setup-uv | v10.0.1 / `20cfd1bf945f4377ade1205e4dbc17946fc9a30d` / Node 24 | CI uv/Python |
 | actions/upload-artifact | v6.0.0 / `b7c566a772e6b6bfb58ed0dc250532a479d7789f` / Node 24 | CI artifact；要求 GitHub Actions Runner `>=2.327.1`，当前 `ubuntu-latest` 满足，若引入 self-hosted runner 必须重新核对 |
 
 上述版本与 SHA 已通过官方 GitHub tag/API 只读核对；本地治理只证明配置与 allowlist 正确。Node 24 新组合的远程 GitHub CI 仍需下一次获准推送后的真实 run 验证；Dependabot 和漏洞数据库状态仍需远程 alert 证据。

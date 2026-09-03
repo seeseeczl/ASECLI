@@ -223,7 +223,7 @@ P2 可选优化
 - P1.4 后续清零：CR-0014 将 GUI/Editor C# 分别拆为 300/283 与 205/205 行片段，拼装字节与单事务边界不变；EXC-0001/0002 删除。已知旧 GUI 的备份/复核/原子升级及失败恢复自动通过，团结 `2022.3.61t9` GUI 编译 `1 passed/26.15s`，ASE `1.9.6.2` 干净隔离双进程 `1 passed/39.86s`。
 - P1.5：四类真实图的 wire/计算语义保持不变，TruePosition containment 与正常缩放画布人工验收通过；证据见 `docs/03-quality/evidence/REG-0041/`。
 - P1.6：发现并修复长中文标签截断和 Tooltip 浮点噪声；深/浅色、300/480px、Retina、Foldout、mixed、disabled、focus/Tab 通过；证据见 `docs/03-quality/evidence/REG-0042/`。
-- P2.1：checkout v5.0.1、setup-uv v7.1.6、upload-artifact v6.0.0 已切换官方 Node 24 固定 SHA，并新增 allowlist 防回退。因本轮未获推送授权，远程 Actions run 不冒充完成。
+- P2.1：checkout v5.0.1、setup-uv、upload-artifact 已切换官方 Node 24 固定 SHA并新增 allowlist 防回退。首次授权推送后的 run 33713836753 三项 job 全绿且清除了 Node 20 强制兼容警告，但日志仍暴露 setup-uv v7.1.6 的 `DEP0040`/`DEP0169`；门槛保持开放并升级到当前官方不可变 v10.0.1，等待第二次远程 run。
 - 计划外发现已处理：已知 `0.2.0-original` 旧 GUI 已具备可恢复升级；任意未知内容仍以 `target_conflict` 安全拒绝。干净 E2E 的空 Generated 目录会被首次刷新移除，已登记 BUG-0021 并用隐藏占位修复。
 
 ## 进度更新模板

@@ -73,7 +73,7 @@
 - 可复现实现：Hatchling 版本进入 dev lock，CI 使用 `--no-build-isolation`；两次构建输出写入 runner 临时目录，禁止第一次产物进入第二个 sdist。比较失败时保存 hash、gzip header 与 tar 成员元数据/内容差异，但正式 dist 仍阻塞。
 - 安全：离线高置信 secret、Action pin、lock hash 门禁；生产依赖为 0。在线漏洞数据库必须用真实 CI/Dependabot 证据单独解除“未验证”。
 - 发布：本地 REL draft 不等于远程 Release；没有 push/run/artifact 链接时不得标 released。
-- 2026-09-03 运行时维护：checkout v5.0.1、setup-uv v7.1.6、upload-artifact v6.0.0 采用官方 Node 24 tag 对应的完整 commit SHA；`tools/check_ci_governance.py` 维护唯一 allowlist 并拒绝回退。`upload-artifact` v6 要求 Runner `>=2.327.1`，当前只使用 GitHub 托管 `ubuntu-latest`；若引入 self-hosted runner 必须重新评估。
+- 2026-09-03 运行时维护：checkout v5.0.1、setup-uv v10.0.1、upload-artifact v6.0.0 采用官方 Node 24 tag 对应的完整 commit SHA；`tools/check_ci_governance.py` 维护唯一 allowlist 并拒绝回退。首次远程 run 33713836753 证明 setup-uv v7.1.6 虽为 Node 24 action，仍输出 `punycode`/`url.parse()` 弃用警告，因此升级至当前官方不可变 v10.0.1。`upload-artifact` v6 要求 Runner `>=2.327.1`，当前只使用 GitHub 托管 `ubuntu-latest`；若引入 self-hosted runner 必须重新评估。
 
 ### ADR-0010 自定义材质 GUI 采用语义命令与图元数据事实源
 
