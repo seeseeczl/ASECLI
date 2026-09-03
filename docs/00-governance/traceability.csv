@@ -25,7 +25,7 @@ BUG-0006,缺陷,已解决,ADR-0006,MOD-CHECK MOD-CLI,TASK-0009,REG-0004 REG-0018
 BUG-0007,缺陷,已解决,ADR-0001,MOD-CORE,TASK-0014,REG-0011,2026-09-01 1007 节点 5 轮通过,,long,性能假门禁
 BUG-0008,缺陷,已解决,ADR-0001,MOD-CLI,TASK-0016,REG-0020,2026-09-01 catalog 18 条可收集,,long,治理路径漂移
 BUG-0009,缺陷,已解决,ADR-0008,MOD-CORE MOD-CLI,TASK-0017,REG-0019,2026-09-01 自动回归通过,,long,跨模块私有导入
-CR-0006,变更,已确认,ADR-0009,MOD-CLI,TASK-0018 TASK-0019 TASK-0037,REG-0021 REG-0043,2026-09-03 run 33714089230 三项 job 全绿且全日志无 Node 20/Node 弃用警告；artifact 9877900476 下载后 hash/SPDX/供应链/隔离安装与 GUI 升级复验通过,REL-0001 REL-0002 REL-0003,long,CI REL 与供应链基线；公开包仓仍未发布
+CR-0006,变更,已确认,ADR-0009,MOD-CLI,TASK-0018 TASK-0019 TASK-0037 TASK-0041,REG-0021 REG-0043,2026-09-03 v0.3.0 run 33714746589、正式资产五项清单、在线漏洞扫描、安装与 v0.2.0 回滚通过,REL-0001 REL-0002 REL-0003 REL-0004,long,CI REL 与供应链基线；公开包仓仍未发布
 FR-0011,功能,已确认,ADR-0012 ADR-0015,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028 TASK-0032 TASK-0033,REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 REG-0040,2026-09-03 v2 规格与 CLI 后验治理自动通过；团结 2022.3.61t9 + ASE 1.9.6.2 完成创建进程与全新重开进程对账；0 error 且无暂存残留,REL-0003,long,正式 CLI 使用 EditorGraphSpec v2 强制属性呈现；双进程兼容性阻塞已解除
 CR-0008,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028,REG-0026 REG-0027 REG-0028 REG-0029,2026-09-01 自动回归与隔离团结双进程 E2E 通过,,long,离线文本与窄范围 Editor 后端按能力路由；目标画面待验
 CR-0009,变更,已确认,ADR-0009 ADR-0010 ADR-0012 ADR-0013,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI,TASK-0029,REG-0031 REG-0032 REG-0033 REG-0034 REG-0035,2026-09-01 自动与 GitHub run 33510909955 artifact 通过；真实 GUI probe 待验,,long,第二轮对抗性审计整改
@@ -38,10 +38,10 @@ BUG-0015,缺陷,已解决,ADR-0014,MOD-GUI-SUPPORT,TASK-0031,REG-0036,2026-09-02
 CR-0011,变更,已确认,ADR-0014,MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI,TASK-0031,REG-0036,2026-09-02 全量 208 passed/3 skipped；当前团结 Inspector 与 Console 通过；strict 与 HEAD 同为 29 项历史问题,,long,gui-support additive 公开 asecli.inline-help.v1 并在失效时写前拒绝；待后续发布
 CR-0012,变更,已确认,ADR-0015,MOD-CUSTOM-GUI MOD-BRIDGE MOD-CLI,TASK-0032 TASK-0033 TASK-0036,REG-0037 REG-0038 REG-0039 REG-0040 REG-0042,2026-09-03 v2 双进程、Inspector 矩阵与 Tooltip 默认值反射通过；v0.2.0 私有 Release 证据保持有效,REL-0003,long,asecli.property-presentation.v1 强制所有 CLI create 输出；长中文和浮点默认值显示已纳入回归
 CR-0013,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0032,REG-0038,2026-09-02 失败优先契约测试后 editor_create 与 CLI 回归断言 staging_reloaded 与 target_graph_reloaded；随 v0.2.0 私有正式 Release 交付,REL-0003,long,create JSON 区分暂存重载与目标图重载；reloaded 保留为暂存兼容别名
-CR-0014,变更,已确认,ADR-0016,MOD-BRIDGE MOD-GUI-SUPPORT,TASK-0038 TASK-0039 TASK-0040,REG-0044 REG-0045,2026-09-03 确定性拼装与已知旧 GUI 升级自动通过；团结 2022.3.61t9 GUI 编译及 ASE 1.9.6.2 双进程通过,,long,运行时字节与单事务不变；已知旧哈希可备份升级；未知内容继续拒绝
+CR-0014,变更,已确认,ADR-0016,MOD-BRIDGE MOD-GUI-SUPPORT,TASK-0038 TASK-0039 TASK-0040 TASK-0041,REG-0044 REG-0045,2026-09-03 确定性拼装、已知旧 GUI 升级、团结 2022.3.61t9/ASE 1.9.6.2 实机及 v0.3.0 正式 wheel 复验通过,REL-0004,long,运行时字节与单事务不变；已知旧哈希可备份升级；未知内容继续拒绝
 BUG-0016,缺陷,已解决,ADR-0012,MOD-BRIDGE,TASK-0032,REG-0038,2026-09-02 自动回归和当前团结 2022.3.61t9/MCP 3.4.7 v2 创建与重编译通过,REL-0003,long,兼容 execute_code data.result envelope和安全扫描；移除回执前重复目标图加载
 BUG-0017,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0039,2026-09-02 GitHub run 33637146781 动态 0.2.0 包路径通过；私有 Release 已发布,REL-0003,long,0.2.0 package job 不得硬编码 0.1.0 artifact 路径
 BUG-0018,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0040,2026-09-02 run 33637146781 下载 artifact SHA256SUMS 可直接校验；私有 Release 五项载荷复验通过,REL-0003,long,artifact 校验清单不得包含 CI 工作区 dist 路径前缀
-BUG-0019,缺陷,已解决,ADR-0014,MOD-GUI-SUPPORT,TASK-0036,REG-0042,2026-09-03 300/480px 深浅色真实 Inspector 与自动测试通过,,long,超长中文属性标签改为换行并让字段独占下一行
-BUG-0020,缺陷,已解决,ADR-0014,MOD-GUI-SUPPORT,TASK-0036,REG-0042,2026-09-03 自动测试和真实 Editor 默认值反射通过,,long,Tooltip 默认值使用最多六位小数避免二进制浮点噪声
-BUG-0021,缺陷,已解决,ADR-0016,MOD-BRIDGE,TASK-0038,REG-0045,2026-09-03 干净隔离工程先失败后完整双进程 1 passed/39.86s,,long,用隐藏占位保护首次 AssetDatabase Refresh 前的 Generated 目录
+BUG-0019,缺陷,已解决,ADR-0014,MOD-GUI-SUPPORT,TASK-0036,REG-0042,2026-09-03 300/480px 深浅色真实 Inspector 与自动测试通过；随 v0.3.0 发布,REL-0004,long,超长中文属性标签改为换行并让字段独占下一行
+BUG-0020,缺陷,已解决,ADR-0014,MOD-GUI-SUPPORT,TASK-0036,REG-0042,2026-09-03 自动测试和真实 Editor 默认值反射通过；随 v0.3.0 发布,REL-0004,long,Tooltip 默认值使用最多六位小数避免二进制浮点噪声
+BUG-0021,缺陷,已解决,ADR-0016,MOD-BRIDGE,TASK-0038,REG-0045,2026-09-03 干净隔离工程双进程 1 passed/39.86s；随 v0.3.0 发布,REL-0004,long,用隐藏占位保护首次 AssetDatabase Refresh 前的 Generated 目录
