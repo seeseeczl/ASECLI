@@ -24,6 +24,7 @@ from .create_command import cmd_create
 from .custom_gui_command import cmd_custom_gui
 from .gui_support_command import cmd_gui_support
 from .commentary_command import cmd_comment_group
+from .skill_command import cmd_install_skill
 from .usage_command import cmd_graph_audit, cmd_remove_node
 
 
@@ -129,6 +130,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("project", help="Unity/Tuanjie project root containing Assets and ProjectSettings")
     s.add_argument("--write", action="store_true", help="install the built-in ASECLI material GUI when needed")
     s.set_defaults(func=cmd_gui_support)
+
+    s = sub.add_parser("install-skill", help="install the bundled ASECLI Agent Skill for Codex")
+    s.add_argument(
+        "--skill-root",
+        help="Codex skills directory; defaults to $CODEX_HOME/skills or ~/.codex/skills",
+    )
+    s.set_defaults(func=cmd_install_skill)
 
     s = sub.add_parser("comment-group", help="inspect or create native ASE Comment frames")
     s.add_argument("file")

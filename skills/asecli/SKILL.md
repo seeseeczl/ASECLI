@@ -1,9 +1,11 @@
 ---
 name: asecli
-description: Create, modify, validate, layout, install or configure grouped and explained custom material GUI, organize graphs with native Comment frames, and compile Amplify Shader Editor (ASE) shader files via the asecli CLI. Use whenever the user asks to edit or create ASE shaders in a Tuanjie/Unity project.
+description: Create, modify, validate, and strictly lay out Amplify Shader Editor (ASE) graphs; configure explained material properties, native Comment frames, and compilation through asecli. Use for ASE shader work in Unity or Tuanjie, especially when graph layout or canvas readability matters.
 ---
 
 # AseCLI — Agent 操作 ASE Shader 指南
+
+当任务涉及节点图新建、转换、整理或验收时，先读取本文引用的“ASE 节点图精排规范”；它是 ASECLI 交付物的一部分，不是临时 Agent 记忆。离线结构检查和真实 ASE 画布视觉验收必须分开报告。
 
 ## 核心事实（必读）
 
@@ -52,7 +54,7 @@ asecli fix-checksum <file> --write
 
 ### 链路 C：提示文案与分组（写元数据不需要 Unity，最终生效需要重编译）
 
-创建或整理公开材质属性时，必须先读 [ASE 材质属性呈现规范](references/material-property-standard.md)。CLI 以 `asecli.property-presentation.v1` 强制前三层：中文显示名；Tooltip 自动展示英文变量名与 Shader 默认值；控件下方中文 HelpBox 解释用途和调节结果。中文 Foldout 分组按语义选用。
+创建或整理公开材质属性时，必须先读 [ASE 材质属性呈现规范](references/material-property-standard.md)。CLI 以 `asecli.property-presentation.v1` 强制前三层：中文显示名；Tooltip 自动展示英文变量名与 Shader 默认值；控件下方中文 HelpBox 解释用途和调节结果。中文 Foldout 按材质功能层组织，组内按开关、输入、颜色、混合和表面响应的实际依赖顺序排列。
 
 ```bash
 # 检查唯一 ASECLI GUI 的固定安装路径；provider=missing 时安装内置层

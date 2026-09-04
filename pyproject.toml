@@ -1,6 +1,6 @@
 [project]
 name = "asecli"
-version = "0.3.0"
+version = "0.3.1"
 description = "Agent-native CLI for reading, modifying, validating and compiling Amplify Shader Editor assets"
 requires-python = ">=3.10"
 dependencies = []
@@ -18,6 +18,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/asecli"]
+
+# The Agent Skill is a versioned part of the CLI deliverable.  Keep its
+# authoring location discoverable at the repository root while shipping it
+# inside the Python package so `asecli install-skill` can install it after a
+# wheel-based CLI install.
+[tool.hatch.build.targets.wheel.force-include]
+"skills/asecli" = "asecli/skills/asecli"
 
 [tool.hatch.build.targets.sdist]
 # Release/audit records contain artifact evidence and are kept outside the

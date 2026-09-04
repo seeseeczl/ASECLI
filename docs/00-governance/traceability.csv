@@ -39,6 +39,7 @@ CR-0011,变更,已确认,ADR-0014,MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI,TASK-0031,R
 CR-0012,变更,已确认,ADR-0015,MOD-CUSTOM-GUI MOD-BRIDGE MOD-CLI,TASK-0032 TASK-0033 TASK-0036,REG-0037 REG-0038 REG-0039 REG-0040 REG-0042,2026-09-03 v2 双进程、Inspector 矩阵与 Tooltip 默认值反射通过；v0.2.0 私有 Release 证据保持有效,REL-0003,long,asecli.property-presentation.v1 强制所有 CLI create 输出；长中文和浮点默认值显示已纳入回归
 CR-0013,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0032,REG-0038,2026-09-02 失败优先契约测试后 editor_create 与 CLI 回归断言 staging_reloaded 与 target_graph_reloaded；随 v0.2.0 私有正式 Release 交付,REL-0003,long,create JSON 区分暂存重载与目标图重载；reloaded 保留为暂存兼容别名
 CR-0014,变更,已确认,ADR-0016,MOD-BRIDGE MOD-GUI-SUPPORT,TASK-0038 TASK-0039 TASK-0040 TASK-0041,REG-0044 REG-0045,2026-09-03 确定性拼装、已知旧 GUI 升级、团结 2022.3.61t9/ASE 1.9.6.2 实机及 v0.3.0 正式 wheel 复验通过,REL-0004,long,运行时字节与单事务不变；已知旧哈希可备份升级；未知内容继续拒绝
+CR-0015,变更,已确认,ADR-0009,MOD-CLI MOD-SKILL,TASK-0042,REG-0046,2026-09-04 Skill validator、wheel 成员与隔离 uv tool 安装后 Skill 写入通过,,long,随 wheel 分发 ASECLI Skill；安装同内容幂等且不同内容拒绝覆盖
 BUG-0016,缺陷,已解决,ADR-0012,MOD-BRIDGE,TASK-0032,REG-0038,2026-09-02 自动回归和当前团结 2022.3.61t9/MCP 3.4.7 v2 创建与重编译通过,REL-0003,long,兼容 execute_code data.result envelope和安全扫描；移除回执前重复目标图加载
 BUG-0017,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0039,2026-09-02 GitHub run 33637146781 动态 0.2.0 包路径通过；私有 Release 已发布,REL-0003,long,0.2.0 package job 不得硬编码 0.1.0 artifact 路径
 BUG-0018,缺陷,已解决,ADR-0009,MOD-CLI,TASK-0032,REG-0040,2026-09-02 run 33637146781 下载 artifact SHA256SUMS 可直接校验；私有 Release 五项载荷复验通过,REL-0003,long,artifact 校验清单不得包含 CI 工作区 dist 路径前缀
