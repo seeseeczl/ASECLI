@@ -128,7 +128,7 @@ def _cmd_create_editor(args, spec) -> dict:
             allow_remote_mcp=args.allow_remote_mcp,
         )
     except McpError as exc:
-        raise CliError("BRIDGE_ERROR", str(exc)) from exc
+        raise CliError("BRIDGE_ERROR", str(exc), exc.data) from exc
     except FileExistsError as exc:
         raise CliError("USAGE_ERROR", str(exc)) from exc
     except FileNotFoundError as exc:

@@ -8,6 +8,7 @@ Handles both plain-JSON and SSE-framed responses.
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -16,7 +17,9 @@ from .. import __version__
 
 
 class McpError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, data: dict | None = None):
+        super().__init__(message)
+        self.data = data
 
 
 def redact(text: str, *secrets: str | None) -> str:
@@ -24,6 +27,25 @@ def redact(text: str, *secrets: str | None) -> str:
         if secret:
             text = text.replace(secret, "<redacted>")
     return text
+
+
+def _timeout_error(
+    phase: str,
+    started: float,
+    budget: float,
+    *,
+    now: float | None = None,
+) -> McpError:
+    elapsed_ms = max(0, round(((time.monotonic() if now is None else now) - started) * 1000))
+    budget_ms = max(0, round(budget * 1000))
+    return McpError(
+        f"MCP {phase} timed out after {elapsed_ms} ms (budget {budget_ms} ms)",
+        data={
+            "phase": phase,
+            "elapsed_ms": elapsed_ms,
+            "budget_ms": budget_ms,
+        },
+    )
 
 
 def validate_mcp_url(url: str, allow_remote: bool = False) -> str:
@@ -71,8 +93,9 @@ class McpClient:
         url: str,
         instance_token: str | None = None,
         timeout: float = 120.0,
-        connect_timeout: float = 20.0,
         allow_remote: bool = False,
+        *,
+        connect_timeout: float = 20.0,
     ):
         self.url = validate_mcp_url(url, allow_remote=allow_remote)
         self.instance_token = instance_token
@@ -84,6 +107,9 @@ class McpClient:
 
     def _post(self, payload: dict, *, timeout: float | None = None) -> dict | None:
         expected_id = payload.get("id")
+        phase = str(payload.get("method", "request"))
+        effective_timeout = self.timeout if timeout is None else timeout
+        started = time.monotonic()
         body = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
         if self.session_id:
@@ -92,7 +118,7 @@ class McpClient:
             headers["X-Unity-Instance-Token"] = self.instance_token
         req = urllib.request.Request(self.url, data=body, headers=headers, method="POST")
         try:
-            with self._opener.open(req, timeout=self.timeout if timeout is None else timeout) as resp:
+            with self._opener.open(req, timeout=effective_timeout) as resp:
                 sid = resp.headers.get("Mcp-Session-Id")
                 if sid:
                     self.session_id = sid
@@ -102,8 +128,12 @@ class McpClient:
             detail = redact(e.read().decode("utf-8", "replace")[:300], self.instance_token)
             raise McpError(f"HTTP {e.code}: {detail}") from e
         except urllib.error.URLError as e:
+            if isinstance(e.reason, TimeoutError):
+                raise _timeout_error(phase, started, effective_timeout) from e
             detail = redact(str(e.reason), self.instance_token)
             raise McpError(f"cannot reach MCP server: {detail}") from e
+        except TimeoutError as e:
+            raise _timeout_error(phase, started, effective_timeout) from e
         if "text/event-stream" in ctype:
             collected: list[dict] = []
             for line in raw.splitlines():
@@ -157,6 +187,16 @@ class McpClient:
         return resp
 
     def connect(self) -> dict:
+        started = time.monotonic()
+        deadline = started + self.connect_timeout
+
+        def remaining(phase: str) -> float:
+            now = time.monotonic()
+            value = deadline - now
+            if value > 0:
+                return value
+            raise _timeout_error(phase, started, self.connect_timeout, now=now)
+
         resp = self._rpc(
             "initialize",
             {
@@ -164,13 +204,13 @@ class McpClient:
                 "capabilities": {},
                 "clientInfo": {"name": "asecli", "version": __version__},
             },
-            timeout=self.connect_timeout,
+            timeout=remaining("initialize"),
         )
         self._rpc(
             "notifications/initialized",
             {},
             notify=True,
-            timeout=self.connect_timeout,
+            timeout=remaining("notifications/initialized"),
         )
         return resp.get("result", {}).get("serverInfo", {})
 

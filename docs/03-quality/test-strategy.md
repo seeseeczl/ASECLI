@@ -25,7 +25,7 @@
 | 场景 | 命令 | 要求 |
 | --- | --- | --- |
 | 本地/PR | `uv run pytest -q` | 全绿 |
-| REG 文档 | `python3 tools/check_regression_catalog.py` | 所有登记 pytest 文件/节点可收集 |
+| REG 文档 | `python3 tools/check_regression_catalog.py` | 所有 pytest 代码片段可解析，环境变量/uv 选项被分类，登记文件/节点单进程可收集且 `missed=0` |
 | 里程碑 | `uv run pytest -q -m "not bridge"` + 架构校验脚本 | 全绿且追溯完整 |
 | 发布前 | 全量含 bridge + 快速审计 | S0/S1 清零 |
 

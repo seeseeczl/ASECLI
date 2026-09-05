@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate that every pytest command in the REG catalog still collects."""
+"""Validate that every pytest selector in the REG catalog still collects."""
 
 from __future__ import annotations
 
@@ -8,39 +8,77 @@ import json
 import re
 import shlex
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 
-COMMAND_RE = re.compile(r"`(uv run pytest [^`]+)`")
+PYTEST_SPAN_RE = re.compile(r"`([^`\r\n]*\bpytest\b[^`\r\n]*)`")
+ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
-def catalog_commands(catalog: Path) -> list[tuple[str, list[str]]]:
+@dataclass(frozen=True)
+class CatalogCommand:
+    text: str
+    pytest_args: tuple[str, ...]
+    selectors: tuple[str, ...]
+    conditional: bool
+
+
+def catalog_command_spans(catalog: Path) -> list[str]:
+    return PYTEST_SPAN_RE.findall(catalog.read_text(encoding="utf-8"))
+
+
+def _parse_command(command: str) -> CatalogCommand:
+    parts = shlex.split(command)
+    for uv_index in range(len(parts) - 2):
+        if parts[uv_index : uv_index + 2] != ["uv", "run"]:
+            continue
+        try:
+            pytest_index = parts.index("pytest", uv_index + 2)
+        except ValueError:
+            continue
+        pytest_args = tuple(parts[pytest_index + 1 :])
+        selectors = tuple(
+            item for item in pytest_args if item.split("::", 1)[0].endswith(".py")
+        )
+        conditional = any(ENV_ASSIGN_RE.match(item) for item in parts[:uv_index]) or any(
+            item == "bridge" and pytest_args[index - 1] in {"-m", "--markexpr"}
+            for index, item in enumerate(pytest_args)
+            if index > 0
+        )
+        return CatalogCommand(command, pytest_args, selectors, conditional)
+    raise ValueError("pytest code span is not a supported 'uv run ... pytest' command")
+
+
+def catalog_commands(catalog: Path) -> tuple[list[CatalogCommand], list[dict[str, str]]]:
     commands = []
-    for command in COMMAND_RE.findall(catalog.read_text(encoding="utf-8")):
-        parts = shlex.split(command)
-        commands.append((command, parts[3:]))
-    return commands
+    failures = []
+    for command in catalog_command_spans(catalog):
+        try:
+            commands.append(_parse_command(command))
+        except (ValueError, IndexError) as exc:
+            failures.append({"command": command, "detail": str(exc)})
+    return commands, failures
 
 
-def _run_collect(root: Path, pytest_args: list[str]) -> subprocess.CompletedProcess[str]:
+def _unique_selectors(commands: list[CatalogCommand]) -> list[str]:
+    combined = []
+    seen = set()
+    for command in commands:
+        for selector in command.selectors:
+            if selector not in seen:
+                seen.add(selector)
+                combined.append(selector)
+    return combined
+
+
+def _run_collect(root: Path, selectors: list[str] | tuple[str, ...]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["uv", "run", "--frozen", "pytest", "--collect-only", "-q", *pytest_args],
+        ["uv", "run", "--frozen", "pytest", "--collect-only", "-q", *selectors],
         cwd=root,
         capture_output=True,
         text=True,
     )
-
-
-def _unique_pytest_args(commands: list[tuple[str, list[str]]]) -> list[str]:
-    """Combine catalog selectors while preserving their first-seen order."""
-    combined = []
-    seen = set()
-    for _, pytest_args in commands:
-        for item in pytest_args:
-            if item not in seen:
-                seen.add(item)
-                combined.append(item)
-    return combined
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,19 +87,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--catalog", type=Path, default=root / "docs/03-quality/regression-catalog.md")
     args = parser.parse_args(argv)
 
-    failures = []
-    commands = catalog_commands(args.catalog)
-    combined = _run_collect(root, _unique_pytest_args(commands))
-    if combined.returncode != 0:
-        # The normal path starts pytest once. Fall back to individual commands
-        # only on failure so diagnostics still identify the broken catalog row.
-        for command, pytest_args in commands:
-            proc = _run_collect(root, pytest_args)
+    spans = catalog_command_spans(args.catalog)
+    commands, failures = catalog_commands(args.catalog)
+    combined = None if failures else _run_collect(root, _unique_selectors(commands))
+    if combined is not None and combined.returncode != 0:
+        for command in commands:
+            proc = _run_collect(root, command.selectors)
             if proc.returncode != 0:
-                failures.append({"command": command, "detail": (proc.stdout + proc.stderr)[-800:]})
+                failures.append(
+                    {"command": command.text, "detail": (proc.stdout + proc.stderr)[-800:]}
+                )
 
-    print(json.dumps({"ok": not failures, "checked": len(commands), "failures": failures}, ensure_ascii=False))
-    return 0 if not failures else 1
+    payload = {
+        "ok": not failures and len(commands) == len(spans),
+        "checked": len(spans),
+        "parsed": len(commands),
+        "conditional": sum(command.conditional for command in commands),
+        "missed": len(spans) - len(commands),
+        "failures": failures,
+    }
+    print(json.dumps(payload, ensure_ascii=False))
+    return 0 if payload["ok"] else 1
 
 
 if __name__ == "__main__":

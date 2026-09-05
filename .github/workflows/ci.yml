@@ -27,6 +27,8 @@ jobs:
       - run: uv lock --check
       - run: uv sync --frozen --python ${{ matrix.python-version }}
       - run: uv run --frozen --python ${{ matrix.python-version }} pytest -q
+      - name: Validate regression catalog coverage
+        run: uv run --frozen --python ${{ matrix.python-version }} python tools/check_regression_catalog.py
       - run: uv run --frozen --python ${{ matrix.python-version }} python tools/check_ci_governance.py
 
   package:

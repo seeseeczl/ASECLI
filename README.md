@@ -39,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.4.1`；需要回滚时可安装不可变的 `v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.4.2`；需要回滚时可安装不可变的 `v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -47,11 +47,11 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 gh auth login
-mkdir asecli-v0.4.1
-cd asecli-v0.4.1
-gh release download v0.4.1 --repo seeseeczl/ASECLI
+mkdir asecli-v0.4.2
+cd asecli-v0.4.2
+gh release download v0.4.2 --repo seeseeczl/ASECLI
 shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.4.1-py3-none-any.whl
+uv tool install ./asecli-0.4.2-py3-none-any.whl
 asecli install-skill
 asecli --help
 ```
@@ -59,7 +59,7 @@ asecli --help
 `uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
 
 ```bash
-uv tool install --force ./asecli-0.4.1-py3-none-any.whl
+uv tool install --force ./asecli-0.4.2-py3-none-any.whl
 asecli install-skill
 ```
 
@@ -68,7 +68,7 @@ asecli install-skill
 `v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
 
 ```bash
-uv tool install --force ./asecli-0.4.1-py3-none-any.whl && asecli install-skill
+uv tool install --force ./asecli-0.4.2-py3-none-any.whl && asecli install-skill
 ```
 
 `install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
@@ -88,7 +88,7 @@ uv tool install --force ./asecli-0.3.1-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.4.1（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.4.1)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+正式版本与校验资产见 [ASECLI v0.4.2（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.4.2)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
@@ -349,7 +349,7 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
 - 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图。成功 JSON 中 `reloaded` 与 `staging_reloaded` 表示暂存图已 LoadFromDisk；`target_graph_reloaded` 恒为 `false`。CLI 属性收尾后必须使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
 - MCP 3.4.7 默认按源码模式拦截 `AssetDatabase.DeleteAsset`。CLI 仅对包内固定、参数已校验且暂存名带随机 nonce 的事务执行器设置该次 `safety_checks=false`；不会把用户 C# 透传到这一入口。
-- MCP 客户端超时代表完成状态未知，不等同于 Editor 已停止或已回滚。重试前先检查目标文件及同目录 `ASECLI-Temp-*`，避免把迟到成功误判为失败。
+- MCP 客户端超时代表完成状态未知，不等同于 Editor 已停止或已回滚。初始化握手共用 20 秒总预算，真实 `tools/call` 保留 120 秒执行预算；超时 JSON 会给出 `phase`、`elapsed_ms`、`budget_ms` 并返回 `BRIDGE_ERROR`/3。重试前先检查目标文件及同目录 `ASECLI-Temp-*`，避免把迟到成功误判为失败。
 - 隔离团结 E2E 已证明 Caster-like/Receiver-like 图可创建、保存、关闭并由新进程重载；这不证明目标工程的运行时矩阵注入、材质绑定或最终渲染画面正确。
 
 ## JSON 契约
@@ -520,7 +520,7 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.4.1` 按用户 2026-09-05 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.4.2` 按用户 2026-09-05 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
 
 ### 供应链、许可证与密钥
 

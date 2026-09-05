@@ -139,7 +139,7 @@ def _editor_bounds(args) -> dict[str, tuple[float, float, float, float]]:
             allow_remote_mcp=args.allow_remote_mcp,
         )
     except McpError as exc:
-        raise CliError("BRIDGE_ERROR", str(exc))
+        raise CliError("BRIDGE_ERROR", str(exc), exc.data)
     except FileNotFoundError as exc:
         raise CliError("NOT_FOUND", str(exc))
     except ValueError as exc:

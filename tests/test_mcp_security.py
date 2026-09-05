@@ -2,6 +2,8 @@
 
 import io
 import json
+import socket
+import threading
 import urllib.error
 
 import pytest
@@ -26,6 +28,14 @@ def test_remote_mcp_requires_explicit_opt_in():
     with pytest.raises(McpError, match="remote"):
         validate_mcp_url("https://mcp.example.test/mcp")
     assert validate_mcp_url("https://mcp.example.test/mcp", allow_remote=True) == "https://mcp.example.test/mcp"
+
+
+def test_legacy_fourth_positional_argument_still_enables_remote_mcp():
+    client = McpClient("https://mcp.example.test/mcp", "token", 120.0, True)
+
+    assert client.url == "https://mcp.example.test/mcp"
+    assert client.timeout == 120.0
+    assert client.connect_timeout == 20.0
 
 
 @pytest.mark.parametrize("url", [
@@ -189,6 +199,8 @@ def test_connect_uses_short_timeout_but_tool_calls_keep_execution_timeout(monkey
         connect_timeout=20.0,
     )
     seen = []
+    clock = iter([100.0, 100.0, 105.0])
+    monkeypatch.setattr("asecli.bridge.mcp_client.time.monotonic", lambda: next(clock))
 
     def fake_post(payload, *, timeout=None):
         seen.append((payload["method"], timeout))
@@ -207,6 +219,95 @@ def test_connect_uses_short_timeout_but_tool_calls_keep_execution_timeout(monkey
 
     assert seen == [
         ("initialize", 20.0),
-        ("notifications/initialized", 20.0),
+        ("notifications/initialized", 15.0),
         ("tools/call", None),
     ]
+
+
+def test_connect_refuses_second_phase_after_total_budget_is_exhausted(monkeypatch):
+    client = McpClient("http://127.0.0.1:8080/mcp", connect_timeout=20.0)
+    seen = []
+    clock = iter([100.0, 100.0, 121.0])
+    monkeypatch.setattr("asecli.bridge.mcp_client.time.monotonic", lambda: next(clock))
+
+    def fake_post(payload, *, timeout=None):
+        seen.append((payload["method"], timeout))
+        return {"id": payload["id"], "result": {"serverInfo": {}}}
+
+    monkeypatch.setattr(client, "_post", fake_post)
+
+    with pytest.raises(McpError, match="notifications/initialized") as captured:
+        client.connect()
+
+    assert seen == [("initialize", 20.0)]
+    assert captured.value.data == {
+        "phase": "notifications/initialized",
+        "elapsed_ms": 21000,
+        "budget_ms": 20000,
+    }
+
+
+def test_stalled_http_response_is_reported_as_structured_mcp_timeout():
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    port = listener.getsockname()[1]
+
+    def stall_response():
+        connection, _ = listener.accept()
+        try:
+            connection.recv(4096)
+            threading.Event().wait(0.2)
+        finally:
+            connection.close()
+            listener.close()
+
+    worker = threading.Thread(target=stall_response, daemon=True)
+    worker.start()
+    client = McpClient(f"http://127.0.0.1:{port}/mcp", timeout=0.05)
+
+    with pytest.raises(McpError, match="MCP demo timed out") as captured:
+        client._rpc("demo")
+
+    worker.join(timeout=1.0)
+    assert captured.value.data["phase"] == "demo"
+    assert captured.value.data["elapsed_ms"] >= 40
+    assert captured.value.data["budget_ms"] == 50
+
+
+def test_urlerror_wrapped_timeout_is_reported_as_structured_mcp_timeout(monkeypatch):
+    client = McpClient("http://127.0.0.1:8080/mcp", timeout=0.05)
+    error = urllib.error.URLError(TimeoutError("timed out"))
+    monkeypatch.setattr(
+        client._opener,
+        "open",
+        lambda *args, **kwargs: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(McpError, match="MCP demo timed out") as captured:
+        client._rpc("demo")
+
+    assert captured.value.data["phase"] == "demo"
+    assert captured.value.data["budget_ms"] == 50
+
+
+def test_cli_preserves_structured_mcp_timeout_and_bridge_exit_code(monkeypatch, capsys):
+    from asecli.cli.main import app
+
+    def fake_recompile(*args, **kwargs):
+        raise McpError(
+            "MCP initialize timed out",
+            data={"phase": "initialize", "elapsed_ms": 50, "budget_ms": 50},
+        )
+
+    monkeypatch.setattr("asecli.cli.commands.recompile_via_mcp", fake_recompile)
+    rc = app(["recompile", "ignored.shader"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert rc == 3
+    assert payload["error"]["code"] == "BRIDGE_ERROR"
+    assert payload["data"] == {
+        "phase": "initialize",
+        "elapsed_ms": 50,
+        "budget_ms": 50,
+    }

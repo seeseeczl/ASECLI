@@ -98,6 +98,20 @@ def _python_loc_findings(root: Path, config: dict) -> list[str]:
     return findings
 
 
+def _release_record_findings(root: Path) -> list[str]:
+    findings = []
+    release_root = root / "docs/04-delivery/releases"
+    for path in release_root.glob("REL-*.md"):
+        text = path.read_text(encoding="utf-8")
+        if not re.search(r"^status:\s*released\s*$", text, re.MULTILINE):
+            continue
+        if re.search(r"\bpending\b|待回填", text, re.IGNORECASE):
+            findings.append(
+                f"released record contains pending evidence: {path.relative_to(root)}"
+            )
+    return findings
+
+
 def _packed_executor_loc_findings(root: Path, source_limit: int, exemptions: dict[str, dict]) -> list[str]:
     findings: list[str] = []
     seen: set[str] = set()
@@ -168,6 +182,7 @@ def main() -> int:
     findings.extend(_python_loc_findings(root, config))
     findings.extend(_packed_executor_loc_findings(root, source_limit, exemptions))
     findings.extend(_audit_supplement_findings(root, config))
+    findings.extend(_release_record_findings(root))
 
     private_core_import = re.compile(r"from\s+\.\.core\s+import\s+[^\n]*\b_\w+")
     for path in (root / "src/asecli").rglob("*.py"):

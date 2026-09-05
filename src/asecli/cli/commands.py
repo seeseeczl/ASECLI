@@ -241,7 +241,7 @@ def cmd_recompile(args) -> dict:
             result["metadata_restored"] = restored
         return result
     except McpError as e:
-        raise CliError("BRIDGE_ERROR", str(e))
+        raise CliError("BRIDGE_ERROR", str(e), e.data)
     except FileNotFoundError as e:
         raise CliError("NOT_FOUND", str(e))
     except ValueError as e:

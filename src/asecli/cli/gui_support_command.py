@@ -29,5 +29,7 @@ def cmd_gui_support(args) -> dict:
         return operation(args.project, write=args.write, runtime_probe=runtime_probe)
     except FileNotFoundError as exc:
         raise CliError("NOT_FOUND", str(exc)) from exc
-    except (FileExistsError, ValueError, RuntimeError, OSError, McpError) as exc:
+    except McpError as exc:
+        raise CliError("BRIDGE_ERROR", str(exc), exc.data) from exc
+    except (FileExistsError, ValueError, RuntimeError, OSError) as exc:
         raise CliError("GUI_SUPPORT_ERROR", str(exc)) from exc
