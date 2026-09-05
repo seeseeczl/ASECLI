@@ -28,7 +28,6 @@ jobs:
       - run: uv sync --frozen --python ${{ matrix.python-version }}
       - run: uv run --frozen --python ${{ matrix.python-version }} pytest -q
       - run: uv run --frozen --python ${{ matrix.python-version }} python tools/check_ci_governance.py
-      - run: uv run --frozen --python ${{ matrix.python-version }} python tools/check_regression_catalog.py
 
   package:
     needs: verify

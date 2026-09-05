@@ -39,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.4.0`；需要回滚时可安装不可变的 `v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.4.1`；需要回滚时可安装不可变的 `v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -47,11 +47,11 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 gh auth login
-mkdir asecli-v0.4.0
-cd asecli-v0.4.0
-gh release download v0.4.0 --repo seeseeczl/ASECLI
+mkdir asecli-v0.4.1
+cd asecli-v0.4.1
+gh release download v0.4.1 --repo seeseeczl/ASECLI
 shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.4.0-py3-none-any.whl
+uv tool install ./asecli-0.4.1-py3-none-any.whl
 asecli install-skill
 asecli --help
 ```
@@ -59,7 +59,7 @@ asecli --help
 `uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
 
 ```bash
-uv tool install --force ./asecli-0.4.0-py3-none-any.whl
+uv tool install --force ./asecli-0.4.1-py3-none-any.whl
 asecli install-skill
 ```
 
@@ -68,7 +68,7 @@ asecli install-skill
 `v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
 
 ```bash
-uv tool install --force ./asecli-0.4.0-py3-none-any.whl && asecli install-skill
+uv tool install --force ./asecli-0.4.1-py3-none-any.whl && asecli install-skill
 ```
 
 `install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
@@ -88,7 +88,7 @@ uv tool install --force ./asecli-0.3.1-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.4.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.4.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+正式版本与校验资产见 [ASECLI v0.4.1（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.4.1)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
@@ -183,7 +183,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 
 ## 完整命令目录
 
-所有命令都可用 `asecli <command> --help` 查看参数。下表列出当前全部 15 个公开子命令及其实际副作用。
+所有命令都可用 `asecli <command> --help` 查看参数。下表列出当前全部 16 个公开子命令及其实际副作用。
 
 | 命令 | 做什么 | 写入/运行边界 |
 | --- | --- | --- |
@@ -199,6 +199,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `layout <file> [--gap-x X] [--gap-y Y] [--write]` | 按左到右数据流排列节点，保持连线和非位置字段不变。 | 默认预演；只改坐标。真实画布的节点宽高和贝塞尔线仍需 Editor 验收。 |
 | `gui-support <project> [--runtime-probe] [--handoff-native] [--write]` | 优先检测并选用原生 MZGUI；缺失时安装 fallback；原生后来加入时可恢复交接。 | V2 枚举全部 provider；handoff 默认预演，只处理已知哈希并保留 authoring-only bridge，复验失败可恢复。 |
 | `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；以 MZGUI 标准格式设置或清除 Foldout、Tooltip、HelpBox。 | 新写入统一生成 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`；provider 由 `gui-support` 的 `recommended_editor` 决定。 |
+| `install-skill [--skill-root DIR]` | 安装 wheel 内置的 ASECLI Agent Skill。 | 相同内容幂等；目标已有不同内容时拒绝覆盖，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
 | `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
 | `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
 | `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `help`，目标必须位于 `Assets/` 且不存在。 |
@@ -519,7 +520,7 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.4.0` 按用户 2026-09-05 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.4.1` 按用户 2026-09-05 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
 
 ### 供应链、许可证与密钥
 

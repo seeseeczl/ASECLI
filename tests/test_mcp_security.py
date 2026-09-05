@@ -180,3 +180,33 @@ def test_plain_json_rejects_wrong_response_id(monkeypatch):
     )
     with pytest.raises(McpError, match="id mismatch"):
         client._rpc("demo")
+
+
+def test_connect_uses_short_timeout_but_tool_calls_keep_execution_timeout(monkeypatch):
+    client = McpClient(
+        "http://127.0.0.1:8080/mcp",
+        timeout=120.0,
+        connect_timeout=20.0,
+    )
+    seen = []
+
+    def fake_post(payload, *, timeout=None):
+        seen.append((payload["method"], timeout))
+        if payload["method"] == "initialize":
+            return {"id": payload["id"], "result": {"serverInfo": {}}}
+        if payload["method"] == "notifications/initialized":
+            return None
+        return {
+            "id": payload["id"],
+            "result": {"content": [{"type": "text", "text": "done"}]},
+        }
+
+    monkeypatch.setattr(client, "_post", fake_post)
+    client.connect()
+    client.call_tool("execute_code", {})
+
+    assert seen == [
+        ("initialize", 20.0),
+        ("notifications/initialized", 20.0),
+        ("tools/call", None),
+    ]

@@ -22,6 +22,27 @@ def catalog_commands(catalog: Path) -> list[tuple[str, list[str]]]:
     return commands
 
 
+def _run_collect(root: Path, pytest_args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["uv", "run", "--frozen", "pytest", "--collect-only", "-q", *pytest_args],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _unique_pytest_args(commands: list[tuple[str, list[str]]]) -> list[str]:
+    """Combine catalog selectors while preserving their first-seen order."""
+    combined = []
+    seen = set()
+    for _, pytest_args in commands:
+        for item in pytest_args:
+            if item not in seen:
+                seen.add(item)
+                combined.append(item)
+    return combined
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     root = Path(__file__).resolve().parents[1]
@@ -30,15 +51,14 @@ def main(argv: list[str] | None = None) -> int:
 
     failures = []
     commands = catalog_commands(args.catalog)
-    for command, pytest_args in commands:
-        proc = subprocess.run(
-            ["uv", "run", "--frozen", "pytest", "--collect-only", "-q", *pytest_args],
-            cwd=root,
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode != 0:
-            failures.append({"command": command, "detail": (proc.stdout + proc.stderr)[-800:]})
+    combined = _run_collect(root, _unique_pytest_args(commands))
+    if combined.returncode != 0:
+        # The normal path starts pytest once. Fall back to individual commands
+        # only on failure so diagnostics still identify the broken catalog row.
+        for command, pytest_args in commands:
+            proc = _run_collect(root, pytest_args)
+            if proc.returncode != 0:
+                failures.append({"command": command, "detail": (proc.stdout + proc.stderr)[-800:]})
 
     print(json.dumps({"ok": not failures, "checked": len(commands), "failures": failures}, ensure_ascii=False))
     return 0 if not failures else 1

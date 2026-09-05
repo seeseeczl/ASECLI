@@ -71,16 +71,18 @@ class McpClient:
         url: str,
         instance_token: str | None = None,
         timeout: float = 120.0,
+        connect_timeout: float = 20.0,
         allow_remote: bool = False,
     ):
         self.url = validate_mcp_url(url, allow_remote=allow_remote)
         self.instance_token = instance_token
         self.timeout = timeout
+        self.connect_timeout = connect_timeout
         self.session_id: str | None = None
         self._next_id = 0
         self._opener = urllib.request.build_opener(NoRedirectHandler())
 
-    def _post(self, payload: dict) -> dict | None:
+    def _post(self, payload: dict, *, timeout: float | None = None) -> dict | None:
         expected_id = payload.get("id")
         body = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
@@ -90,7 +92,7 @@ class McpClient:
             headers["X-Unity-Instance-Token"] = self.instance_token
         req = urllib.request.Request(self.url, data=body, headers=headers, method="POST")
         try:
-            with self._opener.open(req, timeout=self.timeout) as resp:
+            with self._opener.open(req, timeout=self.timeout if timeout is None else timeout) as resp:
                 sid = resp.headers.get("Mcp-Session-Id")
                 if sid:
                     self.session_id = sid
@@ -131,14 +133,20 @@ class McpClient:
             return response
         return _matching_response([response], expected_id)
 
-    def _rpc(self, method: str, params: dict | None = None, notify: bool = False) -> dict | None:
+    def _rpc(
+        self,
+        method: str,
+        params: dict | None = None,
+        notify: bool = False,
+        timeout: float | None = None,
+    ) -> dict | None:
         self._next_id += 1
         payload: dict = {"jsonrpc": "2.0", "method": method}
         if params is not None:
             payload["params"] = params
         if not notify:
             payload["id"] = self._next_id
-        resp = self._post(payload)
+        resp = self._post(payload) if timeout is None else self._post(payload, timeout=timeout)
         if notify:
             return None
         if resp is None:
@@ -156,8 +164,14 @@ class McpClient:
                 "capabilities": {},
                 "clientInfo": {"name": "asecli", "version": __version__},
             },
+            timeout=self.connect_timeout,
         )
-        self._rpc("notifications/initialized", {}, notify=True)
+        self._rpc(
+            "notifications/initialized",
+            {},
+            notify=True,
+            timeout=self.connect_timeout,
+        )
         return resp.get("result", {}).get("serverInfo", {})
 
     def call_tool(self, name: str, arguments: dict) -> dict:
