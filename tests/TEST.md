@@ -1,14 +1,14 @@
 # ASECLI test plan
 
-## Current refinement: ASECLI material GUI protocol
+## Current refinement: MZGUI-compatible material GUI protocol
 
 Planned coverage before implementation:
 
-- `tests/test_gui_support.py`: 唯一 ASECLI GUI 的 dry-run、幂等安装、冲突/符号链接/
-  竞争写入拒绝、已有原生 MZGUI 文件不阻断、打包 C# 契约、`asecli.inline-help.v1`
+- `tests/test_gui_support.py`: 原生 MZGUI 优先、fallback 的 dry-run/幂等安装、冲突/符号链接/
+  竞争写入拒绝、静态不确定时失败关闭、打包 C# 契约、`asecli.inline-help.v1`
   呈现契约报告/写前拒绝和 CLI JSON 行为。
-- `tests/test_custom_gui.py`: 只生成 `ASECLIFoldout`、`ASECLITooltip`、
-  `ASECLIHelpBox`；旧三标记可读取，并在同语义写入或清理时迁移。Property
+- `tests/test_custom_gui.py`: 新写入 `FoldoutMzgui`、`TooltipMzgui`、
+  `HelpBoxMzgui`；旧 ASECLI 标记可读取，并在同语义写入或清理时迁移。Property
   尾部按图版本探测，未知布局失败关闭而非猜测字段下标。
 - `tests/test_cli_contract.py`: `gui-support` participates in the stable one-line
   JSON error contract.
@@ -53,3 +53,11 @@ resource require a real Unity/Tuanjie Editor gate and are reported separately.
 
 Open gap: BatchMode did not exercise mouse-hover, foldout clicking, or the final
 Inspector appearance. Those remain target-project UI acceptance checks.
+
+## Current Editor authoring adapter — 2026-09-05
+
+- 全量自动回归：`254 passed, 3 skipped`；CI governance、40 条 regression catalog、离线供应链和 `git diff --check` 全部通过。
+- `tests/test_gui_support.py`: fallback 包含原生 EditorWindow，使用三项开关/文本框、ASE Custom Attributes、运行时成员探测和编译 metadata hydration；原生与 fallback 都公开 `MZGUI.MZGUI`，不修改或编译期引用 ASE 源码。
+- `tests/test_gui_upgrade.py`: 已安装的 `0.3.1-material-only` 与 `0.3.1-authoring-preview` 资源可通过已知哈希备份并原子升级，未知内容仍拒绝覆盖。
+- `tests/test_build_reproducibility.py`: wheel 必须包含全部 authoring/hydration C# 片段。
+- 真实无 MZGUI ASE 中的选择 Property、编辑、Save、退出重开仍是 REG-0047 的 Editor 门禁，自动测试不得冒充该结果。

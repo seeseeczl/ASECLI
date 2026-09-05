@@ -91,7 +91,7 @@ def _shader(kind: str) -> str:
             ENDCG
         }}
     }}
-    CustomEditor "ASECLI.MaterialGUI.ASECLIMaterialGUI"
+    CustomEditor "MZGUI.MZGUI"
 }}
 '''
 

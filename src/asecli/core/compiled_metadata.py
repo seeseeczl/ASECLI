@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from .custom_gui import (
+    MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES,
     PROPERTY_METADATA_ATTRIBUTE_TYPES,
     is_material_property_node,
     parse_property_metadata_attribute,
@@ -14,9 +15,8 @@ from .compiled_properties import inspect_compiled_properties
 from .model import AseFile
 
 
-_LEGACY_ATTRIBUTE_TYPES = ("FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui")
 _MANAGED_ATTRIBUTE_TYPES = frozenset(
-    (*PROPERTY_METADATA_ATTRIBUTE_TYPES, *_LEGACY_ATTRIBUTE_TYPES)
+    MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES
 )
 _KNOWN_TEMPLATE_COMPILED_ONLY_PROPERTIES = {
     "2992e84f91cbeb14eab234972e07ea9d": frozenset({

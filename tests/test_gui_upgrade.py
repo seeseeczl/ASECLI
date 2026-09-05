@@ -17,6 +17,61 @@ from asecli.bridge.gui_support import (
 
 ROOT = Path(__file__).parents[1]
 LEGACY_GUI = ROOT / "tests/fixtures/asecli_material_gui_v0_2_0.cs.txt"
+V031_GUI_PARTS = (
+    ROOT / "src/asecli/bridge/resources/asecli_material_gui.part00.cs.txt",
+    ROOT / "src/asecli/bridge/resources/asecli_material_gui.part01.cs.txt",
+)
+
+
+def material_only_v031_source() -> bytes:
+    source = b"".join(path.read_bytes() for path in V031_GUI_PARTS).decode("utf-8")
+    source = source.replace(
+        "// ASECLI clean-room implementation of the public MZGUI.MZGUI contract.\n"
+        "// New shaders use the native FoldoutMzgui, TooltipMzgui and HelpBoxMzgui names.\n",
+        "// ASECLI clean-room material GUI.\n"
+        "// Implements ASECLIFoldout, ASECLITooltip, and ASECLIHelpBox metadata for\n"
+        "// ASECLI-generated shaders, and reads the three historical MZGUI names.\n",
+    )
+    source = source.replace("    public interface IASECLIFallbackProvider { }\n", "")
+    source = source.replace(
+        "public class ASECLIMaterialGUI : ShaderGUI, IASECLIFallbackProvider",
+        "public sealed class ASECLIMaterialGUI : ShaderGUI",
+    )
+    source = source.replace(
+        "\n// Portable public entry point. A shader authored in a fallback project keeps\n"
+        "// working unchanged when moved to a project containing the native MZGUI package.\n"
+        "namespace MZGUI\n{\n"
+        "    public sealed class MZGUI : ASECLI.MaterialGUI.ASECLIMaterialGUI { }\n}\n",
+        "",
+    )
+    return source.encode("utf-8")
+
+
+def authoring_preview_source() -> bytes:
+    resources = ROOT / "src/asecli/bridge/resources"
+    authoring = b"".join(
+        (resources / name).read_bytes()
+        for name in (
+            "asecli_material_gui.authoring.part00.cs.txt",
+            "asecli_material_gui.authoring.part01.cs.txt",
+            "asecli_material_gui.hydration.cs.txt",
+        )
+    ).decode("utf-8")
+    authoring = authoring.replace(
+        'field.SetValue(master, "MZGUI.MZGUI");',
+        'field.SetValue(master, "ASECLI.MaterialGUI.ASECLIMaterialGUI");',
+    )
+    authoring = authoring.replace(
+        'MenuItem("Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)")',
+        'MenuItem("Window/Amplify Shader Editor/GUI Attributes (ASECLI)")',
+    )
+    authoring = authoring.replace(
+        'new GUIContent("MZGUI Attributes")', 'new GUIContent("ASE GUI Attributes")'
+    )
+    authoring = authoring.replace(
+        '"使用 MZGUI.MZGUI 材质面板"', '"使用 ASECLI 兼容材质面板"'
+    )
+    return material_only_v031_source() + authoring.encode("utf-8")
 
 
 def unity_project(tmp_path: Path) -> Path:
@@ -67,6 +122,39 @@ def test_known_previous_gui_is_backed_up_and_atomically_upgraded(tmp_path):
     repeated = install_gui_support(project, write=True)
     assert repeated["action"] == "already_installed"
     assert backup.read_bytes() == previous
+
+
+def test_material_only_v031_gui_upgrades_to_the_editor_authoring_adapter(tmp_path):
+    project = unity_project(tmp_path)
+    target = project / GUI_SUPPORT_ASSET_PATH
+    target.parent.mkdir(parents=True)
+    previous = material_only_v031_source()
+    digest = hashlib.sha256(previous).hexdigest()
+    assert GUI_SUPPORT_KNOWN_PREVIOUS[digest] == "0.3.1-material-only"
+    target.write_bytes(previous)
+
+    upgraded = install_gui_support(project, write=True)
+
+    assert upgraded["written"] is True
+    assert target.read_text(encoding="utf-8") == GUI_SUPPORT_SOURCE
+    assert Path(upgraded["backup"]).read_bytes() == previous
+    assert not target.with_name(target.name + ".asecli-upgrade.tmp").exists()
+
+
+def test_authoring_preview_upgrades_to_the_portable_mzgui_editor_name(tmp_path):
+    project = unity_project(tmp_path)
+    target = project / GUI_SUPPORT_ASSET_PATH
+    target.parent.mkdir(parents=True)
+    previous = authoring_preview_source()
+    digest = hashlib.sha256(previous).hexdigest()
+    assert GUI_SUPPORT_KNOWN_PREVIOUS[digest] == "0.3.1-authoring-preview"
+    target.write_bytes(previous)
+
+    upgraded = install_gui_support(project, write=True)
+
+    assert upgraded["recommended_editor"] == "MZGUI.MZGUI"
+    assert target.read_text(encoding="utf-8") == GUI_SUPPORT_SOURCE
+    assert Path(upgraded["backup"]).read_bytes() == previous
 
 
 def test_upgrade_refuses_a_conflicting_existing_backup(tmp_path):

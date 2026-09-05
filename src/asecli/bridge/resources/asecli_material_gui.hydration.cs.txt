@@ -1,0 +1,103 @@
+
+#if UNITY_EDITOR
+namespace ASECLI.MaterialGUI.Authoring
+{
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Reflection;
+    using UnityEditor;
+    using UnityEngine;
+
+    // Converts compiled MZGUI metadata into ASE's native Custom Attributes as
+    // soon as an unmodified ASE graph opens, so a normal ASE save retains it.
+    [InitializeOnLoad]
+    internal static class ASEMetadataHydrator
+    {
+        private static double nextCheck;
+
+        static ASEMetadataHydrator() { EditorApplication.update += Update; }
+
+        private static void Update()
+        {
+            if (EditorApplication.timeSinceStartup < nextCheck) return;
+            nextCheck = EditorApplication.timeSinceStartup + 1.0;
+            EditorWindow window;
+            object graph;
+            if (!ASEReflection.TryGraph(out window, out graph)) return;
+            Shader shader = ASEReflection.Value(graph, "CurrentShader") as Shader;
+            if (shader == null) return;
+            Dictionary<string, List<string>> metadata = ReadMetadata(shader);
+            if (metadata.Count == 0) return;
+            IList nodes = ASEReflection.PropertyNodes(graph);
+            if (nodes == null) return;
+            bool anyChanged = false;
+            foreach (object value in nodes)
+            {
+                UnityEngine.Object node = value as UnityEngine.Object;
+                string propertyName = ASEReflection.Value(
+                    value, "PropertyName", "m_propertyName") as string;
+                List<string> attributes;
+                if (node == null || String.IsNullOrEmpty(propertyName) ||
+                    !metadata.TryGetValue(propertyName, out attributes)) continue;
+                bool changed;
+                string error;
+                if (ASEAttributeStore.TryMergeRaw(node, attributes, out changed, out error))
+                    anyChanged |= changed;
+            }
+            if (anyChanged) window.Repaint();
+        }
+
+        private static Dictionary<string, List<string>> ReadMetadata(Shader shader)
+        {
+            Dictionary<string, List<string>> result =
+                new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            MethodInfo count = FindShaderUtil("GetPropertyCount", typeof(Shader));
+            if (count == null) count = FindShaderUtil("GetShaderPropertyCount", typeof(Shader));
+            MethodInfo name = FindShaderUtil("GetPropertyName", typeof(Shader), typeof(int));
+            MethodInfo attributes = FindShaderUtil(
+                "GetShaderPropertyAttributes", typeof(Shader), typeof(int));
+            if (count == null || name == null || attributes == null) return result;
+            try
+            {
+                int length = Convert.ToInt32(count.Invoke(null, new object[] { shader }));
+                for (int index = 0; index < length; index++)
+                {
+                    string propertyName = name.Invoke(null, new object[] { shader, index }) as string;
+                    object raw = attributes.Invoke(null, new object[] { shader, index });
+                    IEnumerable sequence = raw as IEnumerable;
+                    if (String.IsNullOrEmpty(propertyName) || sequence == null) continue;
+                    List<string> managed = new List<string>();
+                    foreach (object item in sequence)
+                    {
+                        string value = item as string ?? String.Empty;
+                        if (value.StartsWith("FoldoutMzgui", StringComparison.Ordinal) ||
+                            value.StartsWith("TooltipMzgui", StringComparison.Ordinal) ||
+                            value.StartsWith("HelpBoxMzgui", StringComparison.Ordinal) ||
+                            value.StartsWith("ASECLIFoldout", StringComparison.Ordinal) ||
+                            value.StartsWith("ASECLITooltip", StringComparison.Ordinal) ||
+                            value.StartsWith("ASECLIHelpBox", StringComparison.Ordinal))
+                            managed.Add(value);
+                    }
+                    if (managed.Count > 0) result[propertyName] = managed;
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("ASECLI GUI metadata hydration skipped: " + exception.Message);
+            }
+            return result;
+        }
+
+        private static MethodInfo FindShaderUtil(string name, params Type[] arguments)
+        {
+            return typeof(ShaderUtil).GetMethod(
+                name,
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                null,
+                arguments,
+                null);
+        }
+    }
+}
+#endif

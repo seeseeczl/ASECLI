@@ -14,12 +14,12 @@ PROPERTY_PRESENTATION_CONTRACT = {
     "scope": "exported_properties",
     "display_name": {"language": "zh-Hans", "requires_han": True},
     "tooltip": {
-        "provider": "ASECLI.MaterialGUI.ASECLIMaterialGUI",
+        "providers": ["MZGUI.MZGUI", "ASECLI.MaterialGUI.ASECLIMaterialGUI"],
         "automatic_fields": ["property_name", "shader_default_value"],
         "property_name_format": "english_identifier",
     },
     "inline_help": {
-        "attribute": "ASECLIHelpBox",
+        "attribute": "HelpBoxMzgui",
         "language": "zh-Hans",
         "requires_han": True,
         "presentation_contract": "asecli.inline-help.v1",
@@ -83,18 +83,21 @@ def inspect_property_presentation(
     properties: list[dict],
     compiled_source: str,
     *,
-    asecli_editor: str,
+    supported_editors: frozenset[str],
 ) -> dict:
     """Inspect already-parsed Custom GUI state without importing graph modules."""
-    claimed = editor.get("graph") == asecli_editor or editor.get("compiled") == asecli_editor
+    claimed = (
+        editor.get("graph") in supported_editors
+        or editor.get("compiled") in supported_editors
+    )
     managed = (
-        editor.get("graph") == asecli_editor
-        and editor.get("compiled") == asecli_editor
+        editor.get("graph") in supported_editors
+        and editor.get("compiled") == editor.get("graph")
         and editor.get("consistent") is True
     )
     violations: list[str] = []
     if not managed:
-        violations.append("editor:asecli_material_gui_required")
+        violations.append("editor:mzgui_compatible_material_gui_required")
 
     compiled_properties, compiled_properties_error = inspect_compiled_properties(compiled_source)
     if compiled_properties_error is not None:
@@ -123,7 +126,7 @@ def inspect_property_presentation(
         help_values = [
             item.get("text")
             for item in prop.get("attributes", [])
-            if item.get("type") == "ASECLIHelpBox"
+            if item.get("type") in {"HelpBoxMzgui", "ASECLIHelpBox"}
         ]
         if len(help_values) != 1 or not contains_han(help_values[0]):
             property_violations.append("help:chinese_required")
@@ -138,7 +141,7 @@ def inspect_property_presentation(
             compiled_help_values = [
                 item.get("text")
                 for item in compiled.get("attributes", [])
-                if item.get("type") == "ASECLIHelpBox"
+                if item.get("type") in {"HelpBoxMzgui", "ASECLIHelpBox"}
             ]
             if len(compiled_help_values) != 1 or not contains_han(compiled_help_values[0]):
                 property_violations.append("compiled_help:chinese_required")
@@ -178,7 +181,7 @@ def inspect_property_presentation(
 
 
 def require_managed_property_presentation(ase_file: AseFile) -> dict | None:
-    """Fail closed only after a file claims the ASECLI material GUI."""
+    """Fail closed only after a file claims an MZGUI-compatible material GUI."""
     from .custom_gui import inspect_custom_gui
 
     try:
@@ -187,14 +190,14 @@ def require_managed_property_presentation(ase_file: AseFile) -> dict | None:
         if not _has_asecli_presentation_marker(ase_file):
             return None
         raise ValueError(
-            f"ASECLI-managed property presentation inspection failed: {exc}"
+            f"MZGUI-compatible property presentation inspection failed: {exc}"
         ) from exc
     if result["valid"]:
         return result
     if not result["claimed"] and not _has_asecli_presentation_marker(ase_file):
         return result
     raise ValueError(
-        "ASECLI-managed property presentation contract failed: "
+        "MZGUI-compatible property presentation contract failed: "
         + ", ".join(result["violations"])
     )
 
@@ -227,5 +230,4 @@ def _unique_properties(properties: list[dict], source: str, violations: list[str
 
 def _has_asecli_presentation_marker(ase_file: AseFile) -> bool:
     text = ase_file.serialize()
-    editor = PROPERTY_PRESENTATION_CONTRACT["tooltip"]["provider"]
-    return editor in text or "[ASECLI" in text
+    return any(editor in text for editor in PROPERTY_PRESENTATION_CONTRACT["tooltip"]["providers"]) or "Mzgui" in text or "[ASECLI" in text

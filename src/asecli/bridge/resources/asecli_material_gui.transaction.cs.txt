@@ -1,0 +1,106 @@
+
+#if UNITY_EDITOR
+namespace ASECLI.MaterialGUI.Authoring
+{
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Reflection;
+    using UnityEditor;
+    using UnityEngine;
+
+    internal static class ASEApplyTransaction
+    {
+        internal static bool TryApply(
+            UnityEngine.Object node, string foldout, string tooltip, string help,
+            bool assignEditor, bool save, out string error)
+        {
+            List<string> attributes;
+            int attributeCount;
+            object master;
+            FieldInfo masterField;
+            string inspector;
+            string shaderPath;
+            byte[] shaderContent;
+            if (!TrySnapshot(node, out attributes, out attributeCount, out error) ||
+                !ASEReflection.TryMasterSnapshot(
+                    assignEditor, out master, out masterField, out inspector, out error) ||
+                !ASEReflection.CanSave(save, out error) ||
+                !ASEReflection.TryDiskSnapshot(save, out shaderPath, out shaderContent, out error))
+                return false;
+
+            Undo.IncrementCurrentGroup();
+            int group = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("Apply ASECLI MZGUI attributes");
+            string stage = "write_attributes";
+            try
+            {
+                if (!ASEAttributeStore.TryWrite(node, foldout, tooltip, help, out error))
+                    throw new InvalidOperationException(error);
+                stage = "assign_editor";
+                if (assignEditor && !ASEReflection.TryAssignFallbackEditor(out error))
+                    throw new InvalidOperationException(error);
+                stage = "save_shader";
+                if (save && !ASEReflection.TrySave(out error))
+                    throw new InvalidOperationException(error);
+                Undo.CollapseUndoOperations(group);
+                error = String.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Undo.RevertAllDownToGroup(group);
+                string attributeRollback;
+                string masterRollback;
+                string diskRollback;
+                bool restoredAttributes = TryRestore(
+                    node, attributes, attributeCount, out attributeRollback);
+                bool restoredMaster = ASEReflection.TryRestoreMaster(
+                    master, masterField, inspector, out masterRollback);
+                bool restoredDisk = ASEReflection.TryRestoreDisk(
+                    shaderPath, shaderContent, out diskRollback);
+                string cause = exception.GetBaseException().Message;
+                error = "MZGUI 应用失败 [" + stage + "]: " + cause +
+                    "; rollback=" + (restoredAttributes && restoredMaster && restoredDisk ? "ok" : "failed");
+                if (!restoredAttributes) error += "; attributes=" + attributeRollback;
+                if (!restoredMaster) error += "; editor=" + masterRollback;
+                if (!restoredDisk) error += "; disk=" + diskRollback;
+                Debug.LogError("ASECLI " + error);
+                return false;
+            }
+        }
+
+        private static bool TrySnapshot(
+            UnityEngine.Object node, out List<string> snapshot, out int count, out string error)
+        {
+            snapshot = new List<string>();
+            count = 0;
+            IList values; FieldInfo listField; FieldInfo countField;
+            if (!ASEAttributeStore.TryStorage(
+                    node, out values, out listField, out countField, out error)) return false;
+            foreach (object item in values) snapshot.Add(item as string ?? String.Empty);
+            count = Convert.ToInt32(countField.GetValue(node));
+            return true;
+        }
+
+        private static bool TryRestore(
+            UnityEngine.Object node, List<string> snapshot, int count, out string error)
+        {
+            try
+            {
+                IList values; FieldInfo listField; FieldInfo countField;
+                if (!ASEAttributeStore.TryStorage(
+                        node, out values, out listField, out countField, out error)) return false;
+                values.Clear();
+                foreach (string item in snapshot) values.Add(item);
+                countField.SetValue(node, count);
+                EditorUtility.SetDirty(node);
+                error = String.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            { error = exception.GetBaseException().Message; return false; }
+        }
+    }
+}
+#endif

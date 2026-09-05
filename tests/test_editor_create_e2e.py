@@ -315,7 +315,7 @@ public static class ASECLIEditorCreateE2E
                 var sampler = graph.AllNodes.Find(n => n is AmplifyShaderEditor.SamplerNode) as AmplifyShaderEditor.SamplerNode;
                 var strength = graph.AllNodes.Find(n => n is AmplifyShaderEditor.RangedFloatNode) as AmplifyShaderEditor.RangedFloatNode;
                 var casterWorld = graph.AllNodes.Find(n => n is AmplifyShaderEditor.WorldPosInputsNode);
-                return master.CurrentInspector == "ASECLI.MaterialGUI.ASECLIMaterialGUI" &&
+                return master.CurrentInspector == "MZGUI.MZGUI" &&
                     sampler != null && sampler.PropertyName == "_AuditMask" &&
                     sampler.PropertyInspectorName == "验证遮罩" && sampler.AutoRegister &&
                     strength != null && strength.PropertyName == "_AuditStrength" &&
@@ -328,7 +328,7 @@ public static class ASECLIEditorCreateE2E
             var world = graph.AllNodes.Find(n => n is AmplifyShaderEditor.WorldPosInputsNode);
             var texture = graph.AllNodes.Find(n => n is AmplifyShaderEditor.TexturePropertyNode) as AmplifyShaderEditor.TexturePropertyNode;
             var uv = graph.AllNodes.Find(n => n is AmplifyShaderEditor.TextureCoordinatesNode);
-            return master.CurrentInspector == "ASECLI.MaterialGUI.ASECLIMaterialGUI" &&
+            return master.CurrentInspector == "MZGUI.MZGUI" &&
                 expression != null && world != null && texture != null && uv != null &&
                 texture.PropertyName == "_GroundMask" && texture.PropertyInspectorName == "地面遮罩" &&
                 expression.InputPorts.Count == 2 &&

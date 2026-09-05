@@ -12,6 +12,7 @@ from asecli.core import (
     ASECLI_GUI_EDITOR,
     AseFile,
     inspect_custom_gui,
+    MZGUI_EDITOR,
     semantic_attribute,
     set_property_metadata_attribute,
 )
@@ -94,8 +95,8 @@ def test_cli_write_is_recoverable_rechecks_checksum_and_roundtrips(tmp_path):
     state = inspect_custom_gui(written)
     assert state["editor"]["consistent"] is True
     attrs = {item["type"]: item for item in state["properties"][0]["attributes"]}
-    assert attrs["ASECLITooltip"]["text"] == "颜色强度提示"
-    assert attrs["ASECLIFoldout"]["text"] == "颜色设置"
+    assert attrs["TooltipMzgui"]["text"] == "颜色强度提示"
+    assert attrs["FoldoutMzgui"]["text"] == "颜色设置"
 
 
 def test_cli_can_select_builtin_gui_and_add_annotations_in_one_operation(tmp_path):
@@ -117,16 +118,37 @@ def test_cli_can_select_builtin_gui_and_add_annotations_in_one_operation(tmp_pat
         "--write",
     )
     assert code == 0
-    assert payload["data"]["state"]["editor"]["graph"] == ASECLI_GUI_EDITOR
-    assert AseFile.from_path(path).graph.node_by_id("1").raw_fields[9] == ASECLI_GUI_EDITOR
+    assert payload["data"]["state"]["editor"]["graph"] == MZGUI_EDITOR
+    assert AseFile.from_path(path).graph.node_by_id("1").raw_fields[9] == MZGUI_EDITOR
 
 
-def test_readme_single_property_example_selects_the_required_asecli_editor():
+def test_cli_writes_the_same_mzgui_protocol_when_native_mzgui_is_selected(tmp_path):
+    path = tmp_path / "native.shader"
+    path.write_text(sample_shader(), encoding="utf-8")
+
+    code, payload = run_cli(
+        "custom-gui", str(path), "--editor", MZGUI_EDITOR,
+        "--property", "_BaseColor", "--group", "基础参数",
+        "--tooltip", "控制基础色。", "--help-box", "使用线性空间颜色。", "--write",
+    )
+
+    assert code == 0, payload
+    state = inspect_custom_gui(AseFile.from_path(path))
+    assert state["editor"]["graph"] == MZGUI_EDITOR
+    assert [item["type"] for item in state["properties"][0]["attributes"]] == [
+        "FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui"
+    ]
+
+
+def test_readme_single_property_example_uses_the_detected_gui_provider():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "gui-support" in readme
+    assert "recommended_editor" in readme
     assert (
         "asecli custom-gui Assets/Example.shader --editor "
-        "ASECLI.MaterialGUI.ASECLIMaterialGUI --property _PaintColor"
+        "MZGUI.MZGUI --property _PaintColor"
     ) in readme
+    assert "MZGUI.MZGUI" in readme
 
 
 def test_cli_raw_attribute_add_remove_and_non_property_failure(tmp_path):
@@ -144,7 +166,7 @@ def test_cli_raw_attribute_add_remove_and_non_property_failure(tmp_path):
     )
     assert code == 0
     remaining = inspect_custom_gui(AseFile.from_path(path))["properties"][0]["attributes"]
-    assert [item["type"] for item in remaining] == ["ASECLIHelpBox"]
+    assert [item["type"] for item in remaining] == ["HelpBoxMzgui"]
     code, payload = run_cli("custom-gui", str(path), "--node", "10", "--add-attribute", "[VectorMzgui(Four)]")
     assert code == 2 and payload["error"]["code"] == "CUSTOM_GUI_ERROR"
     code, payload = run_cli("custom-gui", str(path), "--node", "11", "--tooltip", "提示")
@@ -158,9 +180,13 @@ def test_cli_property_name_target_sets_help_box(tmp_path):
         "custom-gui", str(path), "--property", "_BaseColor", "--help-box", "车漆颜色", "--write"
     )
     assert code == 0
-    assert payload["data"]["changes"][0]["node_id"] == "10"
+    assert payload["data"]["changes"][0]["kind"] == "custom_editor"
+    assert payload["data"]["changes"][0]["after"] == MZGUI_EDITOR
+    assert next(
+        change for change in payload["data"]["changes"] if change.get("node_id") == "10"
+    )
     attrs = inspect_custom_gui(AseFile.from_path(path))["properties"][0]["attributes"]
-    assert {item["type"]: item for item in attrs}["ASECLIHelpBox"]["text"] == "车漆颜色"
+    assert {item["type"]: item for item in attrs}["HelpBoxMzgui"]["text"] == "车漆颜色"
 
 
 def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
@@ -214,12 +240,12 @@ def test_cli_json_spec_atomically_reorders_groups_and_explains(tmp_path):
     base_attrs = {item["type"]: item["text"] for item in properties["_BaseColor"]["attributes"]}
     contrast_attrs = {item["type"]: item["text"] for item in properties["_Contrast"]["attributes"]}
     assert base_attrs == {
-        "ASECLIFoldout": "固有色",
-        "ASECLIHelpBox": "控制车辆基础漆面颜色。",
-        "ASECLITooltip": "变量名：_BaseColor\n默认值：(1, 1, 1, 1)",
+        "FoldoutMzgui": "固有色",
+        "HelpBoxMzgui": "控制车辆基础漆面颜色。",
+        "TooltipMzgui": "变量名：_BaseColor\n默认值：(1, 1, 1, 1)",
     }
-    assert contrast_attrs["ASECLITooltip"] == "变量名：_Contrast\n默认值：1.0"
-    assert contrast_attrs["ASECLIHelpBox"].endswith("对比越弱。")
+    assert contrast_attrs["TooltipMzgui"] == "变量名：_Contrast\n默认值：1.0"
+    assert contrast_attrs["HelpBoxMzgui"].endswith("对比越弱。")
     assert verify_checksum(path.read_text(encoding="utf-8"))[0] is True
 
 

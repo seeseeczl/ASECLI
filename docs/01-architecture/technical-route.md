@@ -121,9 +121,9 @@
 - 安全与许可：不复制或打包 MZGUI 专有源码；只实现 Foldout/Tooltip/HelpBox 与技术 Tooltip。原生提供者存在时不安装；固定路径存在不同内容时拒绝覆盖；不实现 Ramp、搜索、还原按钮和关键字面板。
 - 验收边界：Python 覆盖检测、dry-run、安装、哈希、冲突和 CLI 契约；隔离 Unity 覆盖 C# 编译、三种 attribute 实例化与默认值读取；目标 Inspector 的折叠点击、悬停触发和视觉排版仍需真实 UI 验收。
 
-### ADR-0014 ASECLI 自有元数据协议与唯一内置 GUI
+### ADR-0014 ASECLI 自有元数据协议与唯一内置 GUI（已由 ADR-0017 取代）
 
-- 状态：已确认（2026-09-02，CR-0010 / FR-0009）
+- 状态：历史决策；`CustomEditor` 与元数据命名部分已由 ADR-0017/CR-0016 取代（2026-09-05）
 - 背景：`*Mzgui` 既是序列化属性类型又绑定原生提供者选择，继续把新资产写为该名称会把外部 GUI 标识带入项目。静态扫描和 Editor 反射也使仅安装自有 GUI 的路径依赖无关 MCP 与外部实现。
 - 决策：新写入只使用 `[ASECLIFoldout(...)]`、`[ASECLITooltip(...)]`、`[ASECLIHelpBox(...)]`，唯一推荐 `CustomEditor` 为 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。`gui-support` 只检查和安装固定 ASECLI 资源，移除原生提供者探测、优先级与 `--runtime-probe`。C# 正常属性读取与 Python inspection 仍识别旧三标记；同语义写入或 clear 时只迁移被触碰的属性。
 - 兼容与迁移：不批量修改用户 Shader，不写入或选择 `MZGUI.MZGUI`。含旧属性的 Shader 可查询和由内置 GUI 读取；要开始新写入，用户必须显式把主 Master/编译指令改为 ASECLI Editor。原始专家入口仅接受三种 ASECLI 类型。
@@ -147,3 +147,13 @@
 - 升级协议：只识别登记的旧 SHA-256；dry-run 报告来源与备份路径，写入时使用目录描述符拒绝符号链接，先落盘并 fsync 备份，再复核目标 digest/inode，最后以同目录临时文件原子替换。未知目标、冲突备份、并发变化和替换失败均保留原内容并失败关闭。
 - 验证：REG-0044/0045 覆盖片段顺序、字节哈希、单 placeholder/单 catch/finally、包内容、幂等/冲突/并发/失败恢复；团结 `2022.3.61t9` 完成已知旧 GUI 升级后 C# 编译，ASE `1.9.6.2` 完成创建进程与全新重开进程回归。
 - 回滚：恢复单资源读取与上一已验证资源；若升级中断，从确定性备份恢复。不得用重新加入长期例外替代修复。
+
+### ADR-0017 无原生 MZGUI 时使用独立、能力探测型 ASE Editor 适配层
+
+- 状态：已实现，自动回归与真实 native Editor 只读/编译已验证；双环境 UI 交互待验（2026-09-05，CR-0016 / BUG-0022）
+- 背景：真实 MZGUI 通过直接修改 ASE 的 `PropertyNode.cs`、`MasterNode.cs` 增加编辑 UI 和尾部序列化。这种源码补丁与 ASE 升级强耦合；无补丁的 ASE 打开并保存尾部 MZGUI 数据时会丢失 GUI 能力。
+- 决策：公共 `CustomEditor` 始终为 `MZGUI.MZGUI`。原生实现存在时完全沿用；确认缺失时安装提供同名入口的 clean-room fallback，在 `Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)` 提供 Foldout/Tooltip/HelpBox 三项开关和文本输入。数据写入 ASE 原生 Custom Attributes，不要求用户输入 attribute 代码。
+- 版本策略：不维护乐观 ASE 版本白名单，也不引用 ASE 编译类型。运行时按类型全名和候选成员探测窗口、图、选中 Property、Custom Attributes、Master Custom Editor 与 Save；任一必要能力缺失即在 UI 中报告并停止对应写入。
+- 保存恢复：fallback 在 ASE 图打开后读取编译 Shader 的三类标准 MZGUI 属性；无原生 authoring 时补齐 Custom Attributes，有唯一原生 provider 且 `m_mzguiAttribs`/`m_selectedMzguiAttribs` 能力完整时迁入原生状态并删除双存储。Apply 预检并快照节点、Master 和 Shader 文件，Save 异常恢复内存与磁盘。
+- 跨环境兼容：fallback 实现 `MZGUI.MZGUI` 同名代理，新 Shader 只写该公共类名和三种标准 `*Mzgui` Attribute；移入原生 MZGUI 工程后由原生类无迁移接管。旧 `ASECLI.MaterialGUI.ASECLIMaterialGUI` 仅保留为历史读取别名。
+- 安全/升级：V2 runtime probe 枚举全部同名 provider，外部 fallback 复用、冲突拒写；V1 保持兼容。显式 `--handoff-native` 默认 dry-run，只将已知 fallback 备份并替换为不声明 `MZGUI.MZGUI` 的 authoring-only bridge，唯一 native 复验失败可恢复；未知文件不移动或删除。

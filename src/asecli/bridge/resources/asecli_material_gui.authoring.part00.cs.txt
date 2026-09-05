@@ -1,0 +1,290 @@
+
+#if UNITY_EDITOR
+namespace ASECLI.MaterialGUI.Authoring
+{
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Reflection;
+    using System.Text;
+    using System.Text.RegularExpressions;
+    using UnityEditor;
+    using UnityEngine;
+
+    // Clean-room ASE integration. It uses the public Custom Attributes storage
+    // through a capability-checked reflection adapter and never patches ASE source.
+    public sealed class ASECLIGUIAttributesWindow : EditorWindow
+    {
+        private UnityEngine.Object selectedNode;
+        private string nodeLabel = String.Empty;
+        private string aseVersion = "unknown";
+        private string adapterError = String.Empty;
+        private bool useFoldout;
+        private bool useTooltip;
+        private bool useHelpBox;
+        private bool assignFallbackEditor = true;
+        private string foldout = String.Empty;
+        private string tooltip = String.Empty;
+        private string helpBox = String.Empty;
+        private Vector2 scroll;
+
+        [MenuItem("Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)")]
+        public static void Open()
+        {
+            ASECLIGUIAttributesWindow window = GetWindow<ASECLIGUIAttributesWindow>();
+            window.titleContent = new GUIContent("MZGUI Attributes");
+            window.minSize = new Vector2(340f, 360f);
+            window.Show();
+        }
+
+        private void OnEnable() { EditorApplication.update += TrackSelection; }
+        private void OnDisable() { EditorApplication.update -= TrackSelection; }
+
+        private void TrackSelection()
+        {
+            UnityEngine.Object node;
+            string label;
+            string version;
+            string error;
+            if (!ASEReflection.TrySelectedProperty(out node, out label, out version, out error))
+            {
+                if (selectedNode != null || adapterError != error)
+                {
+                    selectedNode = null;
+                    adapterError = error;
+                    aseVersion = version;
+                    Repaint();
+                }
+                return;
+            }
+            if (node == selectedNode)
+                return;
+            selectedNode = node;
+            nodeLabel = label;
+            aseVersion = version;
+            adapterError = String.Empty;
+            LoadValues();
+            Repaint();
+        }
+
+        private void OnGUI()
+        {
+            EditorGUILayout.LabelField("ASE GUI 属性", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("ASE 版本", aseVersion);
+            GUILayout.Label(
+                "选择一个 ASE Property 节点后，在这里直接编辑兼容 MZGUI 的 Foldout、Tooltip 和 HelpBox。",
+                EditorStyles.wordWrappedLabel);
+            if (selectedNode == null)
+            {
+                GUILayout.Label(
+                    String.IsNullOrEmpty(adapterError) ? "请打开 ASE 并选择一个 Property 节点。" : adapterError,
+                    EditorStyles.wordWrappedLabel);
+                if (GUILayout.Button("重新检测")) TrackSelection();
+                return;
+            }
+
+            EditorGUILayout.LabelField("当前属性", nodeLabel);
+            scroll = EditorGUILayout.BeginScrollView(scroll);
+            useFoldout = EditorGUILayout.ToggleLeft("Foldout", useFoldout);
+            using (new EditorGUI.DisabledScope(!useFoldout))
+                foldout = EditorGUILayout.TextField("分组标题", foldout);
+            EditorGUILayout.Space(8f);
+            useTooltip = EditorGUILayout.ToggleLeft("Tooltip", useTooltip);
+            using (new EditorGUI.DisabledScope(!useTooltip))
+                tooltip = EditorGUILayout.TextArea(tooltip, GUILayout.MinHeight(64f));
+            EditorGUILayout.Space(8f);
+            useHelpBox = EditorGUILayout.ToggleLeft("HelpBox", useHelpBox);
+            using (new EditorGUI.DisabledScope(!useHelpBox))
+                helpBox = EditorGUILayout.TextArea(helpBox, GUILayout.MinHeight(80f));
+            EditorGUILayout.Space(8f);
+            assignFallbackEditor = EditorGUILayout.ToggleLeft(
+                "使用 MZGUI.MZGUI 材质面板", assignFallbackEditor);
+            EditorGUILayout.EndScrollView();
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("应用到节点")) Apply(false);
+            if (GUILayout.Button("应用并保存 Shader")) Apply(true);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void LoadValues()
+        {
+            Dictionary<string, string> values;
+            string error;
+            if (!ASEAttributeStore.TryRead(selectedNode, out values, out error))
+            {
+                adapterError = error;
+                selectedNode = null;
+                return;
+            }
+            useFoldout = values.TryGetValue("FoldoutMzgui", out foldout);
+            useTooltip = values.TryGetValue("TooltipMzgui", out tooltip);
+            useHelpBox = values.TryGetValue("HelpBoxMzgui", out helpBox);
+        }
+
+        private void Apply(bool save)
+        {
+            string error;
+            if (!ASEApplyTransaction.TryApply(
+                selectedNode, useFoldout ? foldout : null,
+                useTooltip ? tooltip : null, useHelpBox ? helpBox : null,
+                assignFallbackEditor, save, out error))
+            { ShowNotification(new GUIContent(error)); return; }
+            ShowNotification(new GUIContent(save ? "已应用并保存" : "已应用"));
+        }
+    }
+
+    internal static class ASEAttributeStore
+    {
+        private static readonly Regex Managed = new Regex(
+            @"^\[?(FoldoutMzgui|TooltipMzgui|HelpBoxMzgui|ASECLIFoldout|ASECLITooltip|ASECLIHelpBox)(?:\((.*)\))?\]?$",
+            RegexOptions.CultureInvariant);
+
+        internal static bool TryRead(
+            UnityEngine.Object node, out Dictionary<string, string> values, out string error)
+        {
+            values = new Dictionary<string, string>(StringComparer.Ordinal);
+            IList attributes;
+            FieldInfo listField;
+            FieldInfo countField;
+            if (!TryStorage(node, out attributes, out listField, out countField, out error))
+                return false;
+            foreach (object item in attributes)
+            {
+                Match match = Managed.Match(item as string ?? String.Empty);
+                if (!match.Success) continue;
+                string encoded = match.Groups[2].Success ? match.Groups[2].Value : String.Empty;
+                string canonical = Canonical(match.Groups[1].Value);
+                string decoded = Decode(encoded);
+                string existing;
+                if (values.TryGetValue(canonical, out existing) && existing != decoded &&
+                    match.Groups[1].Value == canonical)
+                {
+                    error = "同一 MZGUI 属性存在冲突的 canonical 值；已停止写入";
+                    return false;
+                }
+                if (!values.ContainsKey(canonical) || match.Groups[1].Value == canonical)
+                    values[canonical] = decoded;
+            }
+            return true;
+        }
+
+        internal static bool TryWrite(
+            UnityEngine.Object node, string foldout, string tooltip, string help, out string error)
+        {
+            IList attributes;
+            FieldInfo listField;
+            FieldInfo countField;
+            if (!TryStorage(node, out attributes, out listField, out countField, out error))
+                return false;
+            if (foldout != null && foldout.IndexOfAny(";\r\n\\><'\"[]{}=+`~/?!@#$%^&*:".ToCharArray()) >= 0)
+            {
+                error = "Foldout 标题包含 ASE 不接受的字符";
+                return false;
+            }
+            Undo.RecordObject(node, "Edit ASE GUI attributes");
+            List<string> kept = new List<string>();
+            foreach (object item in attributes)
+            {
+                string raw = item as string ?? String.Empty;
+                if (!Managed.IsMatch(raw)) kept.Add(raw);
+            }
+            if (foldout != null) kept.Add("FoldoutMzgui(" + EncodeFoldout(foldout) + ")");
+            if (tooltip != null) kept.Add("TooltipMzgui(" + EncodeUnicode(tooltip) + ")");
+            if (help != null) kept.Add("HelpBoxMzgui(" + EncodeUnicode(help) + ")");
+            attributes.Clear();
+            foreach (string raw in kept) attributes.Add(raw);
+            countField.SetValue(node, attributes.Count);
+            EditorUtility.SetDirty(node);
+            error = String.Empty;
+            return true;
+        }
+
+        internal static bool TryMergeRaw(
+            UnityEngine.Object node, IEnumerable<string> source, out bool changed, out string error)
+        {
+            changed = false;
+            bool handled;
+            if (!ASENativeMzguiReconciler.TryMerge(
+                    node, source, out handled, out changed, out error))
+                return false;
+            if (handled) return true;
+            IList attributes;
+            FieldInfo listField;
+            FieldInfo countField;
+            if (!TryStorage(node, out attributes, out listField, out countField, out error))
+                return false;
+            HashSet<string> existing = new HashSet<string>(StringComparer.Ordinal);
+            foreach (object item in attributes)
+            {
+                Match match = Managed.Match(item as string ?? String.Empty);
+                if (match.Success) existing.Add(Canonical(match.Groups[1].Value));
+            }
+            foreach (string item in source)
+            {
+                string raw = (item ?? String.Empty).Trim();
+                if (raw.StartsWith("[", StringComparison.Ordinal) && raw.EndsWith("]", StringComparison.Ordinal))
+                    raw = raw.Substring(1, raw.Length - 2);
+                Match match = Managed.Match(raw);
+                if (!match.Success || existing.Contains(Canonical(match.Groups[1].Value))) continue;
+                raw = Canonical(match.Groups[1].Value) +
+                    (match.Groups[2].Success ? "(" + match.Groups[2].Value + ")" : String.Empty);
+                if (!changed) Undo.RecordObject(node, "Restore ASE GUI attributes");
+                attributes.Add(raw);
+                existing.Add(Canonical(match.Groups[1].Value));
+                changed = true;
+            }
+            if (changed)
+            {
+                countField.SetValue(node, attributes.Count);
+                EditorUtility.SetDirty(node);
+            }
+            error = String.Empty;
+            return true;
+        }
+
+        internal static bool TryStorage(
+            object node, out IList values, out FieldInfo listField, out FieldInfo countField, out string error)
+        {
+            listField = ASEReflection.Field(node.GetType(), "m_customAttr", "m_customAttributes");
+            countField = ASEReflection.Field(node.GetType(), "m_customAttrCount", "m_customAttributesCount");
+            values = listField != null ? listField.GetValue(node) as IList : null;
+            if (values != null && countField != null)
+            {
+                error = String.Empty;
+                return true;
+            }
+            error = "当前 ASE 版本未暴露兼容的 Custom Attributes 存储；已停止写入";
+            return false;
+        }
+
+        private static string EncodeFoldout(string value)
+        {
+            StringBuilder output = new StringBuilder();
+            foreach (char c in value) output.Append(c <= 127 ? c.ToString() : "#" + ((int)c).ToString("x4"));
+            return output.ToString();
+        }
+
+        private static string EncodeUnicode(string value)
+        {
+            StringBuilder output = new StringBuilder();
+            foreach (char c in value) output.Append("#" + ((int)c).ToString("X4"));
+            return output.ToString();
+        }
+
+        private static string Decode(string value)
+        {
+            return Regex.Replace(value, @"#([0-9A-Fa-f]{4})", delegate(Match match)
+            {
+                return ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString();
+            });
+        }
+
+        private static string Canonical(string value)
+        {
+            if (value == "ASECLIFoldout") return "FoldoutMzgui";
+            if (value == "ASECLITooltip") return "TooltipMzgui";
+            if (value == "ASECLIHelpBox") return "HelpBoxMzgui";
+            return value;
+        }
+    }

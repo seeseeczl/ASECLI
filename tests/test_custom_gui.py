@@ -15,6 +15,7 @@ from asecli.checks import fix_checksum, verify_checksum
 from asecli.core import (
     ASECLI_GUI_EDITOR,
     AseFile,
+    MZGUI_EDITOR,
     SUPPORTED_GUI_EDITORS,
     compiled_custom_editor,
     decode_custom_unicode,
@@ -103,22 +104,25 @@ def test_inspection_returns_property_order_index():
     assert state["properties"][0]["order_index"] == 0
 
 
-def test_inspection_advertises_the_asecli_material_gui():
+def test_inspection_advertises_mzgui_as_the_portable_public_editor():
     state = inspect_custom_gui(AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR)))
     assert state["editor"]["graph"] == ASECLI_GUI_EDITOR
-    assert state["capabilities"]["built_in_editor"] == ASECLI_GUI_EDITOR
+    assert state["capabilities"]["built_in_editor"] == MZGUI_EDITOR
+    assert state["capabilities"]["legacy_fallback_editor"] == ASECLI_GUI_EDITOR
     assert set(state["capabilities"]["supported_editors"]) == SUPPORTED_GUI_EDITORS
 
 
-def test_custom_editor_updates_only_main_master_and_compiled_directive():
+def test_legacy_fallback_editor_input_is_canonicalized_on_write():
     shader = AseFile.from_text(sample_shader())
     secondary_before = shader.graph.node_by_id("0").to_line()
     change = set_custom_editor(shader, ASECLI_GUI_EDITOR)
     assert change["main_node_id"] == "1"
     assert shader.graph.node_by_id("0").to_line() == secondary_before
-    assert shader.graph.node_by_id("1").raw_fields[9] == ASECLI_GUI_EDITOR
-    assert compiled_custom_editor(shader) == ASECLI_GUI_EDITOR
-    assert shader.serialize().count(f'CustomEditor "{ASECLI_GUI_EDITOR}"') == 1
+    assert change["after"] == MZGUI_EDITOR
+    assert shader.graph.node_by_id("1").raw_fields[9] == MZGUI_EDITOR
+    assert compiled_custom_editor(shader) == MZGUI_EDITOR
+    assert shader.serialize().count(f'CustomEditor "{MZGUI_EDITOR}"') == 1
+    assert ASECLI_GUI_EDITOR not in shader.serialize()
     set_custom_editor(shader, None)
     assert shader.graph.node_by_id("1").raw_fields[9] == ""
     assert compiled_custom_editor(shader) is None
@@ -128,8 +132,8 @@ def test_custom_editor_can_be_inserted_when_compiled_directive_is_missing():
     shader = AseFile.from_text(sample_shader().replace('\tCustomEditor "UnityEditor.ShaderGraphLitGUI"\n', ""))
     assert compiled_custom_editor(shader) is None
     set_custom_editor(shader, ASECLI_GUI_EDITOR)
-    assert compiled_custom_editor(shader) == ASECLI_GUI_EDITOR
-    assert shader.prefix.index(f'CustomEditor "{ASECLI_GUI_EDITOR}"') < shader.prefix.index("Fallback Off")
+    assert compiled_custom_editor(shader) == MZGUI_EDITOR
+    assert shader.prefix.index(f'CustomEditor "{MZGUI_EDITOR}"') < shader.prefix.index("Fallback Off")
 
 
 def test_property_metadata_unicode_codecs_use_the_verified_utf16_format():
@@ -315,10 +319,10 @@ def test_recompile_cli_restores_metadata_discarded_by_editor_save(tmp_path, monk
     )
     shader = AseFile.from_text(fix_checksum(compiled))
     set_property_metadata_attribute(
-        shader.graph, "10", semantic_attribute("ASECLIFoldout", "基础参数")
+        shader.graph, "10", semantic_attribute("FoldoutMzgui", "基础参数")
     )
     set_property_metadata_attribute(
-        shader.graph, "10", semantic_attribute("ASECLIHelpBox", "控制最终固有色。")
+        shader.graph, "10", semantic_attribute("HelpBoxMzgui", "控制最终固有色。")
     )
     path.write_text(fix_checksum(shader.serialize()), encoding="utf-8")
 
@@ -335,8 +339,8 @@ def test_recompile_cli_restores_metadata_discarded_by_editor_save(tmp_path, monk
         item["type"]: item
         for item in inspect_custom_gui(restored)["properties"][0]["attributes"]
     }
-    assert attrs["ASECLIFoldout"]["text"] == "基础参数"
-    assert attrs["ASECLIHelpBox"]["text"] == "控制最终固有色。"
+    assert attrs["FoldoutMzgui"]["text"] == "基础参数"
+    assert attrs["HelpBoxMzgui"]["text"] == "控制最终固有色。"
     declaration = next(line for line in restored.prefix.splitlines() if "_BaseColor(" in line)
-    assert "[ASECLIFoldout(" in declaration
-    assert "[ASECLIHelpBox(" in declaration
+    assert "[FoldoutMzgui(" in declaration
+    assert "[HelpBoxMzgui(" in declaration

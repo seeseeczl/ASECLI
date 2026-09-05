@@ -7,7 +7,7 @@ from pathlib import Path
 
 from asecli.cli.main import app
 from asecli.checks import fix_checksum
-from asecli.core import ASECLI_GUI_EDITOR, AseFile, semantic_attribute
+from asecli.core import ASECLI_GUI_EDITOR, AseFile, MZGUI_EDITOR, semantic_attribute
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -164,7 +164,10 @@ def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, m
     assert payload["data"]["staging_reloaded"] is True
     assert payload["data"]["target_graph_reloaded"] is False
     assert payload["data"]["property_presentation"]["valid"] is True
-    assert AseFile.from_path(target).graph.nodes
+    created = AseFile.from_path(target)
+    assert created.graph.nodes
+    assert created.graph.node_by_id("1").raw_fields[9] == MZGUI_EDITOR
+    assert payload["data"]["gui_support"]["recommended_editor"] == MZGUI_EDITOR
 
 
 def test_auto_without_spec_uses_legacy_text_path(tmp_path):

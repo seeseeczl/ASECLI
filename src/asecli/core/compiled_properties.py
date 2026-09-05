@@ -183,7 +183,7 @@ def _parse_attribute(raw: str) -> dict:
     if match is None:
         raise ValueError(f"invalid ShaderLab property attribute: {raw!r}")
     result = {"type": match.group("type"), "raw": raw, "args": match.group("args")}
-    if result["type"] in {"ASECLITooltip", "ASECLIHelpBox"} and result["args"] is not None:
+    if result["type"] in {"ASECLITooltip", "ASECLIHelpBox", "TooltipMzgui", "HelpBoxMzgui"} and result["args"] is not None:
         units = re.findall(r"#([0-9A-Fa-f]{4})", result["args"])
         encoded = b"".join(int(unit, 16).to_bytes(2, "little") for unit in units)
         result["text"] = encoded.decode("utf-16-le", errors="replace")

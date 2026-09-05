@@ -6,10 +6,17 @@ import os
 from pathlib import Path
 import re
 
-from ..bridge import McpError, SpecError, create_shader_via_mcp, load_editor_graph_spec, route_create_backend
+from ..bridge import (
+    MZGUI_EDITOR,
+    McpError,
+    SpecError,
+    create_shader_via_mcp,
+    install_gui_support,
+    load_editor_graph_spec,
+    route_create_backend,
+)
 from ..checks import ChecksumFormatError, fix_checksum, validate_file
 from ..core import (
-    ASECLI_GUI_EDITOR,
     AseFile,
     apply_material_gui_spec,
     main_master_node,
@@ -17,6 +24,7 @@ from ..core import (
     sync_compiled_property_metadata,
 )
 from .commands import CliError, _commit_text, _load
+from .gui_provider import select_editor_provider
 from .io import UnsafeWritePathError, file_digest
 
 
@@ -108,6 +116,10 @@ def _cmd_create_editor(args, spec) -> dict:
     if args.instance_token_argv is not None:
         raise CliError("USAGE_ERROR", "do not pass MCP tokens via argv; use ASECLI_MCP_INSTANCE_TOKEN")
     try:
+        selected_editor, gui_support = select_editor_provider(args.out)
+    except (FileNotFoundError, ValueError, RuntimeError, OSError) as exc:
+        raise CliError("GUI_SUPPORT_ERROR", str(exc)) from exc
+    try:
         result = create_shader_via_mcp(
             args.out,
             spec,
@@ -144,7 +156,9 @@ def _cmd_create_editor(args, spec) -> dict:
             },
         )
     try:
-        output, presentation = _finalize_editor_property_presentation(created, spec)
+        output, presentation = _finalize_editor_property_presentation(
+            created, spec, editor=selected_editor
+        )
         _commit_text(args.out, output, created.source_digest)
         result["shader_sha256"] = file_digest(args.out)
     except (OSError, UnicodeError, ValueError) as exc:
@@ -156,15 +170,18 @@ def _cmd_create_editor(args, spec) -> dict:
     return {
         "created": args.out,
         "backend": "editor",
+        "gui_support": gui_support,
         "property_presentation": presentation,
         **result,
     }
 
 
-def _finalize_editor_property_presentation(created: AseFile, spec) -> tuple[str, dict]:
+def _finalize_editor_property_presentation(
+    created: AseFile, spec, *, editor: str = MZGUI_EDITOR
+) -> tuple[str, dict]:
     """Apply the same v2 presentation contract after ASE commits an Editor graph."""
     presentation_spec = {
-        "editor": ASECLI_GUI_EDITOR,
+        "editor": editor,
         "properties": [
             {
                 "name": node.property_name,

@@ -4,22 +4,17 @@ from dataclasses import dataclass
 import re
 from .model import AseFile, AseGraph, NodeLine
 from .custom_gui_versions import CUSTOM_EDITOR_GRAPH_VERSIONS, PROPERTY_METADATA_TAIL_GRAPH_VERSIONS, TARGET_ASE_VERSION, TARGET_GRAPH_VERSION, require_custom_editor_version, require_property_metadata_tail_version
+from .material_gui_protocol import LEGACY_PROPERTY_METADATA_ATTRIBUTE_TYPES as _ALTERNATE_ASECLI_ATTRIBUTE_TYPES, MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES, PROPERTY_METADATA_ATTRIBUTE_TYPES, canonical_property_metadata_type, equivalent_property_metadata_types
 from .property_presentation import inspect_property_presentation
 
 ASECLI_GUI_EDITOR = "ASECLI.MaterialGUI.ASECLIMaterialGUI"
-SUPPORTED_GUI_EDITORS = frozenset((ASECLI_GUI_EDITOR,))
-CUSTOM_EDITOR_SUGGESTIONS = ("ASEMaterialInspector", ASECLI_GUI_EDITOR, "Rendering.HighDefinition.LightingShaderGraphGUI", "Rendering.HighDefinition.HDUnlitGUI", "UnityEditor.Rendering.HighDefinition.HDLitGUI", "UnityEditor.ShaderGraph.PBRMasterGUI", "UnityEditor.Rendering.HighDefinition.DecalGUI", "UnityEditor.Rendering.HighDefinition.FabricGUI", "UnityEditor.Experimental.Rendering.HDPipeline.HDLitGUI", "Rendering.HighDefinition.DecalGUI", "Rendering.HighDefinition.LitShaderGraphGUI", "Rendering.HighDefinition.DecalShaderGraphGUI", "UnityEditor.ShaderGraphUnlitGUI", "UnityEditor.ShaderGraphLitGUI", "UnityEditor.Rendering.Universal.DecalShaderGraphGUI")
-PROPERTY_METADATA_ATTRIBUTE_TYPES = ("ASECLIFoldout", "ASECLITooltip", "ASECLIHelpBox")
-_LEGACY_MZGUI_ATTRIBUTE_TYPES = ("FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui")
-_LEGACY_TYPE_BY_CANONICAL = dict(zip(PROPERTY_METADATA_ATTRIBUTE_TYPES, _LEGACY_MZGUI_ATTRIBUTE_TYPES))
+MZGUI_EDITOR = "MZGUI.MZGUI"
+SUPPORTED_GUI_EDITORS = frozenset((MZGUI_EDITOR, ASECLI_GUI_EDITOR))
+CUSTOM_EDITOR_SUGGESTIONS = ("ASEMaterialInspector", MZGUI_EDITOR, ASECLI_GUI_EDITOR, "Rendering.HighDefinition.LightingShaderGraphGUI", "Rendering.HighDefinition.HDUnlitGUI", "UnityEditor.Rendering.HighDefinition.HDLitGUI", "UnityEditor.ShaderGraph.PBRMasterGUI", "UnityEditor.Rendering.HighDefinition.DecalGUI", "UnityEditor.Rendering.HighDefinition.FabricGUI", "UnityEditor.Experimental.Rendering.HDPipeline.HDLitGUI", "Rendering.HighDefinition.DecalGUI", "Rendering.HighDefinition.LitShaderGraphGUI", "Rendering.HighDefinition.DecalShaderGraphGUI", "UnityEditor.ShaderGraphUnlitGUI", "UnityEditor.ShaderGraphLitGUI", "UnityEditor.Rendering.Universal.DecalShaderGraphGUI")
 _MASTER_TYPES = {"AmplifyShaderEditor.TemplateMultiPassMasterNode", "AmplifyShaderEditor.TemplateMasterNode", "AmplifyShaderEditor.StandardSurfaceOutputNode", "AmplifyShaderEditor.LogNode"}
 _EDITOR_CLASS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
-_ATTRIBUTE_RE = re.compile(
-    r"^\[(?P<type>[A-Za-z_][A-Za-z0-9_]*)(?:\((?P<args>.*)\))?\]$"
-)
-_CUSTOM_EDITOR_LINE_RE = re.compile(
-    r'(?m)^(?P<indent>[ \t]*)CustomEditor[ \t]+"(?P<name>[^"\r\n]*)"[ \t]*(?:\r?\n|$)'
-)
+_ATTRIBUTE_RE = re.compile(r"^\[(?P<type>[A-Za-z_][A-Za-z0-9_]*)(?:\((?P<args>.*)\))?\]$")
+_CUSTOM_EDITOR_LINE_RE = re.compile(r'(?m)^(?P<indent>[ \t]*)CustomEditor[ \t]+"(?P<name>[^"\r\n]*)"[ \t]*(?:\r?\n|$)')
 _FALLBACK_LINE_RE = re.compile(r"(?im)^(?P<indent>[ \t]*)fallback\b")
 _GROUP_INVALID = frozenset("\r\n\\><'\";:[]{}=+`~/?!@#$%^&*")
 @dataclass(frozen=True)
@@ -55,6 +50,7 @@ def compiled_custom_editor(ase_file: AseFile) -> str | None:
 def set_custom_editor(ase_file: AseFile, editor: str | None) -> dict:
     if editor is not None:
         validate_editor_class(editor)
+        editor = MZGUI_EDITOR if editor == ASECLI_GUI_EDITOR else editor
     node = main_master_node(ase_file.graph)
     before_graph = node.raw_fields[9] or None
     before_compiled = compiled_custom_editor(ase_file)
@@ -150,11 +146,12 @@ def _validated_raw_attribute(raw: str) -> tuple[str, str]:
         raise ValueError("raw property metadata attribute contains a forbidden serialization character")
     parsed = parse_property_metadata_attribute(raw)
     type_name = str(parsed["type"])
-    if type_name not in PROPERTY_METADATA_ATTRIBUTE_TYPES:
+    canonical_type = canonical_property_metadata_type(type_name)
+    if canonical_type is None:
         raise ValueError(
-            "unsupported ASECLI property metadata attribute type: " + type_name
+            "unsupported MZGUI-compatible property metadata attribute type: " + type_name
         )
-    return type_name, raw
+    return canonical_type, raw
 def set_property_metadata_attribute(graph: AseGraph, node_id: str, raw: str) -> dict:
     type_name, raw = _validated_raw_attribute(raw)
     node = graph.node_by_id(node_id)
@@ -166,7 +163,7 @@ def set_property_metadata_attribute(graph: AseGraph, node_id: str, raw: str) -> 
         index
         for index, item in enumerate(attributes)
         if parse_property_metadata_attribute(item)["type"]
-        in {type_name, _LEGACY_TYPE_BY_CANONICAL[type_name]}
+        in equivalent_property_metadata_types(type_name)
     ]
     before = [attributes[i] for i in matching]
     if matching:
@@ -179,29 +176,31 @@ def set_property_metadata_attribute(graph: AseGraph, node_id: str, raw: str) -> 
     _write_property_metadata_tail(graph, node, tail.count_index, attributes)
     return {"kind": "property_metadata", "node_id": node_id, "type": type_name, "before": before, "after": raw}
 def remove_property_metadata_attribute(graph: AseGraph, node_id: str, type_name: str) -> dict:
-    if type_name not in PROPERTY_METADATA_ATTRIBUTE_TYPES:
-        raise ValueError(f"unsupported ASECLI property metadata attribute type: {type_name}")
+    canonical_type = canonical_property_metadata_type(type_name)
+    if canonical_type is None:
+        raise ValueError(f"unsupported MZGUI-compatible property metadata attribute type: {type_name}")
     node = graph.node_by_id(node_id)
     if node is None:
         raise KeyError(f"node {node_id} not found")
     tail = read_property_metadata_tail(graph, node)
-    types = {type_name, _LEGACY_TYPE_BY_CANONICAL[type_name]}
+    types = equivalent_property_metadata_types(canonical_type)
     removed = [item for item in tail.attributes if parse_property_metadata_attribute(item)["type"] in types]
     kept = [item for item in tail.attributes if parse_property_metadata_attribute(item)["type"] not in types]
     _write_property_metadata_tail(graph, node, tail.count_index, kept)
-    return {"kind": "property_metadata", "node_id": node_id, "type": type_name, "removed": removed}
+    return {"kind": "property_metadata", "node_id": node_id, "type": canonical_type, "removed": removed}
 def _write_property_metadata_tail(graph: AseGraph, node: NodeLine, count_index: int, attributes: list[str]) -> None:
     node.raw_fields = node.raw_fields[:count_index] + [str(len(attributes)), *attributes]
     graph.replace_node(node)
 def semantic_attribute(type_name: str, text: str) -> str:
     if len(text) > 4096:
         raise ValueError("custom GUI text must not exceed 4096 characters")
-    if type_name == "ASECLIFoldout":
-        encoded = encode_foldout_title(text)
-    elif type_name in {"ASECLITooltip", "ASECLIHelpBox"}:
-        encoded = encode_custom_unicode(text)
-    else:
+    canonical_type = canonical_property_metadata_type(type_name)
+    if canonical_type is None:
         raise ValueError(f"no text semantic encoder for {type_name}")
+    if canonical_type == "FoldoutMzgui":
+        encoded = encode_foldout_title(text)
+    elif canonical_type in {"TooltipMzgui", "HelpBoxMzgui"}:
+        encoded = encode_custom_unicode(text)
     return f"[{type_name}({encoded})]"
 def inspect_custom_gui(ase_file: AseFile) -> dict:
     main = main_master_node(ase_file.graph)
@@ -236,15 +235,16 @@ def inspect_custom_gui(ase_file: AseFile) -> dict:
         "editor": editor,
         "properties": properties,
         "property_presentation": inspect_property_presentation(
-            editor, properties, ase_file.prefix, asecli_editor=ASECLI_GUI_EDITOR
+            editor, properties, ase_file.prefix, supported_editors=SUPPORTED_GUI_EDITORS
         ),
         "capabilities": {
             "supported_editors": sorted(SUPPORTED_GUI_EDITORS),
-            "built_in_editor": ASECLI_GUI_EDITOR,
+            "built_in_editor": MZGUI_EDITOR,
+            "legacy_fallback_editor": ASECLI_GUI_EDITOR,
             "editor_suggestions": list(CUSTOM_EDITOR_SUGGESTIONS),
             "property_attribute_types": list(PROPERTY_METADATA_ATTRIBUTE_TYPES),
-            "legacy_read_attribute_types": list(_LEGACY_MZGUI_ATTRIBUTE_TYPES),
-            "semantic_operations": {"group": "ASECLIFoldout", "tooltip": "ASECLITooltip", "help_box": "ASECLIHelpBox"},
+            "legacy_read_attribute_types": list(_ALTERNATE_ASECLI_ATTRIBUTE_TYPES),
+            "semantic_operations": {"group": "FoldoutMzgui", "tooltip": "TooltipMzgui", "help_box": "HelpBoxMzgui"},
             "shader_drawer_only": ["ShowIf"],
         },
     }

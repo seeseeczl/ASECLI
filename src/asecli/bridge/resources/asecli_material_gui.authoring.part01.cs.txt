@@ -1,0 +1,235 @@
+    internal static class ASEReflection
+    {
+        private const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic |
+            BindingFlags.Instance | BindingFlags.Static;
+        private static EditorWindow currentWindow;
+        private static object currentGraph;
+
+        internal static bool TryGraph(out EditorWindow window, out object graph)
+        {
+            window = FindWindow();
+            graph = window != null
+                ? Member(window, "CurrentGraph", "OutsideGraph", "m_mainGraphInstance") : null;
+            return window != null && graph != null;
+        }
+
+        internal static IList PropertyNodes(object graph)
+        {
+            IList nodes = graph != null ? Member(graph, "Nodes", "m_nodes") as IList : null;
+            if (nodes == null) return null;
+            ArrayList properties = new ArrayList();
+            foreach (object node in nodes)
+                if (IsPropertyNode(node)) properties.Add(node);
+            return properties;
+        }
+
+        internal static object Value(object target, params string[] names)
+        {
+            return target != null ? Member(target, names) : null;
+        }
+
+        internal static bool TrySelectedProperty(
+            out UnityEngine.Object node, out string label, out string version, out string error)
+        {
+            node = null;
+            label = String.Empty;
+            version = Version();
+            if (!TryGraph(out currentWindow, out currentGraph))
+            {
+                error = "未检测到打开的 Amplify Shader Editor 窗口";
+                return false;
+            }
+            IList selected = currentGraph != null
+                ? Member(currentGraph, "SelectedNodes", "m_selectedNodes") as IList : null;
+            if (selected == null)
+            {
+                error = "当前 ASE 版本无法读取节点选择；已停止写入";
+                return false;
+            }
+            foreach (object candidate in selected)
+            {
+                if (!IsPropertyNode(candidate)) continue;
+                if (node != null)
+                {
+                    node = null;
+                    error = "请只选择一个 Property 节点";
+                    return false;
+                }
+                node = candidate as UnityEngine.Object;
+            }
+            if (node == null)
+            {
+                error = "请在 ASE 中选择一个 Property 节点";
+                return false;
+            }
+            object name = Member(node, "PropertyInspectorName", "PropertyName", "m_propertyName");
+            label = name as string ?? node.name;
+            error = String.Empty;
+            return true;
+        }
+
+        internal static bool TryAssignFallbackEditor(out string error)
+        {
+            object master = currentGraph != null
+                ? Member(currentGraph, "CurrentMasterNode", "CurrentOutputNode", "m_currentMasterNode") : null;
+            FieldInfo field = master != null ? Field(master.GetType(), "m_customInspectorName") : null;
+            if (field == null)
+            {
+                error = "当前 ASE 版本无法设置 Custom Editor；属性已保留，请在 Master 节点手动选择 ASECLI GUI";
+                return false;
+            }
+            UnityEngine.Object target = master as UnityEngine.Object;
+            if (target != null) Undo.RecordObject(target, "Select ASECLI material GUI");
+            field.SetValue(master, "MZGUI.MZGUI");
+            if (target != null) EditorUtility.SetDirty(target);
+            error = String.Empty;
+            return true;
+        }
+
+        internal static bool TryMasterSnapshot(
+            bool required, out object master, out FieldInfo field, out string value, out string error)
+        {
+            master = currentGraph != null
+                ? Member(currentGraph, "CurrentMasterNode", "CurrentOutputNode", "m_currentMasterNode") : null;
+            field = master != null ? Field(master.GetType(), "m_customInspectorName") : null;
+            value = field != null ? field.GetValue(master) as string : null;
+            if (!required || field != null)
+            {
+                error = String.Empty;
+                return true;
+            }
+            error = "当前 ASE 版本无法设置 Custom Editor；事务未开始";
+            return false;
+        }
+
+        internal static bool TryRestoreMaster(object master, FieldInfo field, string value, out string error)
+        {
+            try
+            {
+                if (field != null) field.SetValue(master, value);
+                UnityEngine.Object target = master as UnityEngine.Object;
+                if (target != null) EditorUtility.SetDirty(target);
+                error = String.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.GetBaseException().Message;
+                return false;
+            }
+        }
+
+        internal static bool CanSave(bool required, out string error)
+        {
+            if (!required || SaveMethod() != null)
+            {
+                error = String.Empty;
+                return true;
+            }
+            error = "当前 ASE 版本无法调用保存；事务未开始";
+            return false;
+        }
+
+        internal static bool TryDiskSnapshot(
+            bool required, out string path, out byte[] content, out string error)
+        {
+            path = null;
+            content = null;
+            if (!required) { error = String.Empty; return true; }
+            Shader shader = currentGraph != null ? Member(currentGraph, "CurrentShader") as Shader : null;
+            path = shader != null ? AssetDatabase.GetAssetPath(shader) : null;
+            string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+            string fullPath = !String.IsNullOrEmpty(path)
+                ? System.IO.Path.GetFullPath(System.IO.Path.Combine(projectRoot, path)) : null;
+            if (String.IsNullOrEmpty(fullPath) || !System.IO.File.Exists(fullPath))
+            { error = "无法建立 Shader 磁盘快照；事务未开始"; return false; }
+            content = System.IO.File.ReadAllBytes(fullPath);
+            path = fullPath;
+            error = String.Empty;
+            return true;
+        }
+
+        internal static bool TryRestoreDisk(string path, byte[] content, out string error)
+        {
+            try
+            {
+                if (path != null && content != null) System.IO.File.WriteAllBytes(path, content);
+                AssetDatabase.Refresh();
+                error = String.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            { error = exception.GetBaseException().Message; return false; }
+        }
+
+        internal static bool TrySave(out string error)
+        {
+            MethodInfo save = SaveMethod();
+            if (save == null)
+            {
+                error = "当前 ASE 版本无法调用保存；属性已应用，请使用 ASE 的 Save 按钮";
+                return false;
+            }
+            save.Invoke(currentWindow, new object[] { false });
+            error = String.Empty;
+            return true;
+        }
+
+        private static MethodInfo SaveMethod()
+        {
+            return currentWindow != null
+                ? currentWindow.GetType().GetMethod("SaveToDisk", All, null, new[] { typeof(bool) }, null) : null;
+        }
+
+        internal static FieldInfo Field(Type type, params string[] names)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+                foreach (string name in names)
+                {
+                    FieldInfo field = current.GetField(name, All);
+                    if (field != null) return field;
+                }
+            return null;
+        }
+
+        private static object Member(object target, params string[] names)
+        {
+            Type type = target.GetType();
+            foreach (string name in names)
+            {
+                PropertyInfo property = type.GetProperty(name, All);
+                if (property != null) return property.GetValue(target, null);
+                FieldInfo field = Field(type, name);
+                if (field != null) return field.GetValue(target);
+            }
+            return null;
+        }
+
+        private static EditorWindow FindWindow()
+        {
+            foreach (EditorWindow window in Resources.FindObjectsOfTypeAll<EditorWindow>())
+                if (window != null && window.GetType().FullName == "AmplifyShaderEditor.AmplifyShaderEditorWindow")
+                    return window;
+            return null;
+        }
+
+        private static bool IsPropertyNode(object node)
+        {
+            for (Type type = node != null ? node.GetType() : null; type != null; type = type.BaseType)
+                if (type.FullName == "AmplifyShaderEditor.PropertyNode") return true;
+            return false;
+        }
+
+        private static string Version()
+        {
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type = assembly.GetType("AmplifyShaderEditor.VersionInfo", false);
+                MethodInfo method = type != null ? type.GetMethod("StaticToString", All) : null;
+                if (method != null) return method.Invoke(null, null) as string ?? "unknown";
+            }
+            return "not detected";
+        }
+    }
+}
+#endif

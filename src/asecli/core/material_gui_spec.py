@@ -19,9 +19,9 @@ from .property_presentation import set_property_display_name
 _TOP_KEYS = {"editor", "reorder", "properties"}
 _PROPERTY_KEYS = {"name", "node", "display_name", "group", "help", "tooltip"}
 _SEMANTIC_TYPES = {
-    "group": "ASECLIFoldout",
-    "help": "ASECLIHelpBox",
-    "tooltip": "ASECLITooltip",
+    "group": "FoldoutMzgui",
+    "help": "HelpBoxMzgui",
+    "tooltip": "TooltipMzgui",
 }
 
 
@@ -103,7 +103,7 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
     active_editor = graph_custom_editor(ase_file.graph)
     if has_additions and active_editor not in SUPPORTED_GUI_EDITORS:
         supported = ", ".join(sorted(SUPPORTED_GUI_EDITORS))
-        raise ValueError(f"ASECLI property metadata requires the ASECLI material GUI: {supported}")
+        raise ValueError(f"MZGUI-compatible property metadata requires a selected material GUI: {supported}")
     if reorder and not resolved:
         raise ValueError("reorder=true requires at least one property entry")
     if reorder:

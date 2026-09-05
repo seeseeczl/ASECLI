@@ -8,6 +8,7 @@ from ..core import (
     AseFile,
     graph_custom_editor,
     inspect_custom_gui,
+    MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES,
     resolve_property_node,
     set_custom_editor,
     set_property_metadata_attribute,
@@ -27,13 +28,14 @@ def snapshot_recompile_metadata(path: str) -> dict | None:
     for prop in state["properties"]:
         attributes = [
             item["raw"] for item in prop["attributes"]
-            if item["type"].startswith("ASECLI")
+            if item["type"] in MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES
         ]
         if attributes:
             properties.append({"name": prop["property_name"], "attributes": attributes})
-    if not properties:
+    editor = graph_custom_editor(ase_file.graph)
+    if not properties and editor is None:
         return None
-    return {"editor": graph_custom_editor(ase_file.graph), "properties": properties}
+    return {"editor": editor, "properties": properties}
 
 
 def restore_recompile_metadata(path: str, snapshot: dict) -> tuple[AseFile, int]:

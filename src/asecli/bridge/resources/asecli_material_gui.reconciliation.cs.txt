@@ -1,0 +1,174 @@
+
+#if UNITY_EDITOR
+namespace ASECLI.MaterialGUI.Authoring
+{
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Reflection;
+    using UnityEditor;
+    using UnityEngine;
+
+    // Moves portable Custom Attributes into the native MZGUI authoring state when
+    // and only when the complete native PropertyNode capability is available.
+    internal static class ASENativeMzguiReconciler
+    {
+        internal static bool TryMerge(
+            UnityEngine.Object node, IEnumerable<string> source, out bool handled,
+            out bool changed, out string error)
+        {
+            handled = false;
+            changed = false;
+            int nativeProviders = NativeProviderCount();
+            if (nativeProviders == 0) { error = String.Empty; return true; }
+            if (nativeProviders != 1)
+            { handled = true; error = "检测到多个原生 MZGUI provider；已停止协调"; return false; }
+            FieldInfo attributesField = ASEReflection.Field(node.GetType(), "m_mzguiAttribs");
+            FieldInfo selectedField = ASEReflection.Field(node.GetType(), "m_selectedMzguiAttribs");
+            if (attributesField == null && selectedField == null)
+            { error = String.Empty; return true; }
+            handled = true;
+            IList attributes = attributesField != null ? attributesField.GetValue(node) as IList : null;
+            IList selected = selectedField != null ? selectedField.GetValue(node) as IList : null;
+            if (attributes == null || selected == null)
+            { error = "检测到不完整的原生 MZGUI 状态；已停止协调"; return false; }
+
+            Dictionary<string, string> requested = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (string item in source)
+            {
+                string raw = (item ?? String.Empty).Trim();
+                if (raw.StartsWith("[", StringComparison.Ordinal) && raw.EndsWith("]", StringComparison.Ordinal))
+                    raw = raw.Substring(1, raw.Length - 2);
+                string semantic = Semantic(raw);
+                if (semantic == null) continue;
+                raw = CanonicalRaw(semantic, raw);
+                string previous;
+                if (requested.TryGetValue(semantic, out previous) && previous != raw)
+                { error = "同一 MZGUI 属性存在冲突值；已停止协调"; return false; }
+                requested[semantic] = raw;
+            }
+            if (requested.Count == 0) { error = String.Empty; return true; }
+
+            Dictionary<string, int> indexes = new Dictionary<string, int>(StringComparer.Ordinal);
+            Dictionary<string, object> records = new Dictionary<string, object>(StringComparer.Ordinal);
+            for (int index = 0; index < attributes.Count; index++)
+            {
+                object record = attributes[index];
+                string name = ReadString(record, "Name");
+                string value = ReadString(record, "Attribute");
+                MethodInfo modify = record != null ? record.GetType().GetMethod(
+                    "ModifyAttribute", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                    null, new[] { typeof(string), typeof(string) }, null) : null;
+                if (String.IsNullOrEmpty(name) || value == null || modify == null) continue;
+                if (indexes.ContainsKey(name))
+                { error = "原生 MZGUI 属性表包含重复项；已停止协调"; return false; }
+                indexes[name] = index;
+                records[name] = record;
+            }
+            foreach (string semantic in requested.Keys)
+                if (!indexes.ContainsKey(semantic))
+                { error = "原生 MZGUI 缺少 " + semantic + " capability；已停止协调"; return false; }
+
+            Undo.RecordObject(node, "Reconcile native MZGUI attributes");
+            foreach (KeyValuePair<string, string> item in requested)
+            {
+                int index = indexes[item.Key];
+                object record = records[item.Key];
+                string bracketed = "[" + item.Value + "]";
+                if (ReadString(record, "Attribute") != bracketed)
+                {
+                    record.GetType().GetMethod("ModifyAttribute",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                        null, new[] { typeof(string), typeof(string) }, null)
+                        .Invoke(record, new object[] { item.Key, bracketed });
+                    changed = true;
+                }
+                if (!ContainsIndex(selected, index)) { selected.Add(index); changed = true; }
+            }
+            bool removed;
+            if (!TryRemovePortable(node, out removed, out error)) return false;
+            changed |= removed;
+            FieldInfo selectedArray = ASEReflection.Field(node.GetType(), "m_selectedMzguiAttribsArr");
+            if (selectedArray != null)
+            {
+                bool[] values = new bool[attributes.Count];
+                foreach (object value in selected)
+                { int index = Convert.ToInt32(value); if (index >= 0 && index < values.Length) values[index] = true; }
+                selectedArray.SetValue(node, values);
+            }
+            if (changed) EditorUtility.SetDirty(node);
+            error = String.Empty;
+            return true;
+        }
+
+        private static string Semantic(string raw)
+        {
+            if (raw.StartsWith("FoldoutMzgui", StringComparison.Ordinal)) return "Foldout";
+            if (raw.StartsWith("TooltipMzgui", StringComparison.Ordinal)) return "Tooltip";
+            if (raw.StartsWith("HelpBoxMzgui", StringComparison.Ordinal)) return "HelpBox";
+            if (raw.StartsWith("ASECLIFoldout", StringComparison.Ordinal)) return "Foldout";
+            if (raw.StartsWith("ASECLITooltip", StringComparison.Ordinal)) return "Tooltip";
+            if (raw.StartsWith("ASECLIHelpBox", StringComparison.Ordinal)) return "HelpBox";
+            return null;
+        }
+
+        private static string CanonicalRaw(string semantic, string raw)
+        {
+            string name = semantic == "Foldout" ? "FoldoutMzgui" :
+                (semantic == "Tooltip" ? "TooltipMzgui" : "HelpBoxMzgui");
+            int arguments = raw.IndexOf('(');
+            return name + (arguments >= 0 ? raw.Substring(arguments) : String.Empty);
+        }
+
+        private static string ReadString(object target, string name)
+        {
+            if (target == null) return null;
+            PropertyInfo property = target.GetType().GetProperty(name,
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (property != null) return property.GetValue(target, null) as string;
+            FieldInfo field = ASEReflection.Field(target.GetType(), name);
+            return field != null ? field.GetValue(target) as string : null;
+        }
+
+        private static bool ContainsIndex(IList selected, int index)
+        {
+            foreach (object value in selected) if (Convert.ToInt32(value) == index) return true;
+            return false;
+        }
+
+        private static bool TryRemovePortable(
+            UnityEngine.Object node, out bool changed, out string error)
+        {
+            changed = false;
+            IList values; FieldInfo listField; FieldInfo countField;
+            if (!ASEAttributeStore.TryStorage(
+                    node, out values, out listField, out countField, out error)) return false;
+            for (int index = values.Count - 1; index >= 0; index--)
+            {
+                string raw = values[index] as string ?? String.Empty;
+                if (Semantic(raw.TrimStart('[')) == null &&
+                    !raw.StartsWith("ASECLIFoldout", StringComparison.Ordinal) &&
+                    !raw.StartsWith("ASECLITooltip", StringComparison.Ordinal) &&
+                    !raw.StartsWith("ASECLIHelpBox", StringComparison.Ordinal)) continue;
+                values.RemoveAt(index);
+                changed = true;
+            }
+            if (changed) countField.SetValue(node, values.Count);
+            error = String.Empty;
+            return true;
+        }
+
+        private static int NativeProviderCount()
+        {
+            int count = 0;
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type = assembly.GetType("MZGUI.MZGUI", false);
+                if (type == null || !typeof(ShaderGUI).IsAssignableFrom(type)) continue;
+                if (type.GetInterface("ASECLI.MaterialGUI.IASECLIFallbackProvider") == null) count++;
+            }
+            return count;
+        }
+    }
+}
+#endif

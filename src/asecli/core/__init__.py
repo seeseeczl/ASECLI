@@ -1,6 +1,8 @@
 from .graph_ops import connect, disconnect, next_free_node_id, node_from_schema, remove_node, set_node_field
 from .custom_gui import (
     ASECLI_GUI_EDITOR,
+    MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES,
+    MZGUI_EDITOR,
     CUSTOM_EDITOR_SUGGESTIONS,
     PROPERTY_METADATA_ATTRIBUTE_TYPES,
     SUPPORTED_GUI_EDITORS,
@@ -49,7 +51,7 @@ __all__ = [
     "AseFile", "AseGraph", "NodeLine", "WireLine", "parse_graph_text", "parse_node_line",
     "connect", "disconnect", "next_free_node_id", "node_from_schema", "remove_node", "set_node_field",
     "layout_positions", "tidy",
-    "ASECLI_GUI_EDITOR", "CUSTOM_EDITOR_SUGGESTIONS", "PROPERTY_METADATA_ATTRIBUTE_TYPES",
+    "ASECLI_GUI_EDITOR", "MZGUI_EDITOR", "CUSTOM_EDITOR_SUGGESTIONS", "PROPERTY_METADATA_ATTRIBUTE_TYPES", "MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES",
     "SUPPORTED_GUI_EDITORS",
     "compiled_custom_editor", "decode_custom_unicode", "decode_foldout_title",
     "encode_custom_unicode", "encode_foldout_title", "graph_custom_editor",

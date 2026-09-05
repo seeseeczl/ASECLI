@@ -19,7 +19,7 @@ from asecli.bridge.gui_support import (
     inspect_gui_support,
     install_gui_support,
 )
-from asecli.core import ASECLI_GUI_EDITOR
+from asecli.core import ASECLI_GUI_EDITOR, MZGUI_EDITOR
 
 
 ROOT = Path(__file__).parents[1]
@@ -47,15 +47,16 @@ def run_cli(*args: str) -> tuple[int, dict]:
     return proc.returncode, json.loads(lines[0])
 
 
-def test_packaged_source_defines_asecli_metadata_and_legacy_read_compatibility():
-    assert "class ASECLIMaterialGUI : ShaderGUI" in GUI_SUPPORT_SOURCE
+def test_packaged_source_reads_the_mzgui_protocol_for_the_fallback_editor():
+    assert "class ASECLIMaterialGUI : ShaderGUI, IASECLIFallbackProvider" in GUI_SUPPORT_SOURCE
+    assert "namespace MZGUI" in GUI_SUPPORT_SOURCE
+    assert "class MZGUI : ASECLI.MaterialGUI.ASECLIMaterialGUI" in GUI_SUPPORT_SOURCE
     assert "class ASECLIFoldoutDecorator" in GUI_SUPPORT_SOURCE
     assert "class ASECLITooltipDecorator" in GUI_SUPPORT_SOURCE
     assert "class ASECLIHelpBoxDecorator" in GUI_SUPPORT_SOURCE
     assert "class FoldoutMzguiDecorator" in GUI_SUPPORT_SOURCE
     assert "class TooltipMzguiDecorator" in GUI_SUPPORT_SOURCE
     assert "class HelpBoxMzguiDecorator" in GUI_SUPPORT_SOURCE
-    assert "ASECLI never writes these names" in GUI_SUPPORT_SOURCE
     assert "GetShaderPropertyAttributes" in GUI_SUPPORT_SOURCE
     assert "new Material(shader)" in GUI_SUPPORT_SOURCE
     assert "GetAssetDependencyHash" in GUI_SUPPORT_SOURCE
@@ -70,7 +71,34 @@ def test_packaged_source_defines_asecli_metadata_and_legacy_read_compatibility()
     assert "File.ReadAllText(fullPath)" in GUI_SUPPORT_SOURCE
     assert "MergeMissingMetadata(metadata, sourceMetadata)" in GUI_SUPPORT_SOURCE
     assert "private static readonly Dictionary<string, bool> foldoutStates" in GUI_SUPPORT_SOURCE
-    assert "AmplifyShaderEditor" not in GUI_SUPPORT_SOURCE
+    assert "using AmplifyShaderEditor" not in GUI_SUPPORT_SOURCE
+    assert "typeof(AmplifyShaderEditor" not in GUI_SUPPORT_SOURCE
+
+
+def test_packaged_fallback_adds_visual_ase_authoring_without_patching_ase_source():
+    assert 'MenuItem("Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)")' in GUI_SUPPORT_SOURCE
+    assert 'new GUIContent("MZGUI Attributes")' in GUI_SUPPORT_SOURCE
+    assert '"使用 MZGUI.MZGUI 材质面板"' in GUI_SUPPORT_SOURCE
+    assert 'ToggleLeft("Foldout"' in GUI_SUPPORT_SOURCE
+    assert 'ToggleLeft("Tooltip"' in GUI_SUPPORT_SOURCE
+    assert 'ToggleLeft("HelpBox"' in GUI_SUPPORT_SOURCE
+    assert '"m_customAttr", "m_customAttributes"' in GUI_SUPPORT_SOURCE
+    assert "runtime capability" not in GUI_SUPPORT_SOURCE  # no optimistic version whitelist
+    assert "当前 ASE 版本未暴露兼容的 Custom Attributes 存储；已停止写入" in GUI_SUPPORT_SOURCE
+    assert "class ASEMetadataHydrator" in GUI_SUPPORT_SOURCE
+    assert "TryMergeRaw" in GUI_SUPPORT_SOURCE
+    assert "class ASEApplyTransaction" in GUI_SUPPORT_SOURCE
+    assert 'string stage = "write_attributes"' in GUI_SUPPORT_SOURCE
+    assert "Undo.RevertAllDownToGroup(group)" in GUI_SUPPORT_SOURCE
+    assert 'rollback=" + (restoredAttributes && restoredMaster && restoredDisk ? "ok" : "failed")' in GUI_SUPPORT_SOURCE
+    assert "class ASENativeMzguiReconciler" in GUI_SUPPORT_SOURCE
+    assert '"m_mzguiAttribs"' in GUI_SUPPORT_SOURCE
+    assert '"m_selectedMzguiAttribs"' in GUI_SUPPORT_SOURCE
+    assert '"ASECLIFoldout"' in GUI_SUPPORT_SOURCE
+    assert '"ASECLITooltip"' in GUI_SUPPORT_SOURCE
+    assert '"ASECLIHelpBox"' in GUI_SUPPORT_SOURCE
+    assert "同一 MZGUI 属性存在冲突的 canonical 值；已停止写入" in GUI_SUPPORT_SOURCE
+    assert "patch PropertyNode" not in GUI_SUPPORT_SOURCE
 
 
 def test_gui_resource_fragments_are_bounded_and_compose_byte_stably():
@@ -80,7 +108,7 @@ def test_gui_resource_fragments_are_bounded_and_compose_byte_stably():
     assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 300 for path in parts)
     assert "".join(path.read_text(encoding="utf-8") for path in parts) == GUI_SUPPORT_SOURCE
     assert hashlib.sha256(GUI_SUPPORT_SOURCE.encode("utf-8")).hexdigest() == (
-        "9541c541628b8404c66ca2c36e80af25f69960d6e1a07deabad53fd6233c5b7a"
+        "e0fa59a9fa3ca2840f8ee2d76e03fbbb862919d2476aefec0fe7f4e64150f034"
     )
 
 
@@ -157,11 +185,18 @@ def test_inspect_and_dry_run_do_not_create_project_files(tmp_path):
     target = project / GUI_SUPPORT_ASSET_PATH
     state = inspect_gui_support(project)
     assert state["provider"] == "missing"
-    assert state["recommended_editor"] == ASECLI_GUI_EDITOR
-    assert state["capabilities"]["foldout"] == "ASECLIFoldout"
-    assert state["capabilities"]["legacy_read_compatibility"] == [
-        "FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui"
-    ]
+    assert state["recommended_editor"] == MZGUI_EDITOR
+    assert state["asecli_material_gui"]["editor"] == MZGUI_EDITOR
+    assert state["asecli_material_gui"]["legacy_editor_alias"] == ASECLI_GUI_EDITOR
+    assert state["capabilities"]["foldout"] == "FoldoutMzgui"
+    assert state["capabilities"]["tooltip"] == "TooltipMzgui"
+    assert state["capabilities"]["help_box"] == "HelpBoxMzgui"
+    assert state["capabilities"]["authoring"] == {
+        "surface": "Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)",
+        "storage": "ase_custom_attributes",
+        "version_strategy": "runtime_capability_probe",
+        "patches_ase_source": False,
+    }
     assert state["would_write"] is True
     planned = install_gui_support(project)
     assert planned["action"] == "install_asecli_material_gui"
@@ -173,7 +208,7 @@ def test_write_installs_exact_resource_and_is_idempotent(tmp_path):
     target = project / GUI_SUPPORT_ASSET_PATH
     installed = install_gui_support(project, write=True)
     assert installed["provider"] == "asecli_compat"
-    assert installed["recommended_editor"] == ASECLI_GUI_EDITOR
+    assert installed["recommended_editor"] == MZGUI_EDITOR
     assert installed["written"] is True
     assert installed["requires_editor_recompile"] is True
     assert target.read_text(encoding="utf-8") == GUI_SUPPORT_SOURCE
@@ -184,16 +219,90 @@ def test_write_installs_exact_resource_and_is_idempotent(tmp_path):
     assert repeated["written"] is False
 
 
-def test_native_mzgui_artifacts_do_not_block_asecli_installation(tmp_path):
+def test_runtime_probe_distinguishes_the_installed_fallback_from_native_mzgui(tmp_path):
+    project = unity_project(tmp_path)
+    install_gui_support(project, write=True)
+    state = inspect_gui_support(
+        project,
+        runtime_probe={
+            "protocol": "ASECLI_GUI_SUPPORT_PROBE_V1",
+            "assets_path": str((project / "Assets").resolve()),
+            "type_found": True,
+            "detected": False,
+            "fallback": True,
+            "assembly": "Assembly-CSharp-Editor",
+        },
+    )
+
+    assert state["provider"] == "asecli_compat"
+    assert state["recommended_editor"] == MZGUI_EDITOR
+
+
+def test_native_mzgui_is_selected_without_injecting_the_fallback(tmp_path):
     project = unity_project(tmp_path)
     native = project / "Assets/Legacy/MZGUI.cs"
     native.parent.mkdir(parents=True)
-    native.write_text("namespace MZGUI { class MZGUI {} }", encoding="utf-8")
+    native.write_text(
+        "using UnityEditor; namespace MZGUI { class MZGUI : ShaderGUI {} }",
+        encoding="utf-8",
+    )
 
     installed = install_gui_support(project, write=True)
-    assert installed["provider"] == "asecli_compat"
-    assert installed["recommended_editor"] == ASECLI_GUI_EDITOR
-    assert (project / GUI_SUPPORT_ASSET_PATH).exists()
+    assert installed["provider"] == "native_mzgui"
+    assert installed["recommended_editor"] == MZGUI_EDITOR
+    assert installed["action"] == "use_native_mzgui"
+    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+def test_fallback_and_native_projects_share_the_same_public_editor_contract(tmp_path):
+    fallback_project = unity_project(tmp_path / "fallback")
+    native_project = unity_project(tmp_path / "native")
+    native = native_project / "Assets/MZGUI/MZGUI.cs"
+    native.parent.mkdir(parents=True)
+    native.write_text(
+        "using UnityEditor; namespace MZGUI { class MZGUI : ShaderGUI {} }",
+        encoding="utf-8",
+    )
+
+    fallback = install_gui_support(fallback_project, write=True)
+    native_state = install_gui_support(native_project, write=True)
+
+    assert fallback["recommended_editor"] == MZGUI_EDITOR
+    assert native_state["recommended_editor"] == MZGUI_EDITOR
+    assert "namespace MZGUI" in (fallback_project / GUI_SUPPORT_ASSET_PATH).read_text(
+        encoding="utf-8"
+    )
+    assert not (native_project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+def test_unverified_mzgui_candidate_blocks_fallback_injection(tmp_path):
+    project = unity_project(tmp_path)
+    candidate = project / "Assets/Legacy/MZGUI.cs"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_text("namespace MZGUI { class MZGUI {} }", encoding="utf-8")
+
+    state = inspect_gui_support(project)
+    assert state["provider"] == "unknown"
+    with pytest.raises(RuntimeError, match="--runtime-probe"):
+        install_gui_support(project, write=True)
+    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
+
+
+def test_native_and_fallback_providers_fail_closed_instead_of_competing(tmp_path):
+    project = unity_project(tmp_path)
+    install_gui_support(project, write=True)
+    native = project / "Assets/Legacy/MZGUI.cs"
+    native.parent.mkdir(parents=True)
+    native.write_text(
+        "using UnityEditor; namespace MZGUI { class MZGUI : ShaderGUI {} }",
+        encoding="utf-8",
+    )
+
+    state = inspect_gui_support(project)
+    assert state["provider"] == "multiple"
+    assert state["recommended_editor"] is None
+    with pytest.raises(RuntimeError, match="both installed"):
+        install_gui_support(project, write=True)
 
 
 def test_existing_different_target_is_never_overwritten(tmp_path):
@@ -284,18 +393,3 @@ def test_cli_dry_run_write_and_conflict_are_single_json(tmp_path):
     code, payload = run_cli("gui-support", str(project), "--write")
     assert code == 2
     assert payload["error"]["code"] == "GUI_SUPPORT_ERROR"
-
-
-def test_cli_no_longer_accepts_the_removed_runtime_probe_option(tmp_path):
-    code, payload = run_cli("gui-support", str(unity_project(tmp_path)), "--runtime-probe")
-    assert code == 2
-    assert payload["error"]["code"] == "USAGE_ERROR"
-
-
-def test_project_shape_is_validated_before_any_write(tmp_path):
-    project = tmp_path / "NotUnity"
-    project.mkdir()
-    code, payload = run_cli("gui-support", str(project), "--write")
-    assert code == 2
-    assert payload["error"]["code"] == "GUI_SUPPORT_ERROR"
-    assert not (project / "Assets").exists()

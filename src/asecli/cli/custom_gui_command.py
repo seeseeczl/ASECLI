@@ -7,6 +7,8 @@ from pathlib import Path
 
 from ..checks import fix_checksum, validate_file
 from ..core import (
+    ASECLI_GUI_EDITOR,
+    MZGUI_EDITOR,
     SUPPORTED_GUI_EDITORS,
     apply_material_gui_spec,
     graph_custom_editor,
@@ -63,23 +65,23 @@ def cmd_custom_gui(args) -> dict:
 
             additions: list[str] = []
             if args.group is not None:
-                additions.append(semantic_attribute("ASECLIFoldout", args.group))
+                additions.append(semantic_attribute("FoldoutMzgui", args.group))
             if args.tooltip is not None:
-                additions.append(semantic_attribute("ASECLITooltip", args.tooltip))
+                additions.append(semantic_attribute("TooltipMzgui", args.tooltip))
             if args.help_box is not None:
-                additions.append(semantic_attribute("ASECLIHelpBox", args.help_box))
+                additions.append(semantic_attribute("HelpBoxMzgui", args.help_box))
             additions.extend(args.add_attribute or [])
 
             if additions and graph_custom_editor(f.graph) not in SUPPORTED_GUI_EDITORS:
                 supported = ", ".join(sorted(SUPPORTED_GUI_EDITORS))
                 raise ValueError(
-                    "ASECLI property metadata requires the ASECLI material GUI; "
+                    "MZGUI-compatible property metadata requires a selected material GUI; "
                     f"pass --editor with one of: {supported}"
                 )
 
             removals = (
-                [(args.clear_group, "ASECLIFoldout"), (args.clear_tooltip, "ASECLITooltip"),
-                 (args.clear_help_box, "ASECLIHelpBox")]
+                [(args.clear_group, "FoldoutMzgui"), (args.clear_tooltip, "TooltipMzgui"),
+                 (args.clear_help_box, "HelpBoxMzgui")]
             )
             for enabled, type_name in removals:
                 if enabled:
@@ -88,6 +90,9 @@ def cmd_custom_gui(args) -> dict:
                 changes.append(remove_property_metadata_attribute(f.graph, target, type_name))
             for raw in additions:
                 changes.append(set_property_metadata_attribute(f.graph, target, raw))
+
+        if changes and graph_custom_editor(f.graph) == ASECLI_GUI_EDITOR:
+            changes.insert(0, set_custom_editor(f, MZGUI_EDITOR))
         if changes:
             changes.extend(sync_compiled_property_metadata(f))
         state = inspect_custom_gui(f)

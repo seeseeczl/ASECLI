@@ -280,4 +280,11 @@
         }
     }
 }
+
+// Portable public entry point. A shader authored in a fallback project keeps
+// working unchanged when moved to a project containing the native MZGUI package.
+namespace MZGUI
+{
+    public sealed class MZGUI : ASECLI.MaterialGUI.ASECLIMaterialGUI { }
+}
 #endif
