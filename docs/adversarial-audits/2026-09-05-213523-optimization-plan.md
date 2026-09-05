@@ -59,4 +59,4 @@
 - 自动验证：`268 passed, 3 skipped in 20.67s`；三个 skip 为需要真实 Editor 环境的既有 bridge 边界。
 - 目录门禁：`50 parsed / 6 conditional / 0 missed`，耗时 `0.56s`。
 - 治理与格式：CI governance 零 finding，`uv lock --check`、`git diff --check` 通过。
-- 发布状态：当前仅完成工作树修复，没有提交、推送、创建 v0.4.2 Release 或覆盖本机 v0.4.1；这些外部动作需单独授权。
+- 发布状态：用户后续授权后已由 `v0.4.2@6755c26` 发布；run `33972763464`、六项正式资产、本机安装和隔离 `v0.4.1` 回滚/恢复均通过，未覆盖历史 tag/Release。
