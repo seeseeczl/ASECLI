@@ -8,6 +8,7 @@ import os
 import sys
 
 from .. import __version__
+from ..core import ENABLE_IF_OPERATORS
 from .commands import EXIT_BRIDGE, EXIT_ERROR, EXIT_OK, CliError
 from .commands import (
     cmd_add_node,
@@ -106,9 +107,9 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("custom-gui", help="inspect or edit CustomEditor and MZGUI-compatible property metadata")
     s.add_argument("file")
     target = s.add_mutually_exclusive_group()
-    target.add_argument("--node", help="PropertyNode id for tooltip/group/help-box operations")
+    target.add_argument("--node", help="PropertyNode id for GUI metadata operations")
     target.add_argument("--property", help="exact ShaderLab property name, for example _PaintColor")
-    s.add_argument("--spec", help="JSON file for atomic property ordering/group/help operations")
+    s.add_argument("--spec", help="JSON file for atomic ordering/group/tooltip/help/enable operations")
     editor = s.add_mutually_exclusive_group()
     editor.add_argument("--editor", help="namespace-qualified ShaderGUI class")
     editor.add_argument("--clear-editor", action="store_true")
@@ -119,8 +120,20 @@ def build_parser() -> argparse.ArgumentParser:
     tooltip.add_argument("--tooltip", help="set TooltipMzgui text")
     tooltip.add_argument("--clear-tooltip", action="store_true")
     help_box = s.add_mutually_exclusive_group()
-    help_box.add_argument("--help-box", help="set HelpBoxMzgui message")
+    help_box.add_argument("--help-box", help="set optional user-authored HelpBoxMzgui content")
     help_box.add_argument("--clear-help-box", action="store_true")
+    enabled_if = s.add_mutually_exclusive_group()
+    enabled_if.add_argument(
+        "--enabled-if",
+        metavar="PROPERTY",
+        help="enable this control only when another float property matches",
+    )
+    enabled_if.add_argument("--clear-enabled-if", action="store_true")
+    s.add_argument(
+        "--enabled-if-operator",
+        choices=ENABLE_IF_OPERATORS,
+    )
+    s.add_argument("--enabled-if-value", type=float)
     s.add_argument("--add-attribute", action="append", help="expert: add/replace an MZGUI-compatible metadata value")
     s.add_argument("--remove-attribute", action="append", help="expert: remove an MZGUI-compatible metadata type")
     s.add_argument("--write", action="store_true")

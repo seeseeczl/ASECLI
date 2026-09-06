@@ -7,7 +7,7 @@ from pathlib import Path
 
 from asecli.cli.main import app
 from asecli.checks import fix_checksum
-from asecli.core import ASECLI_GUI_EDITOR, AseFile, MZGUI_EDITOR, semantic_attribute
+from asecli.core import ASECLI_GUI_EDITOR, AseFile, MZGUI_EDITOR
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -26,7 +26,7 @@ def caster_spec() -> dict:
                 "position": [-520, 20],
                 "property_name": "_BaseColor",
                 "inspector_name": "基础颜色",
-                "help": "控制材质的基础颜色。",
+                "tooltip": "控制材质的基础颜色。",
                 "parameter_type": "Property",
             }
         ],
@@ -50,7 +50,6 @@ def _write_spec(tmp_path):
 
 
 def _editor_created_shader() -> str:
-    help_attribute = semantic_attribute("ASECLIHelpBox", "控制材质的基础颜色。")
     return fix_checksum(f'''Shader "Tests/EditorCaster"
 {{
 \tProperties
@@ -65,7 +64,7 @@ def _editor_created_shader() -> str:
 Version=19602
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;0;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphLitGUI;0;1
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;1;0,0;Float;False;True;-1;2;UnityEditor.ShaderGraphLitGUI;0;1
-Node;AmplifyShaderEditor.ColorNode;10;100,100;Inherit;False;Property;_BaseColor;基础颜色;0;0;Create;False;1;{help_attribute}
+Node;AmplifyShaderEditor.ColorNode;10;100,100;Inherit;False;Property;_BaseColor;基础颜色;0;0;Create;False;0
 ASEEND*/
 //CHKSM=PLACEHOLDER''')
 
@@ -115,7 +114,7 @@ def test_cli_rejects_legacy_v1_spec_before_mcp(tmp_path, monkeypatch, capsys):
     target = _project_target(tmp_path)
     raw = caster_spec()
     raw["version"] = 1
-    raw["nodes"][0].pop("help")
+    raw["nodes"][0].pop("tooltip")
     spec_path = tmp_path / "legacy-v1.json"
     spec_path.write_text(json.dumps(raw), encoding="utf-8")
     called = False

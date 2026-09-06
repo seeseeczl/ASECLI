@@ -12,6 +12,7 @@ import sys
 import pytest
 
 from asecli.bridge.gui_support import (
+    GUI_AUTHORING_SOURCE,
     GUI_SUPPORT_ASSET_PATH,
     GUI_SUPPORT_RESOURCE_PARTS,
     GUI_SUPPORT_SHA256,
@@ -57,6 +58,9 @@ def test_packaged_source_reads_the_mzgui_protocol_for_the_fallback_editor():
     assert "class FoldoutMzguiDecorator" in GUI_SUPPORT_SOURCE
     assert "class TooltipMzguiDecorator" in GUI_SUPPORT_SOURCE
     assert "class HelpBoxMzguiDecorator" in GUI_SUPPORT_SOURCE
+    assert "class EnableIfMzguiDrawer" in GUI_SUPPORT_SOURCE
+    assert "EditorGUI.DisabledScope(!enabled)" in GUI_SUPPORT_SOURCE
+    assert "base.DrawProp(position, prop, label, editor)" in GUI_SUPPORT_SOURCE
     assert "GetShaderPropertyAttributes" in GUI_SUPPORT_SOURCE
     assert "new Material(shader)" in GUI_SUPPORT_SOURCE
     assert "GetAssetDependencyHash" in GUI_SUPPORT_SOURCE
@@ -82,6 +86,9 @@ def test_packaged_fallback_adds_visual_ase_authoring_without_patching_ase_source
     assert 'ToggleLeft("Foldout"' in GUI_SUPPORT_SOURCE
     assert 'ToggleLeft("Tooltip"' in GUI_SUPPORT_SOURCE
     assert 'ToggleLeft("HelpBox"' in GUI_SUPPORT_SOURCE
+    assert 'kept.Add("HelpBoxMzgui(' in GUI_SUPPORT_SOURCE
+    assert 'ToggleLeft(\n                "条件启用（不满足时置灰）"' in GUI_SUPPORT_SOURCE
+    assert 'kept.Add("EnableIfMzgui(' in GUI_SUPPORT_SOURCE
     assert '"m_customAttr", "m_customAttributes"' in GUI_SUPPORT_SOURCE
     assert "runtime capability" not in GUI_SUPPORT_SOURCE  # no optimistic version whitelist
     assert "当前 ASE 版本未暴露兼容的 Custom Attributes 存储；已停止写入" in GUI_SUPPORT_SOURCE
@@ -108,7 +115,7 @@ def test_gui_resource_fragments_are_bounded_and_compose_byte_stably():
     assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 300 for path in parts)
     assert "".join(path.read_text(encoding="utf-8") for path in parts) == GUI_SUPPORT_SOURCE
     assert hashlib.sha256(GUI_SUPPORT_SOURCE.encode("utf-8")).hexdigest() == (
-        "e0fa59a9fa3ca2840f8ee2d76e03fbbb862919d2476aefec0fe7f4e64150f034"
+        "8f726d9d3d5b8eff4100a5f7bb6ddcbaabadad60a27e8e0641f3a1e3db624bfa"
     )
 
 
@@ -191,6 +198,7 @@ def test_inspect_and_dry_run_do_not_create_project_files(tmp_path):
     assert state["capabilities"]["foldout"] == "FoldoutMzgui"
     assert state["capabilities"]["tooltip"] == "TooltipMzgui"
     assert state["capabilities"]["help_box"] == "HelpBoxMzgui"
+    assert state["capabilities"]["enabled_if"] == "EnableIfMzgui"
     assert state["capabilities"]["authoring"] == {
         "surface": "Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)",
         "storage": "ase_custom_attributes",
@@ -238,22 +246,6 @@ def test_runtime_probe_distinguishes_the_installed_fallback_from_native_mzgui(tm
     assert state["recommended_editor"] == MZGUI_EDITOR
 
 
-def test_native_mzgui_is_selected_without_injecting_the_fallback(tmp_path):
-    project = unity_project(tmp_path)
-    native = project / "Assets/Legacy/MZGUI.cs"
-    native.parent.mkdir(parents=True)
-    native.write_text(
-        "using UnityEditor; namespace MZGUI { class MZGUI : ShaderGUI {} }",
-        encoding="utf-8",
-    )
-
-    installed = install_gui_support(project, write=True)
-    assert installed["provider"] == "native_mzgui"
-    assert installed["recommended_editor"] == MZGUI_EDITOR
-    assert installed["action"] == "use_native_mzgui"
-    assert not (project / GUI_SUPPORT_ASSET_PATH).exists()
-
-
 def test_fallback_and_native_projects_share_the_same_public_editor_contract(tmp_path):
     fallback_project = unity_project(tmp_path / "fallback")
     native_project = unity_project(tmp_path / "native")
@@ -272,7 +264,9 @@ def test_fallback_and_native_projects_share_the_same_public_editor_contract(tmp_
     assert "namespace MZGUI" in (fallback_project / GUI_SUPPORT_ASSET_PATH).read_text(
         encoding="utf-8"
     )
-    assert not (native_project / GUI_SUPPORT_ASSET_PATH).exists()
+    native_extension = (native_project / GUI_SUPPORT_ASSET_PATH).read_text(encoding="utf-8")
+    assert native_extension == GUI_AUTHORING_SOURCE
+    assert "class MZGUI :" not in native_extension
 
 
 def test_unverified_mzgui_candidate_blocks_fallback_injection(tmp_path):
@@ -382,6 +376,8 @@ def test_cli_dry_run_write_and_conflict_are_single_json(tmp_path):
         payload["data"]["capabilities"]["inline_help_presentation"]["contract"]
         == "asecli.inline-help.v1"
     )
+    assert payload["data"]["capabilities"]["help_box"] == "HelpBoxMzgui"
+    assert payload["data"]["capabilities"]["enabled_if"] == "EnableIfMzgui"
 
     code, payload = run_cli("gui-support", str(project), "--write")
     assert code == 0

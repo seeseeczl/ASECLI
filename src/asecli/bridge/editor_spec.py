@@ -41,7 +41,9 @@ class NodeSpec:
     type: str | None = None
     property_name: str | None = None
     inspector_name: str | None = None
+    tooltip: str | None = None
     help: str | None = None
+    enabled_if: dict | None = None
     parameter_type: str | None = None
     name: str | None = None
     code: str | None = None
@@ -71,8 +73,12 @@ class NodeSpec:
                 inspector_name=self.inspector_name,
                 parameter_type=self.parameter_type,
             )
+            if self.tooltip is not None:
+                result["tooltip"] = self.tooltip
             if self.help is not None:
                 result["help"] = self.help
+            if self.enabled_if is not None:
+                result["enabled_if"] = dict(self.enabled_if)
         if self.kind == "custom_expression":
             result.update(
                 name=self.name,
@@ -146,6 +152,8 @@ class EditorGraphSpec:
         payload["version"] = 1
         for node in payload["nodes"]:
             node.pop("help", None)
+            node.pop("tooltip", None)
+            node.pop("enabled_if", None)
         return {**payload, "asset_path": asset_path, "temporary_asset_path": temporary_asset_path}
 
     def expected_manifest(self) -> dict:

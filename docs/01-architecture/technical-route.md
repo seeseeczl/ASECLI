@@ -131,13 +131,14 @@
 - 响应式呈现：长中文标签不缩写、不裁切；超过当前 Inspector 可用标签区时自动换行并独占一行，字段在下一行使用完整宽度。Tooltip 默认值使用 invariant、最多六位小数的稳定格式，避免暴露 Unity `float` 的二进制噪声；变量名、默认值语义和 Material 值不变。
 - 验收边界：Python 回归证明协议写入、旧属性读取、触碰迁移、安装、冲突与 CLI 契约；REG-0042 已在团结 `2022.3.61t9`、ASE `1.9.6.2`、Retina 下完成深/浅色、300/480px、Foldout、mixed、disabled 与焦点导航矩阵。
 
-### ADR-0015 ASECLI 创建采用强制属性呈现契约
+### ADR-0015 ASECLI 创建采用强制属性呈现契约（CR-0018 修订）
 
-- 状态：已确认（2026-09-02，CR-0012 / FR-0010 / FR-0011）
+- 状态：已修订（2026-09-06，CR-0018 / FR-0010 / FR-0011）
 - 背景：FR-0010 已描述中文显示名、技术 Tooltip 和逐项中文说明，但旧 `create` 可以克隆不合规模板，EditorGraphSpec v1 也允许英文 `inspector_name` 且无法携带说明，因此规范仍依赖调用者自觉。
-- 决策：新增 `asecli.property-presentation.v1` 文件级契约。每个导出 Property 必须使用含中文的显示名、合法英文 Shader 属性标识符，并具有恰好一条含中文的 `ASECLIHelpBox`；ASECLI GUI 继续从默认 `Material(shader)` 自动生成属性名和 Shader 默认值 Tooltip。`custom-gui` 公开逐属性检查结果，已声明 ASECLI GUI 的文件在任何相关写入后必须继续合规。
-- 创建与兼容：文本 `create` 对模板壳与 donor 图组合后的最终文件执行写前门禁。正式 Editor CLI 创建要求 EditorGraphSpec v2，每个 Property/Sampler 必填中文 `inspector_name` 和中文 `help`；固定 ASE Editor 执行协议仍为 v1，v2 的说明在 ASE Save/Load 成功后由 CLI 原子写入并再次验收。EditorGraphSpec v1 保留底层解析/桥接兼容，但 CLI 不再接受它创建新文件。
-- 修复与回滚：既有文件可通过 `custom-gui --spec` 的 `display_name`/`help` 一次性治理；显示名同时写入图字段和编译 Properties，说明同步至图尾部和编译属性。写入前保留原始文件，失败不落盘；Editor 已提交后的后验失败仍保留目标与 `.meta` 供诊断。回滚 CLI 不自动迁移或删除已生成文件。
+- 决策：`asecli.property-presentation.v2` 文件级契约要求每个导出 Property 使用含中文的显示名、合法英文 Shader 属性标识符，并具有一条含中文的 `TooltipMzgui`；GUI 从默认 `Material(shader)` 追加属性名和 Shader 默认值。`HelpBoxMzgui` 是用户可选内容，不自动生成、不参与合规门禁，存在时继续允许编辑和保留。
+- 创建与兼容：文本 `create` 对模板壳与 donor 图组合后的最终文件执行写前门禁。正式 Editor CLI 创建要求 EditorGraphSpec v2，每个 Property/Sampler 必填中文 `inspector_name` 和中文 `tooltip`；旧规格只有 `help` 时迁移为 Tooltip，不额外制造 HelpBox。固定 ASE Editor 执行协议 v1 与 EditorGraphSpec v1 仅保留底层兼容。
+- 条件编辑：`enabled_if` 写为 `EnableIfMzgui(source, operator, value)` 并同时进入 PropertyNode Custom Attributes 和编译属性；Editor 只用 `DisabledScope` 控制控件可编辑状态，不清空值、不代替 Shader 分支。
+- 修复与回滚：既有文件可通过 `custom-gui --spec` 的 `display_name`/`tooltip`/可选 `help`/`enabled_if` 一次性治理；显示名和属性元数据同步图与编译区。写入前保留原始文件，失败不落盘；Editor 已提交后的后验失败仍保留目标与 `.meta` 供诊断。回滚 CLI 不自动迁移或删除已生成文件。
 
 ### ADR-0016 打包 C# 资源采用确定性片段拼装并关闭临时例外
 
@@ -152,8 +153,8 @@
 
 - 状态：已实现，自动回归与真实 native Editor 只读/编译已验证；双环境 UI 交互待验（2026-09-05，CR-0016 / BUG-0022）
 - 背景：真实 MZGUI 通过直接修改 ASE 的 `PropertyNode.cs`、`MasterNode.cs` 增加编辑 UI 和尾部序列化。这种源码补丁与 ASE 升级强耦合；无补丁的 ASE 打开并保存尾部 MZGUI 数据时会丢失 GUI 能力。
-- 决策：公共 `CustomEditor` 始终为 `MZGUI.MZGUI`。原生实现存在时完全沿用；确认缺失时安装提供同名入口的 clean-room fallback，在 `Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)` 提供 Foldout/Tooltip/HelpBox 三项开关和文本输入。数据写入 ASE 原生 Custom Attributes，不要求用户输入 attribute 代码。
+- 决策：公共 `CustomEditor` 始终为 `MZGUI.MZGUI`。原生实现存在时沿用 provider 并只补 authoring/条件 Drawer；确认缺失时安装提供同名入口的 clean-room fallback，在 `Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)` 提供 Foldout/Tooltip/HelpBox/条件启用控件。数据写入 ASE 原生 Custom Attributes，不要求用户输入 attribute 代码。
 - 版本策略：不维护乐观 ASE 版本白名单，也不引用 ASE 编译类型。运行时按类型全名和候选成员探测窗口、图、选中 Property、Custom Attributes、Master Custom Editor 与 Save；任一必要能力缺失即在 UI 中报告并停止对应写入。
-- 保存恢复：fallback 在 ASE 图打开后读取编译 Shader 的三类标准 MZGUI 属性；无原生 authoring 时补齐 Custom Attributes，有唯一原生 provider 且 `m_mzguiAttribs`/`m_selectedMzguiAttribs` 能力完整时迁入原生状态并删除双存储。Apply 预检并快照节点、Master 和 Shader 文件，Save 异常恢复内存与磁盘。
-- 跨环境兼容：fallback 实现 `MZGUI.MZGUI` 同名代理，新 Shader 只写该公共类名和三种标准 `*Mzgui` Attribute；移入原生 MZGUI 工程后由原生类无迁移接管。旧 `ASECLI.MaterialGUI.ASECLIMaterialGUI` 仅保留为历史读取别名。
+- 保存恢复：fallback/原生扩展在 ASE 图打开后读取编译 Shader 的 Foldout、Tooltip、HelpBox、EnableIf 标准属性；无原生 authoring 时补齐 Custom Attributes，有唯一原生 provider 且 `m_mzguiAttribs`/`m_selectedMzguiAttribs` 能力完整时迁入原生状态并删除双存储。Apply 预检并快照节点、Master 和 Shader 文件，Save 异常恢复内存与磁盘。
+- 跨环境兼容：fallback 实现 `MZGUI.MZGUI` 同名代理，新 Shader 只写该公共类名和四种标准 `*Mzgui` Attribute；移入原生 MZGUI 工程后由原生类无迁移接管。旧 `ASECLI.MaterialGUI.ASECLIMaterialGUI` 仅保留为历史读取别名。
 - 安全/升级：V2 runtime probe 枚举全部同名 provider，外部 fallback 复用、冲突拒写；V1 保持兼容。显式 `--handoff-native` 默认 dry-run，只将已知 fallback 备份并替换为不声明 `MZGUI.MZGUI` 的 authoring-only bridge，唯一 native 复验失败可恢复；未知文件不移动或删除。

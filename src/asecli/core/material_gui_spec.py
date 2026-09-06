@@ -12,12 +12,15 @@ from .custom_gui import (
     set_property_metadata_attribute,
 )
 from .custom_gui_versions import require_property_metadata_tail_version
+from .material_gui_condition import enable_if_attribute, validate_enable_if
 from .model import AseFile, AseGraph, NodeLine
 from .property_presentation import set_property_display_name
 
 
 _TOP_KEYS = {"editor", "reorder", "properties"}
-_PROPERTY_KEYS = {"name", "node", "display_name", "group", "help", "tooltip"}
+_PROPERTY_KEYS = {
+    "name", "node", "display_name", "group", "help", "tooltip", "enabled_if"
+}
 _SEMANTIC_TYPES = {
     "group": "FoldoutMzgui",
     "help": "HelpBoxMzgui",
@@ -52,7 +55,7 @@ def resolve_property_node(
 
 
 def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
-    """Apply a declarative property order/group/help spec in memory."""
+    """Apply a declarative property order/group/tooltip/optional-help spec in memory."""
     if not isinstance(spec, dict):
         raise ValueError("material GUI spec root must be a JSON object")
     unknown = set(spec) - _TOP_KEYS
@@ -99,6 +102,7 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
         seen.add(node.node_id)
         resolved.append((node, entry))
         has_additions |= any(entry.get(key) is not None for key in _SEMANTIC_TYPES if key in entry)
+        has_additions |= entry.get("enabled_if") is not None
 
     active_editor = graph_custom_editor(ase_file.graph)
     if has_additions and active_editor not in SUPPORTED_GUI_EDITORS:
@@ -130,6 +134,27 @@ def apply_material_gui_spec(ase_file: AseFile, spec: dict) -> list[dict]:
                 )
             else:
                 raise ValueError(f"property {node.raw_fields[7]} field {key!r} must be string or null")
+        if "enabled_if" in entry:
+            condition = entry["enabled_if"]
+            if condition is None:
+                changes.append(
+                    remove_property_metadata_attribute(
+                        ase_file.graph, node.node_id, "EnableIfMzgui"
+                    )
+                )
+            else:
+                validated = validate_enable_if(condition)
+                changes.append(
+                    set_property_metadata_attribute(
+                        ase_file.graph,
+                        node.node_id,
+                        enable_if_attribute(
+                            validated["property"],
+                            validated["operator"],
+                            validated["value"],
+                        ),
+                    )
+                )
     return changes
 
 

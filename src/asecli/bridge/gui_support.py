@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 from pathlib import Path
 
@@ -16,29 +15,18 @@ from .gui_provider_detection import (
     validate_runtime_probe,
 )
 from .gui_presentation import inspect_inline_help_presentation, require_inline_help_presentation
-from .resource_text import compose_resource_text
+from .gui_support_resource import (
+    GUI_AUTHORING_SHA256,
+    GUI_AUTHORING_SOURCE,
+    GUI_SUPPORT_ASSET_PATH,
+    GUI_SUPPORT_KNOWN_PREVIOUS,
+    GUI_SUPPORT_RESOURCE_PARTS,
+    GUI_SUPPORT_SHA256,
+    GUI_SUPPORT_SOURCE,
+    gui_target_state,
+)
 
-GUI_SUPPORT_ASSET_PATH = "Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
-GUI_SUPPORT_RESOURCE_PARTS = (
-    "asecli_material_gui.part00.cs.txt",
-    "asecli_material_gui.part01.cs.txt",
-    "asecli_material_gui.authoring.part00.cs.txt",
-    "asecli_material_gui.authoring.part01.cs.txt",
-    "asecli_material_gui.reconciliation.cs.txt",
-    "asecli_material_gui.transaction.cs.txt",
-    "asecli_material_gui.hydration.cs.txt",
-)
-GUI_SUPPORT_SOURCE = compose_resource_text(
-    "asecli.bridge", "resources", GUI_SUPPORT_RESOURCE_PARTS
-)
-GUI_SUPPORT_SHA256 = hashlib.sha256(GUI_SUPPORT_SOURCE.encode("utf-8")).hexdigest()
-GUI_SUPPORT_KNOWN_PREVIOUS = {
-    "cf45c7d6ad6aa79880205d73f7a6db45e20239cb312f91743056c5efa00b41b8": "0.2.0-original",
-    "9541c541628b8404c66ca2c36e80af25f69960d6e1a07deabad53fd6233c5b7a": "0.3.1-material-only",
-    "76a092825c44ea43fa10bde7cd4185c3af1d3c26a900d90da2d8fadde150967f": "0.3.1-authoring-preview",
-    "738a79e7e9198dd6b21879d7d42dfad4dae6b74ef6e50e7cf17c4b3372d0e92c": "0.3.2-portable-mzgui",
-    "77ccadf84e3c2c1eddff343ae535c09af15402b92172e772efdf481d06c3433e": "0.3.1-authoring-preview",
-}
+
 def inspect_gui_support(
     project_root: str | Path, *, runtime_probe: dict | None = None
 ) -> dict:
@@ -64,24 +52,33 @@ def inspect_gui_support(
         elif not runtime_provider_details and native_evidence:
             native_candidates = [*native_candidates, *native_evidence]
             native_evidence = []
-    target_state, actual_sha256 = _target_state(project.target)
+    target_state, actual_sha256 = gui_target_state(project.target)
     providers = []
     if native_evidence:
         providers.append("native_mzgui")
     if target_state in {"installed", "upgrade_available"}:
         providers.append("asecli_compat")
+    elif target_state == "native_extension":
+        providers.append("asecli_authoring_extension")
     runtime_fallback = [item for item in runtime_provider_details if item["fallback"]]
     runtime_conflict = len(runtime_provider_details) > 1
     if runtime_conflict:
         provider = "multiple"
         recommended_editor = None
     elif native_evidence:
-        provider = "multiple" if target_state in {"installed", "upgrade_available"} else "native_mzgui"
-        recommended_editor = MZGUI_EDITOR if provider == "native_mzgui" else None
+        if target_state in {"installed", "upgrade_available"}:
+            provider = "multiple"
+            recommended_editor = None
+        elif target_state == "conflict":
+            provider = "target_conflict"
+            recommended_editor = None
+        else:
+            provider = "native_mzgui"
+            recommended_editor = MZGUI_EDITOR
     elif runtime_fallback and target_state == "absent":
         provider = "fallback_external"
         recommended_editor = MZGUI_EDITOR
-    elif target_state == "conflict":
+    elif target_state in {"conflict", "native_extension"}:
         provider = "target_conflict"
         recommended_editor = None
     elif native_candidates:
@@ -133,6 +130,7 @@ def inspect_gui_support(
             "foldout": "FoldoutMzgui",
             "tooltip": "TooltipMzgui",
             "help_box": "HelpBoxMzgui",
+            "enabled_if": "EnableIfMzgui",
             "inline_help_presentation": inspect_inline_help_presentation(GUI_SUPPORT_SOURCE),
             "fallback_editor": MZGUI_EDITOR,
             "legacy_fallback_editor": ASECLI_GUI_EDITOR,
@@ -145,7 +143,8 @@ def inspect_gui_support(
             "automatic_technical_tooltip": ["property_name", "shader_default_value"],
             "ase_version_dependency": False,
         },
-        "would_write": provider in {"missing", "asecli_upgrade_available"},
+        "would_write": provider in {"missing", "asecli_upgrade_available"}
+        or (provider == "native_mzgui" and target_state == "absent"),
         "written": False,
     }
 
@@ -164,9 +163,28 @@ def install_gui_support(
             "before selecting MZGUI.MZGUI"
         )
     if state["provider"] == "native_mzgui":
-        state["action"] = "use_native_mzgui"
-        state["would_write"] = False
-        return state
+        target_state = state["asecli_material_gui"]["state"]
+        if target_state == "native_extension":
+            state["action"] = "use_native_mzgui"
+            state["would_write"] = False
+            return state
+        state["action"] = "install_native_mzgui_extension"
+        if not write:
+            return state
+        project = unity_project(project_root, GUI_SUPPORT_ASSET_PATH)
+        install_gui_resource(project, GUI_AUTHORING_SOURCE.encode("utf-8"))
+        installed = inspect_gui_support(project_root, runtime_probe=runtime_probe)
+        if installed["provider"] != "native_mzgui" or installed[
+            "asecli_material_gui"
+        ]["state"] != "native_extension":
+            raise RuntimeError("ASECLI native MZGUI extension failed digest verification")
+        installed.update(
+            action="install_native_mzgui_extension",
+            would_write=False,
+            written=True,
+            requires_editor_recompile=True,
+        )
+        return installed
     if state["provider"] == "fallback_external":
         state["action"] = "use_external_fallback"
         state["would_write"] = False
@@ -220,18 +238,3 @@ def install_gui_support(
     installed["backed_up"] = backup_path is not None
     installed["backup"] = str(backup_path) if backup_path else None
     return installed
-
-
-def _target_state(target: Path) -> tuple[str, str | None]:
-    if target.is_symlink():
-        return "conflict", None
-    if not target.exists():
-        return "absent", None
-    if not target.is_file():
-        return "conflict", None
-    actual = hashlib.sha256(target.read_bytes()).hexdigest()
-    if actual == GUI_SUPPORT_SHA256:
-        return "installed", actual
-    if actual in GUI_SUPPORT_KNOWN_PREVIOUS:
-        return "upgrade_available", actual
-    return "conflict", actual

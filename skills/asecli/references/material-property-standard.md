@@ -1,133 +1,108 @@
 # ASE 材质属性呈现规范
 
-## 目标
+## 目标与硬契约
 
-每个导出材质属性都必须同时服务两类读者：美术人员能直接理解和调节，技术人员能快速确认 Shader 变量与默认状态。前三层由 CLI 的 `asecli.property-presentation.v1` 强制：中文显示名、悬浮技术信息、属性下方中文帮助说明；语义分组按实际需要使用。
+每个导出材质属性同时服务美术与技术人员。CLI 使用 `asecli.property-presentation.v2` 强制：
 
-## 四层结构
+1. 公开属性使用简短、自然的中文 `display_name` / `inspector_name`。
+2. 每个公开属性恰好有一条含中文的 `TooltipMzgui` 使用说明。
+3. GUI 在 Tooltip 后自动追加真实英文变量名与 Shader 默认值。
+4. Foldout 按实际语义选用；HelpBox 仅在用户明确提供内容时可选写入。
 
-### 1. 中文显示名
+Tooltip 是工具默认生成和强制校验的属性说明渠道。HelpBox 不参与属性呈现合规判断，工具不会自动补写；用户可通过编辑窗口、`--help-box` 或 spec 的 `help` 字段添加自己的常驻内容。
 
-- 公开 Property 的 `display_name` / `inspector_name` 默认使用简短、自然、能直接说明用途的中文，例如“车漆颜色”“清漆强度”“法线贴图”。
-- AO、UV、HDR、法线等团队已普遍使用的术语可以保留，但不要整项使用难读的英文句子。
-- 显示名只承担“这是什么”的职责，不在主标签中堆叠变量名、默认值、单位和长说明。
-- 同类属性使用一致词序和术语，例如统一使用“清漆强度”，不要在同一面板中混用“强度-清漆”“Coat Power”等表达。
+## 中文显示名
 
-创建新 Property 时，通过 EditorGraphSpec v2 的 `inspector_name` 写入中文显示名。整理已有 Property 时，用 `asecli custom-gui <file>` 查询契约，再通过完整 `custom-gui --spec` 的 `display_name` 同步图字段和编译 ShaderLab 标签。
+- 显示名只回答“这是什么”，不要堆叠变量名、默认值、单位或长说明。
+- AO、UV、HDR、法线等团队通用术语可以保留；其余使用自然中文。
+- 同类属性保持一致词序，例如统一为“清漆强度”，不要混用“强度-清漆”“Coat Power”。
+- 已发布 Shader 变量名属于 API；整理 Inspector 时优先只改显示名、顺序、Foldout 和 Tooltip。
 
-### 2. 悬浮提示
+新 Property 使用 EditorGraphSpec v2 的 `inspector_name`；已有 Property 使用完整 `custom-gui --spec` 的 `display_name`，由 CLI 同步图字段与编译 ShaderLab 标签。
 
-每个公开属性的 Tooltip 都必须包含真实变量名和 Shader 默认值，显示模板为：
+## Tooltip：默认说明渠道
+
+Tooltip 正文用一到两句说明真实用途，按属性类型覆盖必要信息：
+
+- 开关：是否启用该层，以及关闭时的回退结果。
+- 纹理：控制区域或数据来源；只写已证实的 RGB/A 通道语义与混合关系。
+- 颜色：着色对象、是否与贴图相乘，以及 Alpha 是否参与效果。
+- 滑条：控制对象、数值增大/减小时的可见结果；有明确物理语义时再写单位。
+
+不要在正文重复变量名与默认值。ASECLI fallback 会动态追加：
 
 ```text
 变量名：_PaintColor
 默认值：(1, 1, 1, 1)
 ```
 
-- 这两行由 ASECLI GUI 自动追加，不写进 `ASECLITooltip` 文本。ASECLI GUI 从默认 `Material(shader)` 读取 Shader 默认值，不读取当前材质实例值。
-- 因为是显示时动态读取，Shader 默认值变化后无需人工同步一份字符串，也不会把旧默认值留在 ASE 节点尾部。
-- `--tooltip` 仅用于可选的额外悬浮说明；用途、通道和调节结果仍优先放在 HelpBox，避免 Tooltip 过长。
-- 开始前运行 `asecli gui-support <project-root>`。缺失时显式 `--write` 安装内置层，并使用唯一的 `ASECLI.MaterialGUI.ASECLIMaterialGUI`。若返回 `target_conflict`，停止写入并人工辨认固定资源 `Assets/Editor/ASECLI/ASECLIMaterialGUI.cs`，不得覆盖。
+默认值来自默认 `Material(shader)`，不是当前材质实例值；Shader 默认值变化后无需维护第二份字符串。
 
-`custom-gui` 示例：
+单属性示例：
 
 ```bash
-asecli custom-gui My.shader --editor ASECLI.MaterialGUI.ASECLIMaterialGUI --property _PaintColor \
-  --tooltip "车身基础漆色。" \
-  --help-box "控制车辆基础漆面颜色。Alpha 当前不参与透明度计算。" --write
+asecli custom-gui My.shader --editor MZGUI.MZGUI --property _PaintColor \
+  --group "固有色" \
+  --tooltip "控制车辆基础漆面颜色；Alpha 当前不参与透明度计算。" --write
 ```
 
-### 3. 属性下方帮助说明
+默认整理只写 Tooltip，不自动创建 HelpBox。需要常驻内容时，用户可显式传入 `--help-box "内容"`；`--clear-help-box` 可单独清除它。
 
-- 每个导出属性都使用 `ASECLIHelpBox` 在控件下方提供常驻中文说明。
-- 说明优先回答：控制什么；数值调大/调小时发生什么；贴图各通道表达什么；必要的单位、范围、依赖或性能影响。
-- 颜色、贴图、开关等不适合“调大/调小”的类型，改写为对选择结果、通道或启用条件的说明。
-- 一到两句即可，不复述中文显示名，也不重复 Tooltip 中的变量名和默认值。
-- 无法从节点图、HLSL 或项目语义确认因果时，只写已证实用途或暂不写，禁止编造效果。
+## Foldout 与排序
 
-### 4. 语义分组
+- 使用短中文功能名，例如“固有色层”“底漆层”“清漆层”“拉花层”“高级选项”。
+- 每组只有第一个 PropertyNode 写 `FoldoutMzgui`；后续属性继承该组直到下一个标题。
+- 顶层按美术调节和材质叠加顺序：基础外观、叠加表层、局部效果/贴图、发光/法线/AO、诊断与高级选项。
+- 组内按真实依赖取子集排序：总开关 → 源输入/贴图 → 配色 → 混合/遮罩 → 表面响应 → 质量或性能项。
+- 不要一个属性一个组，也不要使用“其他”“参数 1”等无语义标题。
 
-- 使用中文 Foldout 标题按功能组织属性，例如：固有色、阴影层、底漆层、清漆层、环境层、AO 层、法线层、珠光层、伪装层。
-- 排序优先满足实际调节流程：常用基础项在前，细节与高级项在后，诊断/调试项最后。
-- 每组只有第一个 PropertyNode 写 `ASECLIFoldout`；后续属性继承该组，直到下一个分组标题。
-- 避免一个属性一个组，也不要用“其他”“参数 1”这类无语义标题。确实只有一个独立功能时可以单项成组。
+## 变量命名
 
-## Inspector 编排与变量命名
+- Shader 变量名保持英文、`_` 前缀和 `PascalCase`，例如 `_FlakeTex`、`_FlakeColor`、`_FlakeBlend`。
+- 开关在同一项目内统一 `_UseFeature` 或 `_FeatureEnabled`，不要混用。
+- 不使用拼音、中文、序号或无语义后缀，例如 `_Tex1`、`_Value`、`_Param`、`_ColorNew`。
 
-这一节规定的是通用的材质 Inspector 信息架构。它参考“固有色层 → 底漆层 → 清漆层 → 拉花层 → 自发光/法线/AO → 高级选项”这类真实车漆面板的可读性，不把任何特定 Shader 的参数、取值或计算方式当作通用规则。
+## 批量规范
 
-### 顶层组的顺序
-
-- 优先按美术调节和材质叠加的顺序组织：基础外观在前，叠加表层随后，局部效果与贴图层居中，发光/法线/AO 等辅助效果靠后，诊断、兼容性和低频调整项放进“高级选项”。
-- 组名使用短中文功能名，例如“固有色层”“底漆层”“清漆层”“拉花层”。组标题回答“正在调哪一层/哪种效果”，不使用变量名、实现方式或“设置 1”。
-- 只有实际独立、可单独理解的功能才建立 Foldout；不要为颜色、贴图、滑条各建一个组。组的排序应让美术能自上而下完成一次常规调节，而不是按代码声明顺序排列。
-
-### 组内控件顺序
-
-组内首先遵从数据和调节依赖；常用模板如下，按实际存在的属性取子集，不强行补齐：
-
-1. 该层的总开关或实现选择开关。
-2. 源输入：贴图、遮罩、环境图、LUT 等；需要配色时，贴图后紧跟其 Tint/颜色。
-3. 基础颜色，再到边缘色、第二颜色等派生颜色；每个颜色的角色必须明确。
-4. 混合度、遮罩阈值、区域权重等“如何参与合成”的控制。
-5. 金属度、光滑度、菲涅尔、F0 等表面响应控制。
-6. Mip 层级、反射强度、质量或性能倾向等环境/高级控制。
-
-- 例如简单固有色可以是“主色 → 边缘色 → 菲涅尔”；带贴图的拉花层可以是“拉花开关 → 拉花贴图 → 拉花颜色 → 混合度 → 金属度 → 光滑度”。这表达了素材先定义、颜色修饰、再参与合成、最后定义表面响应的阅读顺序。
-- 总开关必须是组内第一项，并立即说明关闭后的结果或替代路径。开关关闭时是否隐藏后续控件取决于真实交互和实现；不要仅为减少画面高度隐藏仍需预设或排查的参数。
-- 一个纹理控件及其预览应完整出现后，再显示该纹理的 HelpBox；不要把别的属性插入纹理与其说明之间。颜色、开关和滑条同样遵守“控件后紧跟自己的说明”的局部邻接。
-- 每个属性一行主控件，标签在左、控件在右；同组使用一致的标签宽度、控件宽度和说明缩进。纹理预览较高时，保持后续说明与下一属性的起始位置稳定，避免说明条错属于其他控件。
-
-### 中文属性名与英文变量名
-
-- `display_name` 只写美术可读的中文名称，承担“这是什么”。同一组内可以保留必要的层前缀以消除歧义，例如“清漆光滑度”“拉花颜色”；组标题已足够明确时可省略重复主体，但不能因此让“颜色”“强度”失去对象。
-- Shader 变量名保持英文、`_` 前缀和 `PascalCase`，承担稳定的技术标识；一个概念共享同一词干，例如 `_FlakeTex`、`_FlakeColor`、`_FlakeBlend`、`_FlakeMetallic`、`_FlakeSmoothness`。开关采用同一项目约定的 `_UseFeature` 或 `_FeatureEnabled` 之一，不能混用。
-- 不用拼音、中文、序号或无语义后缀作为公开变量名，例如 `_Tex1`、`_Value`、`_Param`、`_ColorNew`。已有公开变量名是 API；整理 Inspector 时只改善显示名、顺序和说明，除非用户明确授权迁移引用后再改变量名。
-- Tooltip 由 GUI 自动显示实际英文变量名与 Shader 默认值。不要把变量名、默认值、范围或实现细节重复塞进中文主标签；截图未展示 Tooltip 时，不得猜测其变量名或默认值。
-
-### 帮助说明的写法
-
-- 开关：说明是否启用该层，以及关闭时回退到什么输入或效果。
-- 纹理：说明它控制的区域或数据来源，明确 RGB、A 等通道含义，以及与颜色/遮罩的相乘、混合或覆盖关系；未证实的通道语义不得编造。
-- 颜色：说明着色对象、是否与贴图相乘，以及 Alpha 是否参与效果。
-- 滑条：说明控制对象、数值增大或减小时的可见结果；有明确物理语义时再写单位、范围或“非金属/金属”等离散边界。
-- 一条 HelpBox 只解释紧邻的一个控件，通常一到两句。使用“控制……”“RGB……”“关闭时……”等直接句式，不复述组名、变量名和默认值。
-
-## 批量规范示例
-
-`material-gui.json` 负责中文显示名、顺序、分组、可选 Tooltip 和 HelpBox；变量名与默认值由 GUI 自动显示，不应在 JSON 中重复：
+`material-gui.json` 负责中文显示名、顺序、Foldout 和 Tooltip：
 
 ```json
 {
-  "editor": "ASECLI.MaterialGUI.ASECLIMaterialGUI",
+  "editor": "MZGUI.MZGUI",
   "reorder": true,
   "properties": [
     {
       "name": "_PaintColor",
       "display_name": "车漆颜色",
       "group": "固有色",
-      "tooltip": "车身基础漆色。",
-      "help": "控制车辆基础漆面颜色。Alpha 当前不参与透明度计算。"
+      "tooltip": "控制车辆基础漆面颜色；Alpha 当前不参与透明度计算。"
     },
     {
       "name": "_CoatStrength",
       "display_name": "清漆强度",
       "group": "清漆层",
-      "help": "控制清漆反射强度；数值越大，表面高光与环境反射越明显。"
+      "tooltip": "控制清漆反射强度；数值越大，高光与环境反射越明显。"
     }
   ]
 }
 ```
 
+默认不要加入 `help` 字段。用户明确需要常驻内容时可选加入 `help`，它会写为 `HelpBoxMzgui`。新规格仍必须写 `tooltip`；仅含旧 `help`、不含 `tooltip` 的旧 EditorGraphSpec v2 会把该值迁移为 Tooltip，不额外生成 HelpBox。
+
+## GUI provider
+
+开始前运行 `asecli gui-support <project-root>`。存在原生 `MZGUI.MZGUI` 时直接使用；确认缺失才以 `--write` 安装 fallback。目标资源冲突或 provider 不确定时停止，不覆盖工程文件。
+
+fallback 的 ASE 编辑窗口提供 Foldout、Tooltip、HelpBox 的可视化编辑。HelpBox 默认关闭，只有用户启用并填写时才写入；已存在内容可继续编辑或清除。fallback 会以兼容 MZGUI 的轻量常驻说明样式渲染它。
+
+需要由另一个数值属性控制控件是否可编辑时，使用 `enabled_if` 或 `--enabled-if`。它写入 ASE PropertyNode Custom Attributes 中的 `EnableIfMzgui(source,operator,value)`，不写 Shader `if`。条件不满足时只由 `EditorGUI.DisabledScope` 置灰，原值保留；控制属性缺失或多选材质并非全部满足时也置灰。可视化窗口提供控制属性、比较方式和比较值编辑，不要求用户手写 Attribute。原生 MZGUI 工程执行 `gui-support --write` 时只安装这个兼容 Drawer 与 authoring 扩展，不注入第二个 `MZGUI.MZGUI`。
+
 ## 验收
 
-写入后执行：
+写入后做最小充分验证：
 
-1. `asecli gui-support <project-root>`：确认 `provider`、`recommended_editor` 与 Shader 的 `CustomEditor` 一致；内置层安装后等待 Editor 脚本重编译。
-2. `asecli custom-gui <file>`：确认 `property_presentation.contract=asecli.property-presentation.v1`、`valid=true`、`violations=[]`，并核对每个导出属性；旧三标记只作为兼容读取信息。
-3. `asecli validate <file>`：确认图结构、属性和 CHKSM 无错误。
-4. `asecli recompile <file>`：让 ASE 正式生成 ShaderLab 属性声明。
-5. 在真实材质 Inspector 中检查：中文显示名可读；悬浮时同时看到准确变量名与默认值；帮助说明显示在对应控件下方；Foldout 分组与排序符合调节流程。
-6. 进一步检查：每个有总开关的功能层以开关开头；纹理/颜色/混合/表面响应按实际依赖连续排列；没有说明条错属、标签歧义或为追求紧凑而隐藏必要参数的情况。
-
-纯文本回归可以证明字段和编码正确，但不能证明 Tooltip 触发、HelpBox 可读性、控件布局或折叠交互已经在目标 Unity/Tuanjie 版本正常显示。
+1. `asecli custom-gui <file>`：确认 `property_presentation.contract=asecli.property-presentation.v2`、`valid=true`、`violations=[]`。
+2. 核对每个公开属性有中文显示名和中文 Tooltip；若用户添加了 HelpBox，再核对其内容及图/编译区同步。
+3. `asecli validate <file>`：确认结构与 CHKSM 无错误。
+4. 需要 ASE 正式生成 ShaderLab 声明时运行一次 `asecli recompile <file>`。
+5. 只有本次修改触及 Inspector 交互或 C# Editor 资源时，才在一个 Editor 会话中集中检查 Tooltip 悬停与 Foldout；不以重复截图代替自动验证。

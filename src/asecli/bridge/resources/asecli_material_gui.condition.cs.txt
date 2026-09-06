@@ -1,0 +1,99 @@
+
+#if UNITY_EDITOR
+namespace ASECLI.MaterialGUI
+{
+    using System;
+    using UnityEditor;
+    using UnityEngine;
+
+    internal static class EnableIfMzguiCondition
+    {
+        internal static bool Matches(
+            MaterialProperty property, string sourceName, string comparison, float expected)
+        {
+            if (property == null || property.targets == null || property.targets.Length == 0)
+                return false;
+            foreach (UnityEngine.Object target in property.targets)
+            {
+                Material material = target as Material;
+                if (material == null || !material.HasProperty(sourceName) ||
+                    !Compare(material.GetFloat(sourceName), comparison, expected))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool Compare(float actual, string comparison, float expected)
+        {
+            if (comparison == "Less") return actual < expected;
+            if (comparison == "LessEqual") return actual <= expected;
+            if (comparison == "Equal") return Mathf.Approximately(actual, expected);
+            if (comparison == "NotEqual") return !Mathf.Approximately(actual, expected);
+            if (comparison == "GreaterEqual") return actual >= expected;
+            if (comparison == "Greater") return actual > expected;
+            return false;
+        }
+    }
+
+#if ASECLI_FALLBACK_PROVIDER
+    public sealed class EnableIfMzguiDrawer : MaterialPropertyDrawer
+    {
+        private readonly string sourceName;
+        private readonly string comparison;
+        private readonly float expected;
+
+        public EnableIfMzguiDrawer(string sourceName, string comparison, float expected)
+        {
+            this.sourceName = sourceName ?? String.Empty;
+            this.comparison = comparison ?? "Equal";
+            this.expected = expected;
+        }
+
+        public override float GetPropertyHeight(
+            MaterialProperty prop, string label, MaterialEditor editor)
+        {
+            return MaterialEditor.GetDefaultPropertyHeight(prop);
+        }
+
+        public override void OnGUI(
+            Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor)
+        {
+            bool enabled = EnableIfMzguiCondition.Matches(
+                prop, sourceName, comparison, expected);
+            using (new EditorGUI.DisabledScope(!enabled))
+                editor.DefaultShaderProperty(position, prop, label.text);
+            if (!String.IsNullOrEmpty(label.tooltip))
+            {
+                Rect tooltipRect = position;
+                tooltipRect.width = Mathf.Min(position.width, EditorGUIUtility.labelWidth);
+                GUI.Label(
+                    tooltipRect, new GUIContent(String.Empty, label.tooltip), GUIStyle.none);
+            }
+        }
+    }
+#else
+    public sealed class EnableIfMzguiDrawer : MZGUI.MzguiDrawer
+    {
+        private readonly string sourceName;
+        private readonly string comparison;
+        private readonly float expected;
+
+        public EnableIfMzguiDrawer(string sourceName, string comparison, float expected)
+        {
+            this.sourceName = sourceName ?? String.Empty;
+            this.comparison = comparison ?? "Equal";
+            this.expected = expected;
+        }
+
+        public override void DrawProp(
+            Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor)
+        {
+            bool enabled = EnableIfMzguiCondition.Matches(
+                prop, sourceName, comparison, expected);
+            using (new EditorGUI.DisabledScope(!enabled))
+                base.DrawProp(position, prop, label, editor);
+        }
+    }
+#endif
+}
+#endif

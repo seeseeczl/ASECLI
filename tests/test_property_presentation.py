@@ -15,6 +15,7 @@ from asecli.checks import fix_checksum
 from asecli.core import (
     ASECLI_GUI_EDITOR,
     AseFile,
+    encode_custom_unicode,
     inspect_custom_gui,
 )
 from asecli.core.compiled_metadata import hide_known_template_compiled_only_properties
@@ -28,18 +29,20 @@ def managed_shader(
     *,
     property_name: str = "_BaseColor",
     display_name: str = "基础颜色",
-    help_text: str | None = "控制材质的基础颜色。",
+    tooltip_text: str | None = "控制材质的基础颜色。",
+    help_text: str | None = None,
 ) -> str:
-    graph_attributes = ""
-    compiled_attributes = ""
-    if help_text is not None:
-        from asecli.core import semantic_attribute
+    attributes = []
+    from asecli.core import semantic_attribute
 
-        attribute = semantic_attribute("ASECLIHelpBox", help_text)
-        graph_attributes = ";1;" + attribute
-        compiled_attributes = attribute + " "
-    else:
-        graph_attributes = ";0"
+    if tooltip_text is not None:
+        attributes.append(semantic_attribute("ASECLITooltip", tooltip_text))
+    if help_text is not None:
+        attributes.append(f"[ASECLIHelpBox({encode_custom_unicode(help_text)})]")
+    graph_attributes = ";" + str(len(attributes))
+    if attributes:
+        graph_attributes += ";" + ";".join(attributes)
+    compiled_attributes = ((" ".join(attributes) + " ") if attributes else "")
     text = f'''Shader "Tests/Presentation"
 {{
 \tProperties
@@ -76,7 +79,7 @@ def test_custom_gui_reports_complete_property_presentation_contract():
     state = inspect_custom_gui(AseFile.from_text(managed_shader()))
     contract = state["property_presentation"]
 
-    assert contract["contract"] == "asecli.property-presentation.v1"
+    assert contract["contract"] == "asecli.property-presentation.v2"
     assert contract["valid"] is True
     assert contract["violations"] == []
     assert contract["tooltip"]["automatic_fields"] == [
@@ -107,21 +110,21 @@ def test_known_template_compiled_only_properties_are_hidden_without_hiding_unkno
     assert presentation["valid"] is False
 
 
-def test_managed_file_reports_missing_chinese_display_name_and_help():
+def test_managed_file_reports_missing_chinese_display_name_and_tooltip():
     state = inspect_custom_gui(
-        AseFile.from_text(managed_shader(display_name="Base Color", help_text=None))
+        AseFile.from_text(managed_shader(display_name="Base Color", tooltip_text=None))
     )
 
     assert state["property_presentation"]["valid"] is False
     assert state["property_presentation"]["violations"] == [
         "property:_BaseColor:display_name:chinese_required",
-        "property:_BaseColor:help:chinese_required",
+        "property:_BaseColor:tooltip:chinese_required",
         "property:_BaseColor:compiled_display_name:chinese_required",
-        "property:_BaseColor:compiled_help:chinese_required",
+        "property:_BaseColor:compiled_tooltip:chinese_required",
     ]
 
 
-def test_managed_custom_gui_write_fails_closed_when_help_is_removed(tmp_path):
+def test_managed_custom_gui_write_fails_closed_when_tooltip_is_removed(tmp_path):
     path = tmp_path / "managed.shader"
     path.write_text(managed_shader(), encoding="utf-8")
 
@@ -130,7 +133,7 @@ def test_managed_custom_gui_write_fails_closed_when_help_is_removed(tmp_path):
         str(path),
         "--property",
         "_BaseColor",
-        "--clear-help-box",
+        "--clear-tooltip",
         "--write",
     )
 
@@ -164,9 +167,9 @@ def test_generic_write_cannot_change_a_managed_display_name_to_english(tmp_path)
     assert inspect_custom_gui(AseFile.from_path(path))["property_presentation"]["valid"] is True
 
 
-def test_material_gui_spec_can_atomically_repair_display_name_and_help(tmp_path):
+def test_material_gui_spec_can_atomically_repair_display_name_and_tooltip(tmp_path):
     path = tmp_path / "managed.shader"
-    path.write_text(managed_shader(display_name="Base Color", help_text=None), encoding="utf-8")
+    path.write_text(managed_shader(display_name="Base Color", tooltip_text=None), encoding="utf-8")
     spec_path = tmp_path / "gui.json"
     spec_path.write_text(
         json.dumps(
@@ -176,7 +179,7 @@ def test_material_gui_spec_can_atomically_repair_display_name_and_help(tmp_path)
                     {
                         "name": "_BaseColor",
                         "display_name": "基础颜色",
-                        "help": "控制材质的基础颜色。",
+                        "tooltip": "控制材质的基础颜色。",
                     }
                 ],
             },
@@ -208,15 +211,15 @@ def test_text_create_rejects_mismatched_compiled_shell_and_donor_graph(tmp_path)
     assert not output.exists()
 
 
-def test_compiled_display_name_and_help_must_match_the_graph():
-    different_help = "编译区说明与图内说明不一致。"
+def test_compiled_display_name_and_tooltip_must_match_the_graph():
+    different_tooltip = "编译区说明与图内说明不一致。"
     from asecli.core import semantic_attribute
 
     text = managed_shader().replace(
         '_BaseColor("基础颜色", Color)', '_BaseColor("Base Color", Color)', 1
     ).replace(
-        semantic_attribute("ASECLIHelpBox", "控制材质的基础颜色。"),
-        semantic_attribute("ASECLIHelpBox", different_help),
+        semantic_attribute("ASECLITooltip", "控制材质的基础颜色。"),
+        semantic_attribute("ASECLITooltip", different_tooltip),
         1,
     )
 
@@ -229,7 +232,42 @@ def test_compiled_display_name_and_help_must_match_the_graph():
     }
     assert "property:_BaseColor:compiled_display_name:chinese_required" in presentation["violations"]
     assert "property:_BaseColor:display_name:graph_compiled_mismatch" in presentation["violations"]
-    assert "property:_BaseColor:help:graph_compiled_mismatch" in presentation["violations"]
+    assert "property:_BaseColor:tooltip:graph_compiled_mismatch" in presentation["violations"]
+
+
+def test_help_box_is_optional_and_preserved_by_unrelated_spec_updates(tmp_path):
+    path = tmp_path / "managed.shader"
+    path.write_text(
+        managed_shader(help_text="User-authored note."),
+        encoding="utf-8",
+    )
+    before = inspect_custom_gui(AseFile.from_path(path))["property_presentation"]
+    assert before["valid"] is True
+    assert before["help_box"] == {
+        "required": False,
+        "user_authored": True,
+        "attributes": ["HelpBoxMzgui", "ASECLIHelpBox"],
+    }
+    spec_path = tmp_path / "gui.json"
+    spec_path.write_text(
+        json.dumps(
+            {"properties": [{"name": "_BaseColor", "tooltip": "控制材质的基础颜色。"}]},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    code, payload = run_cli("custom-gui", str(path), "--spec", str(spec_path), "--write")
+
+    assert code == 0, payload
+    text = path.read_text(encoding="utf-8")
+    assert "ASECLIHelpBox" in text
+    assert "User-authored note." not in text  # ASE stores user text as encoded metadata.
+    attributes = payload["data"]["state"]["properties"][0]["attributes"]
+    assert {item["type"]: item["text"] for item in attributes}["ASECLIHelpBox"] == (
+        "User-authored note."
+    )
+    assert payload["data"]["state"]["property_presentation"]["valid"] is True
 
 
 @pytest.mark.parametrize(
@@ -241,7 +279,7 @@ def test_compiled_display_name_and_help_must_match_the_graph():
             1,
         ),
         lambda text: text.replace("Version=19602", "Version=25000", 1),
-        lambda text: text.replace("Create;False;1;[ASECLIHelpBox", "Create;False;BROKEN;[ASECLIHelpBox", 1),
+        lambda text: text.replace("Create;False;1;[ASECLITooltip", "Create;False;BROKEN;[ASECLITooltip", 1),
     ],
 )
 def test_managed_generic_writes_fail_closed_when_inspection_is_incomplete(tmp_path, corrupt):

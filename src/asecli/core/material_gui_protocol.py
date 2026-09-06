@@ -1,10 +1,16 @@
 """Shared MZGUI metadata protocol and legacy migration aliases."""
 
-PROPERTY_METADATA_ATTRIBUTE_TYPES = ("FoldoutMzgui", "TooltipMzgui", "HelpBoxMzgui")
+PROPERTY_METADATA_ATTRIBUTE_TYPES = (
+    "FoldoutMzgui",
+    "TooltipMzgui",
+    "HelpBoxMzgui",
+    "EnableIfMzgui",
+)
 LEGACY_PROPERTY_METADATA_ATTRIBUTE_TYPES = (
     "ASECLIFoldout",
     "ASECLITooltip",
     "ASECLIHelpBox",
+    "ASECLIEnableIf",
 )
 _LEGACY_BY_CANONICAL = dict(
     zip(PROPERTY_METADATA_ATTRIBUTE_TYPES, LEGACY_PROPERTY_METADATA_ATTRIBUTE_TYPES)

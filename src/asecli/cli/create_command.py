@@ -186,7 +186,9 @@ def _finalize_editor_property_presentation(
             {
                 "name": node.property_name,
                 "display_name": node.inspector_name,
+                "tooltip": node.tooltip,
                 "help": node.help,
+                "enabled_if": node.enabled_if,
             }
             for node in spec.nodes
             if node.property_name is not None
@@ -199,7 +201,6 @@ def _finalize_editor_property_presentation(
     hide_known_template_compiled_only_properties(created, spec.template.guid)
     presentation = require_property_presentation(created)
     return fix_checksum(created.serialize()), presentation
-
 
 def _preserved_editor_asset_details(path: str, result: dict) -> dict:
     """Describe a post-commit failure without deleting an identity that may have changed."""

@@ -217,33 +217,74 @@ def test_property_inspector_name_accepts_chinese_display_name():
     assert spec.expected_manifest()["nodes"][0]["inspector_name"] == "投射遮罩"
 
 
-def test_v2_requires_chinese_display_name_and_chinese_help_for_every_property():
+def test_v2_requires_chinese_display_name_and_chinese_tooltip_for_every_property():
     raw = caster_spec()
     raw["version"] = 2
     raw["nodes"][0]["inspector_name"] = "投射遮罩"
-    raw["nodes"][0]["help"] = "控制投射遮罩贴图；白色区域显示阴影。"
+    raw["nodes"][0]["tooltip"] = "控制投射遮罩贴图；白色区域显示阴影。"
 
     spec = EditorGraphSpec.from_dict(raw)
 
     assert spec.version == 2
-    assert spec.nodes[0].help == "控制投射遮罩贴图；白色区域显示阴影。"
+    assert spec.nodes[0].tooltip == "控制投射遮罩贴图；白色区域显示阴影。"
+    assert spec.nodes[0].help is None
     assert spec.editor_payload("Assets/Caster.shader", "Assets/ASECLI-Temp-Caster.shader")["version"] == 1
 
-    missing_help = caster_spec()
-    missing_help["version"] = 2
-    missing_help["nodes"][0]["inspector_name"] = "投射遮罩"
-    with pytest.raises(SpecError, match="help"):
-        EditorGraphSpec.from_dict(missing_help)
+    missing_tooltip = caster_spec()
+    missing_tooltip["version"] = 2
+    missing_tooltip["nodes"][0]["inspector_name"] = "投射遮罩"
+    with pytest.raises(SpecError, match="tooltip"):
+        EditorGraphSpec.from_dict(missing_tooltip)
 
     english_display = caster_spec()
     english_display["version"] = 2
-    english_display["nodes"][0]["help"] = "控制投射遮罩贴图。"
+    english_display["nodes"][0]["tooltip"] = "控制投射遮罩贴图。"
     with pytest.raises(SpecError, match="inspector_name.*Chinese"):
         EditorGraphSpec.from_dict(english_display)
 
-    english_help = caster_spec()
-    english_help["version"] = 2
-    english_help["nodes"][0]["inspector_name"] = "投射遮罩"
-    english_help["nodes"][0]["help"] = "Controls the caster mask."
-    with pytest.raises(SpecError, match="help.*Chinese"):
-        EditorGraphSpec.from_dict(english_help)
+    english_tooltip = caster_spec()
+    english_tooltip["version"] = 2
+    english_tooltip["nodes"][0]["inspector_name"] = "投射遮罩"
+    english_tooltip["nodes"][0]["tooltip"] = "Controls the caster mask."
+    with pytest.raises(SpecError, match="tooltip.*Chinese"):
+        EditorGraphSpec.from_dict(english_tooltip)
+
+    with_help = caster_spec()
+    with_help["version"] = 2
+    with_help["nodes"][0]["inspector_name"] = "投射遮罩"
+    with_help["nodes"][0]["tooltip"] = "控制投射遮罩贴图。"
+    with_help["nodes"][0]["help"] = "User-authored persistent note."
+    parsed = EditorGraphSpec.from_dict(with_help)
+    assert parsed.nodes[0].tooltip == "控制投射遮罩贴图。"
+    assert parsed.nodes[0].help == "User-authored persistent note."
+
+    legacy = caster_spec()
+    legacy["version"] = 2
+    legacy["nodes"][0]["inspector_name"] = "投射遮罩"
+    legacy["nodes"][0]["help"] = "旧规格说明会迁移为悬浮提示。"
+    migrated = EditorGraphSpec.from_dict(legacy).nodes[0]
+    assert migrated.tooltip == "旧规格说明会迁移为悬浮提示。"
+    assert migrated.help is None
+
+
+def test_v2_accepts_conditional_enable_but_keeps_it_out_of_editor_payload_v1():
+    raw = caster_spec()
+    raw["version"] = 2
+    raw["nodes"][0].update(
+        inspector_name="投射遮罩",
+        tooltip="控制投射遮罩贴图。",
+        enabled_if={"property": "_ReflectionSource", "operator": "Equal", "value": 2},
+    )
+
+    spec = EditorGraphSpec.from_dict(raw)
+
+    assert spec.nodes[0].enabled_if == {
+        "property": "_ReflectionSource", "operator": "Equal", "value": 2.0
+    }
+    assert spec.to_dict()["nodes"][0]["enabled_if"]["value"] == 2.0
+    payload = spec.editor_payload("Assets/Test.shader", "Assets/Test.tmp.shader")
+    assert "enabled_if" not in payload["nodes"][0]
+
+    raw["nodes"][0]["enabled_if"]["operator"] = "Between"
+    with pytest.raises(SpecError, match="enabled_if.operator"):
+        EditorGraphSpec.from_dict(raw)

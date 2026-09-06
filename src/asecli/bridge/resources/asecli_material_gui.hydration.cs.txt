@@ -74,9 +74,11 @@ namespace ASECLI.MaterialGUI.Authoring
                         if (value.StartsWith("FoldoutMzgui", StringComparison.Ordinal) ||
                             value.StartsWith("TooltipMzgui", StringComparison.Ordinal) ||
                             value.StartsWith("HelpBoxMzgui", StringComparison.Ordinal) ||
+                            value.StartsWith("EnableIfMzgui", StringComparison.Ordinal) ||
                             value.StartsWith("ASECLIFoldout", StringComparison.Ordinal) ||
                             value.StartsWith("ASECLITooltip", StringComparison.Ordinal) ||
-                            value.StartsWith("ASECLIHelpBox", StringComparison.Ordinal))
+                            value.StartsWith("ASECLIHelpBox", StringComparison.Ordinal) ||
+                            value.StartsWith("ASECLIEnableIf", StringComparison.Ordinal))
                             managed.Add(value);
                     }
                     if (managed.Count > 0) result[propertyName] = managed;

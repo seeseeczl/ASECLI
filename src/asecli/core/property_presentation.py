@@ -10,19 +10,21 @@ from .model import AseFile
 
 
 PROPERTY_PRESENTATION_CONTRACT = {
-    "contract": "asecli.property-presentation.v1",
+    "contract": "asecli.property-presentation.v2",
     "scope": "exported_properties",
     "display_name": {"language": "zh-Hans", "requires_han": True},
     "tooltip": {
+        "attribute": "TooltipMzgui",
+        "language": "zh-Hans",
+        "requires_han": True,
         "providers": ["MZGUI.MZGUI", "ASECLI.MaterialGUI.ASECLIMaterialGUI"],
         "automatic_fields": ["property_name", "shader_default_value"],
         "property_name_format": "english_identifier",
     },
-    "inline_help": {
-        "attribute": "HelpBoxMzgui",
-        "language": "zh-Hans",
-        "requires_han": True,
-        "presentation_contract": "asecli.inline-help.v1",
+    "help_box": {
+        "required": False,
+        "user_authored": True,
+        "attributes": ["HelpBoxMzgui", "ASECLIHelpBox"],
     },
 }
 
@@ -123,14 +125,13 @@ def inspect_property_presentation(
             property_violations.append("property_name:english_identifier_required")
         if not contains_han(prop.get("display_name")):
             property_violations.append("display_name:chinese_required")
-        help_values = [
+        tooltip_values = [
             item.get("text")
             for item in prop.get("attributes", [])
-            if item.get("type") in {"HelpBoxMzgui", "ASECLIHelpBox"}
+            if item.get("type") in {"TooltipMzgui", "ASECLITooltip"}
         ]
-        if len(help_values) != 1 or not contains_han(help_values[0]):
-            property_violations.append("help:chinese_required")
-
+        if len(tooltip_values) != 1 or not contains_han(tooltip_values[0]):
+            property_violations.append("tooltip:chinese_required")
         compiled = compiled_by_name.get(property_name)
         if compiled is not None:
             compiled_display_name = compiled.get("display_name")
@@ -138,16 +139,15 @@ def inspect_property_presentation(
                 property_violations.append("compiled_display_name:chinese_required")
             if compiled_display_name != prop.get("display_name"):
                 property_violations.append("display_name:graph_compiled_mismatch")
-            compiled_help_values = [
+            compiled_tooltip_values = [
                 item.get("text")
                 for item in compiled.get("attributes", [])
-                if item.get("type") in {"HelpBoxMzgui", "ASECLIHelpBox"}
+                if item.get("type") in {"TooltipMzgui", "ASECLITooltip"}
             ]
-            if len(compiled_help_values) != 1 or not contains_han(compiled_help_values[0]):
-                property_violations.append("compiled_help:chinese_required")
-            if help_values != compiled_help_values:
-                property_violations.append("help:graph_compiled_mismatch")
-
+            if len(compiled_tooltip_values) != 1 or not contains_han(compiled_tooltip_values[0]):
+                property_violations.append("compiled_tooltip:chinese_required")
+            if tooltip_values != compiled_tooltip_values:
+                property_violations.append("tooltip:graph_compiled_mismatch")
         label = property_name if isinstance(property_name, str) else str(prop.get("node_id"))
         violations.extend(f"property:{label}:{item}" for item in property_violations)
         property_results.append(

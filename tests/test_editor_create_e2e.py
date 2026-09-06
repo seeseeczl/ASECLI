@@ -32,12 +32,12 @@ def _specs() -> tuple[EditorGraphSpec, EditorGraphSpec]:
             {
                 "alias": "mask", "kind": "sampler", "position": [-720, 20],
                 "property_name": "_AuditMask", "inspector_name": "验证遮罩",
-                "help": "用于验证动态纹理属性能够跨进程重新加载。", "parameter_type": "Property",
+                "tooltip": "用于验证动态纹理属性能够跨进程重新加载。", "parameter_type": "Property",
             },
             {
                 "alias": "strength", "kind": "property", "type": "RangedFloatNode",
                 "position": [-420, 20], "property_name": "_AuditStrength", "inspector_name": "验证强度",
-                "help": "用于验证数值属性能够跨进程重新加载。", "parameter_type": "Property",
+                "tooltip": "用于验证数值属性能够跨进程重新加载。", "parameter_type": "Property",
             },
         ],
         "connections": [
@@ -53,7 +53,7 @@ def _specs() -> tuple[EditorGraphSpec, EditorGraphSpec]:
             {
                 "alias": "ground_mask", "kind": "property", "type": "TexturePropertyNode",
                 "position": [-930, 300], "property_name": "_GroundMask", "inspector_name": "地面遮罩",
-                "help": "控制局部阴影接收区域的遮罩纹理。", "parameter_type": "Property",
+                "tooltip": "控制局部阴影接收区域的遮罩纹理。", "parameter_type": "Property",
             },
             {"alias": "uv", "kind": "node", "type": "TextureCoordinatesNode", "position": [-930, 500]},
             {

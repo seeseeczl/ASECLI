@@ -16,7 +16,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 | 图读取与安全检查 | 解析节点/连线、结构校验、CHKSM 校验与修复、无效节点审计 | 否 |
 | 图编辑 | 设置已知字段、schema 驱动或原始行加节点、连线/断线、受保护删节点、最小差异写回 | 否 |
 | 图整理 | 分层网格布局、原生 Comment 框创建/嵌套、真实节点边界检查与自动收框、Local Var 治理规则 | 创建/检查真实边界时需要 |
-| 材质 Inspector | 原生 MZGUI 优先；缺失时才注入 ASECLI ShaderGUI fallback。两者都使用 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`；旧 ASECLI 标记只读兼容 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
+| 材质 Inspector | 原生 MZGUI 优先；缺失时才注入 ASECLI ShaderGUI fallback。两者兼容 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 和条件置灰 `EnableIfMzgui`；默认只生成 Tooltip，HelpBox 由用户按需添加 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
 | Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
 | 编译桥接 | 通过 MCP for Unity 请求 ASE 重新生成 HLSL，并验证工具结果/保存语义 | 是 |
 | Agent 集成 | 全部子命令单行 JSON 输出；稳定错误码与退出码，适合 Agent 子进程编排 | 否 |
@@ -28,7 +28,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 - **节点 schema 库**：295 种节点类型的参数结构来自 ASE 运行时序列化提取；未知或版本不兼容的结构拒绝猜写。
 - **安全写入**：写前比对 SHA-256 快照、加独占锁、拒绝符号链接和陈旧快照；既有文件写入前生成相邻 `.bak` 备份。
 - **受控 Editor 创建**：固定 C# 执行器 + 白名单 JSON 规格，拒绝任意 C#、任意反射字段和不支持版本的降级写入。
-- **属性呈现契约**：所有由 `create` 生成的 ASE Shader 必须满足 `asecli.property-presentation.v1`；公开属性使用中文显示名，Tooltip 自动读取英文变量名与 Shader 默认值，属性下方必须有中文使用说明。
+- **属性呈现契约**：所有由 `create` 生成的 ASE Shader 必须满足 `asecli.property-presentation.v2`；公开属性使用中文显示名和中文 Tooltip，GUI 自动追加英文变量名与 Shader 默认值。HelpBox 是用户可选内容，不参与合规门禁。
 - **证据分层**：文本/自动化通过不等于真实 Editor、目标 Inspector 或最终渲染画面通过；README 会明确标注这些边界。
 
 ## 环境要求
@@ -39,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.4.2`；需要回滚时可安装不可变的 `v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.5.0`；需要回滚时可安装不可变的 `v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -47,11 +47,11 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 gh auth login
-mkdir asecli-v0.4.2
-cd asecli-v0.4.2
-gh release download v0.4.2 --repo seeseeczl/ASECLI
+mkdir asecli-v0.5.0
+cd asecli-v0.5.0
+gh release download v0.5.0 --repo seeseeczl/ASECLI
 shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.4.2-py3-none-any.whl
+uv tool install ./asecli-0.5.0-py3-none-any.whl
 asecli install-skill
 asecli --help
 ```
@@ -59,7 +59,7 @@ asecli --help
 `uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
 
 ```bash
-uv tool install --force ./asecli-0.4.2-py3-none-any.whl
+uv tool install --force ./asecli-0.5.0-py3-none-any.whl
 asecli install-skill
 ```
 
@@ -68,7 +68,7 @@ asecli install-skill
 `v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
 
 ```bash
-uv tool install --force ./asecli-0.4.2-py3-none-any.whl && asecli install-skill
+uv tool install --force ./asecli-0.5.0-py3-none-any.whl && asecli install-skill
 ```
 
 `install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
@@ -78,8 +78,8 @@ Python wheel 安装遵循无 post-install 副作用的规范，`uv tool install`
 回滚到上一正式版：
 
 ```bash
-gh release download v0.3.1 --repo seeseeczl/ASECLI
-uv tool install --force ./asecli-0.3.1-py3-none-any.whl
+gh release download v0.4.2 --repo seeseeczl/ASECLI
+uv tool install --force ./asecli-0.4.2-py3-none-any.whl
 ```
 
 卸载：
@@ -88,7 +88,7 @@ uv tool install --force ./asecli-0.3.1-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.4.2（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.4.2)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+正式版本与校验资产见 [ASECLI v0.5.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.5.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
@@ -155,15 +155,20 @@ asecli gui-support /path/to/UnityProject --runtime-probe --handoff-native
 asecli gui-support /path/to/UnityProject --runtime-probe --handoff-native --write
 
 # provider=native_mzgui 时继续使用工程已有 MZGUI。
-# 安装 fallback 后，在 Unity 中打开：
+# --write 只补 authoring/条件置灰扩展，不会注入第二个 MZGUI.MZGUI。
+# 安装 fallback 或原生扩展后，在 Unity 中打开：
 # Window > Amplify Shader Editor > MZGUI Attributes (ASECLI)
 
 # 使用上一步 JSON 返回的 recommended_editor；也可直接用 ShaderLab 属性名定位
 asecli custom-gui MyShader.shader
 asecli custom-gui MyShader.shader --editor MZGUI.MZGUI --property _PaintColor \
   --group "固有色" \
-  --tooltip "车身基础漆色。" \
-  --help-box "控制车辆基础漆面颜色。" --write
+  --tooltip "控制车辆基础漆面颜色；Alpha 当前不参与透明度计算。" --write
+
+# 当反射来源等于 2 时启用本地环境属性，否则只置灰且保留原值
+asecli custom-gui MyShader.shader --property _BaseEnvironmentTint \
+  --enabled-if _BaseReflectionSource --enabled-if-operator Equal \
+  --enabled-if-value 2 --write
 
 # 9. 给现有节点增加原生 Comment 框（默认只预览）
 asecli comment-group MyShader.shader --nodes 1212,1218 \
@@ -197,12 +202,12 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `remove-node <file> --node N [--force-external] [--write]` | 删除节点及附属连线。 | 默认预演；外部源码仍引用的 Property 默认拒删。`--force-external` 只用于已迁移消费者的明确操作。 |
 | `fix-checksum <file> [--write]` | 重算 `//CHKSM`，并报告旧值、实际值和是否已有效。 | 默认预演；`--write` 后写入并备份原文件。 |
 | `layout <file> [--gap-x X] [--gap-y Y] [--write]` | 按左到右数据流排列节点，保持连线和非位置字段不变。 | 默认预演；只改坐标。真实画布的节点宽高和贝塞尔线仍需 Editor 验收。 |
-| `gui-support <project> [--runtime-probe] [--handoff-native] [--write]` | 优先检测并选用原生 MZGUI；缺失时安装 fallback；原生后来加入时可恢复交接。 | V2 枚举全部 provider；handoff 默认预演，只处理已知哈希并保留 authoring-only bridge，复验失败可恢复。 |
-| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；以 MZGUI 标准格式设置或清除 Foldout、Tooltip、HelpBox。 | 新写入统一生成 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`；provider 由 `gui-support` 的 `recommended_editor` 决定。 |
+| `gui-support <project> [--runtime-probe] [--handoff-native] [--write]` | 优先检测并选用原生 MZGUI；原生环境只安装 authoring/条件置灰扩展，缺失时安装 fallback；原生后来加入时可恢复交接。 | 不创建第二个原生 provider；V2 枚举全部 provider；handoff 默认预演，只处理已知哈希并保留 authoring-only bridge，复验失败可恢复。 |
+| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；设置或清除 Foldout、Tooltip、用户 HelpBox 和由另一数值属性控制的置灰条件。 | 条件写为 `EnableIfMzgui(source,operator,value)`；不满足时只禁用控件，不清空材质值。`--clear-enabled-if` 可清除。 |
 | `install-skill [--skill-root DIR]` | 安装 wheel 内置的 ASECLI Agent Skill。 | 相同内容幂等；目标已有不同内容时拒绝覆盖，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
 | `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
 | `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
-| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `help`，目标必须位于 `Assets/` 且不存在。 |
+| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。仅含旧 `help` 的规格会迁移为 Tooltip。 |
 | `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，并报告 `changed`。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。 |
 
 ### 推荐使用流程
@@ -237,13 +242,13 @@ asecli gui-support /path/to/UnityProject --write
 
 # fallback 安装完成后不需要编写 Attribute 代码：
 # Window > Amplify Shader Editor > MZGUI Attributes (ASECLI)
-# 选择 Property 节点，编辑三项开关/文本框，点击“应用并保存 Shader”。
+# 选择 Property 节点，编辑 Foldout/Tooltip；需要时再启用 HelpBox 或“条件启用”，然后点击“应用并保存 Shader”。
 
 # 查询属性，再以属性名进行预演和写入
 asecli custom-gui Assets/Example.shader
 asecli custom-gui Assets/Example.shader --editor MZGUI.MZGUI --property _PaintColor \
-  --group "固有色" --tooltip "车身基础漆色。" \
-  --help-box "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。" --write
+  --group "固有色" \
+  --tooltip "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。" --write
 asecli validate Assets/Example.shader
 asecli recompile Assets/Example.shader
 ```
@@ -259,13 +264,17 @@ asecli recompile Assets/Example.shader
       "name": "_PaintColor",
       "display_name": "车漆颜色",
       "group": "固有色",
-      "tooltip": "车身基础漆色。",
-      "help": "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。"
+      "tooltip": "控制车身基础漆面颜色；Alpha 当前不参与透明度计算。"
     },
     {
       "name": "_Contrast",
       "display_name": "明暗对比",
-      "help": "控制车身明暗对比度；数值越大，对比越弱。"
+      "tooltip": "控制车身明暗对比度；数值越大，对比越弱。",
+      "enabled_if": {
+        "property": "_BaseReflectionSource",
+        "operator": "Equal",
+        "value": 2
+      }
     }
   ]
 }
@@ -278,7 +287,7 @@ asecli validate Assets/Example.shader
 asecli recompile Assets/Example.shader
 ```
 
-`editor` 必须采用 `gui-support` 输出中的 `recommended_editor`，无论由原生 MZGUI 还是 ASECLI fallback 提供都固定为 `MZGUI.MZGUI`。因此在 fallback 工程中制作的 Shader 可以原样放入已有原生 MZGUI 的工程；三种属性和 `CustomEditor` 都不需要改名。`ASECLI.MaterialGUI.ASECLIMaterialGUI` 仅作为旧文件读取兼容别名。`target_conflict`、`unknown` 或 `multiple` 必须人工处理，工具不会覆盖或猜选。
+`editor` 必须采用 `gui-support` 输出中的 `recommended_editor`，无论由原生 MZGUI 还是 ASECLI fallback 提供都固定为 `MZGUI.MZGUI`。因此在 fallback 工程中制作的 Shader 可以原样放入已有原生 MZGUI 的工程；四种属性和 `CustomEditor` 都不需要改名。原生工程执行 `gui-support --write` 时只安装 `EnableIfMzguiDrawer` 与可视化 authoring 扩展，不定义第二个 `MZGUI.MZGUI`。`ASECLI.MaterialGUI.ASECLIMaterialGUI` 仅作为旧文件读取兼容别名。`target_conflict`、`unknown` 或 `multiple` 必须人工处理，工具不会覆盖或猜选。
 
 #### 3. 整理图布局、Local Var 与 Comment
 
@@ -296,7 +305,7 @@ asecli comment-group Assets/Example.shader --check-bounds
 asecli comment-group Assets/Example.shader --fit --padding 30 --write
 ```
 
-当一个中间结果被多个分散消费者复用、跨 Comment 组或形成长距离交叉线时，在生产者右侧使用一个 `Register Local Var`，并在每个消费者输入侧使用 `Get Local Var`。一次性、同组、相邻结果保持直连；不要为“看起来整齐”重复计算或重复 Register。普通 schema 不会猜造动态 `RegisterLocalVarNode`，应通过真实 ASE 创建或复用同版本、同类型的真实序列化样本。
+先把多消费者、跨 Comment 和长线列为候选，再检查消费者是否分属独立模块、跨越多少阶段以及是否穿过无关区域。真正的模块接口在生产者右侧使用一个 `Register Local Var`，并在每个远端消费者输入侧使用 `Get Local Var`；同组相邻双扇出仍保持直连。普通 schema 不会猜造动态 `RegisterLocalVarNode`，应通过真实 ASE 创建或复用同版本、同类型的真实序列化样本。
 
 #### 4. 创建与编译
 
@@ -334,7 +343,7 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
       "position": [-520, 20],
       "property_name": "_CasterMask",
       "inspector_name": "投射遮罩",
-      "help": "控制投射遮罩贴图；白色区域显示阴影，黑色区域不显示。",
+      "tooltip": "控制投射遮罩贴图；白色区域显示阴影，黑色区域不显示。",
       "parameter_type": "Property"
     }
   ],
@@ -344,7 +353,7 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
 }
 ```
 
-- CLI 创建要求 `EditorGraphSpec v2`。每个 Property/Sampler 必须提供含中文的 `inspector_name` 和 `help`；v1 仅保留底层桥接兼容，不再作为正式 CLI 创建输入。
+- CLI 创建要求 `EditorGraphSpec v2`。每个 Property/Sampler 必须提供含中文的 `inspector_name` 和 `tooltip`；用户可另加可选 `help` 生成 HelpBox。旧 v2 只有 `help`、没有 `tooltip` 时按 Tooltip 迁移读取且不生成 HelpBox；v1 仅保留底层桥接兼容。
 - 首期绑定 ASE `1.9.6.2`；Master 端口契约只开放已实测的 URP Unlit 模板 GUID。未知版本、模板 Master 端口、节点、字段、端口或类型在写入前失败。
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
 - 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图。成功 JSON 中 `reloaded` 与 `staging_reloaded` 表示暂存图已 LoadFromDisk；`target_graph_reloaded` 恒为 `false`。CLI 属性收尾后必须使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
@@ -374,14 +383,14 @@ stdout 恒为单行 JSON，agent 可直接解析：
 
 ### 自定义 GUI 分组规则
 
-- `asecli.property-presentation.v1` 是硬门禁：每个导出 Property 必须使用中文 `display_name`，并具有一条中文 `HelpBoxMzgui` 使用说明。ASECLI fallback 会额外显示英文变量名与 Shader 默认值；原生 MZGUI 的具体呈现以其实现为准。`custom-gui` 查询结果会逐属性报告 `valid` 和 `violations`。
-- 新 Property 通过 EditorGraphSpec v2 的 `inspector_name`/`help` 写入；已有属性使用 `custom-gui --spec` 的 `display_name`/`help` 原子治理。CLI 同步图字段与编译区显示名，不要手工只改 ShaderLab `Properties` 行。
-- `--group` 会给目标属性写入 `FoldoutMzgui`；`--tooltip` 与 `--help-box` 分别写 `TooltipMzgui` 和 `HelpBoxMzgui`。目标属性成为分组首项，后续属性一直归入该组，直到下一个带非空分组标题的属性；因此应选择材质面板中该组的第一个 PropertyNode。
+- `asecli.property-presentation.v2` 是硬门禁：每个导出 Property 必须使用中文 `display_name` 和一条中文 `TooltipMzgui`。HelpBox 可有可无，不参与门禁。GUI 自动在 Tooltip 末尾追加英文变量名与 Shader 默认值。
+- 新 Property 通过 EditorGraphSpec v2 的 `inspector_name`/`tooltip` 写入；已有属性使用 `custom-gui --spec` 的 `display_name`/`tooltip` 原子治理。只有用户显式提供 `help` 时才新增或更新 HelpBox，省略不会清理既有内容。
+- `--group` 写 `FoldoutMzgui`，`--tooltip` 写 `TooltipMzgui`。目标属性成为分组首项，后续属性一直归入该组，直到下一个带非空分组标题的属性。
 - `--property _PaintColor` 可替代节点 ID；批量整理使用 `--spec`。`reorder=true` 按 `properties` 数组重写 PropertyNode 的 `m_orderIndex`，未列属性保持原相对顺序并追加。
-- ASECLI GUI 会在 Tooltip 中自动追加准确变量名与默认基线，并通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值。`--tooltip` 只写可选的额外悬浮说明，不再人工复制变量名和默认值。
-- `--help-box` 是属性下方的常驻中文说明，应写清用途、通道/单位和“调大/调小”的结果，不重复变量名和默认值。中文、换行和 emoji 按已验证的 UTF-16 `#XXXX` 规则编码。
-- 常驻说明统一遵循 `asecli.inline-help.v1`：无图标、无原生 HelpBox 外框、弱背景、左侧强调线、小号弱化斜体文字并自动换行。`gui-support` 在 JSON 的 `capabilities.inline_help_presentation` 中报告契约和校验结果；契约无效时 `--write` 失败关闭。
-- 先运行 `gui-support <project>`；发现原生 `MZGUI.MZGUI` 时直接使用它，不注入 fallback。只有确认不存在 MZGUI 时，才运行 `gui-support <project> --write` 注入 ASECLI fallback 到 `Assets/Editor`。两种路径均写 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`；已有 ASECLI 私有标记在触碰对应属性时迁移为标准标记。
+- ASECLI GUI 会在中文 Tooltip 后自动追加准确变量名与默认基线，并通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值；不要手工复制这些技术信息。
+- `--help-box` 写入用户自定义常驻内容，`--clear-help-box` 清除它。fallback 编辑窗口提供 HelpBox 开关和文本框，但默认关闭；HelpBox 不能替代必填 Tooltip。
+- `--enabled-if SOURCE --enabled-if-value VALUE` 写入 `EnableIfMzgui`；比较方式默认为 `Equal`，也支持 `Less`、`LessEqual`、`NotEqual`、`GreaterEqual`、`Greater`。条件不满足、控制属性缺失或多选材质中任一项不满足时，Drawer 用 `EditorGUI.DisabledScope` 置灰；不会改写目标属性值，也不是 Shader 渲染分支。
+- 先运行 `gui-support <project>`；发现原生 `MZGUI.MZGUI` 时直接使用它，并以 `--write` 安装不含第二 provider 的 authoring/条件置灰扩展。只有确认不存在 MZGUI 时，`--write` 才注入 ASECLI fallback。两种路径使用相同的 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`、`EnableIfMzgui` 名称。
 - 若 fallback 安装后又导入原生 MZGUI，使用 `--runtime-probe --handoff-native` 预演并以 `--write` 执行。工具保留 authoring-only bridge 负责把便携 Custom Attributes 幂等迁入原生 Toggle/文本状态，不保留第二个 `MZGUI.MZGUI` provider；未知哈希或复验失败不会静默删除文件。
 - `custom-gui --write` 会同步图内主 Master 与编译区 `CustomEditor`、重算 `CHKSM` 并保留 `.bak`；Property 属性声明由 ASE 生成，因此随后必须执行 `validate` 和 `recompile`。
 
@@ -389,7 +398,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 
 | Editor / API 条件 | 当前结论 | 证据 |
 | --- | --- | --- |
-| 团结引擎 `2022.3.61t9`，具备 `ShaderUtil.GetShaderPropertyAttributes` | fallback 支持 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 的读取；可读取默认值 | 隔离工程 `tests/test_material_gui_e2e.py` BatchMode 实测通过 |
+| 团结引擎 `2022.3.61t9`，具备 `ShaderUtil.GetShaderPropertyAttributes` | fallback 支持 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 的读取、编辑和轻量常驻说明渲染；可读取默认值 | 隔离工程 `tests/test_material_gui_e2e.py` BatchMode 与既有 Inspector 实测证据 |
 | 缺少该 `ShaderUtil` 方法、仅依赖 `MaterialPropertyHandler` fallback 的版本 | 代码提供 legacy decorator fallback，但尚无实机验证；不纳入已发布兼容矩阵 | 需要在目标版本补跑同一隔离测试后才可宣称支持 |
 
 BatchMode 只验证编译与元数据，不替代实际 Inspector 中的 Tooltip 悬停、Foldout 点击和 HelpBox 视觉验收。
@@ -401,9 +410,9 @@ BatchMode 只验证编译与元数据，不替代实际 Inspector 中的 Tooltip
   "editor": "MZGUI.MZGUI",
   "reorder": true,
   "properties": [
-    {"name": "_PaintColor", "display_name": "车漆颜色", "group": "固有色", "tooltip": "车身基础漆色。", "help": "控制车辆基础漆面颜色。"},
-    {"name": "_Contrast", "display_name": "明暗对比", "help": "控制车身明暗对比度；数值越大，对比越弱。"},
-    {"name": "_Coat_IO", "display_name": "清漆开关", "group": "清漆层", "help": "控制是否启用清漆层。"}
+    {"name": "_PaintColor", "display_name": "车漆颜色", "group": "固有色", "tooltip": "控制车辆基础漆面颜色。"},
+    {"name": "_Contrast", "display_name": "明暗对比", "tooltip": "控制车身明暗对比度；数值越大，对比越弱。"},
+    {"name": "_Coat_IO", "display_name": "清漆开关", "group": "清漆层", "tooltip": "控制是否启用清漆层。"}
   ]
 }
 ```
@@ -430,7 +439,7 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 - 核心目标是“经过人工精心排列”的秩序感：主数据流从左向右层层递进，Master 最右；同阶段严格列对齐，主链尽量水平，重复分支使用完全一致的列、行距和内部模板。
 - 组内紧凑、组间留出明显通道，并列模块和 Comment 边框也要对齐；无父子关系的组不得重叠，父子组只允许完整包含。
 - 连线并非绝对不能交叉。允许少量线与线在空白通道中简洁、可追踪地交叉；但连线不得穿过无关节点本体、端口或标题栏，也不得形成蜘蛛网。不要用大幅绕线换取表面的零交叉。
-- 排版修复只能改变位置和必要的 Comment 边界，不得改变 Shader 参数、端口连接、计算顺序或引入重复计算。跨组长线仍不清晰时才使用 `Register Local Var` / `Get Local Var`。
+- 排版修复只能改变位置和必要的 Comment 边界，不得改变 Shader 参数、端口连接、计算顺序或引入重复计算。先通过对齐和通道解决局部双扇出；只有跨模块长线、分散复用或已有 Register 仍直拉远端消费者时才使用 `Register Local Var` / `Get Local Var`。扇出次数和像素长度都不能单独触发改造。
 - 完整规则与量化/视觉验收边界见 [`skills/asecli/references/layout-standard.md`](skills/asecli/references/layout-standard.md)。真实 ASE 画布仍需复核精排感、贝塞尔线路径和组间关系；编辑器或 MCP 不可用时应明确报告未验证。
 
 ### Master / Output 设置规范
@@ -449,9 +458,10 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 
 ### Local Var 防蜘蛛网规范
 
-- 同一中间结果被多处复用、跨 Comment 分组或需要长距离连线时，优先在生产者模块右侧放一个 `Register Local Var`，在各消费模块输入侧分别放 `Get Local Var`。
+- “同一输出被用两次以上”只表示需要审计，不表示必须注册。只有消费者分属独立模块且存在跨模块长线、直连穿越无关区域且布局无法解决，或已有 Register 仍向远端消费者直拉时，才使用一个 Register 和各消费模块就近的 Get。
 - Comment 表达“算法块做什么”，Local Var 表达“算法块之间传递什么”。两者配合，把跨区长线收敛成模块边界附近的短线。
-- 变量名应唯一且语义明确，例如 `CoatFresnelMask`、`LitValueControl`；避免 `Value`、`Temp1`、`base`。同组相邻、只使用一次的结果仍保持直连，避免过度抽象。
+- 同组/同算法内即使有双扇出，只要集中在生产者附近、跨一到两个阶段且路径清晰，就保持直连。允许“本地消费者直连、远端消费者用 Get”的有边界混合，禁止 Register 已存在却仍给远端模块拉长线。
+- 变量名应唯一且语义明确，例如 `CoatFresnelMask`、`LitValueControl`；避免 `Value`、`Temp1`、`base`。治理记录必须说明模块归属、跨阶段数、遮挡情况和采用直连/Local Var/混合的理由。
 - 当前 `RegisterLocalVarNode` 的端口类型会随输入变化，ASECLI 不允许用不完整 schema 猜造；优先在 ASE 编辑器创建，或只复用同 ASE 版本、同类型的真实序列化样本，随后执行 `validate` 和 `recompile`。
 
 完整操作手册见 [`skills/asecli/SKILL.md`](skills/asecli/SKILL.md)；材质属性四层信息规范见 [`skills/asecli/references/material-property-standard.md`](skills/asecli/references/material-property-standard.md)。
@@ -520,7 +530,7 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.4.2` 按用户 2026-09-05 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.5.0` 按用户 2026-09-06 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
 
 ### 供应链、许可证与密钥
 

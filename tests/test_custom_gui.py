@@ -20,9 +20,11 @@ from asecli.core import (
     compiled_custom_editor,
     decode_custom_unicode,
     decode_foldout_title,
+    enable_if_attribute,
     encode_custom_unicode,
     encode_foldout_title,
     inspect_custom_gui,
+    parse_enable_if_arguments,
     parse_graph_text,
     read_property_metadata_tail,
     remove_property_metadata_attribute,
@@ -144,6 +146,32 @@ def test_property_metadata_unicode_codecs_use_the_verified_utf16_format():
     assert decode_foldout_title(encode_foldout_title("基础参数 😀")) == "基础参数 😀"
 
 
+def test_conditional_enable_metadata_roundtrips_with_legacy_alias_support():
+    shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
+    raw = enable_if_attribute("_ReflectionSource", "Equal", 2)
+    set_property_metadata_attribute(shader.graph, "10", raw)
+
+    condition = inspect_custom_gui(shader)["properties"][0]["attributes"][0]
+    assert condition["type"] == "EnableIfMzgui"
+    assert condition["condition"] == {
+        "property": "_ReflectionSource",
+        "operator": "Equal",
+        "value": 2.0,
+    }
+    assert parse_enable_if_arguments("_Mode,GreaterEqual,1.5")["operator"] == "GreaterEqual"
+
+    set_property_metadata_attribute(
+        shader.graph, "10", "[ASECLIEnableIf(_ReflectionSource,NotEqual,1)]"
+    )
+    attributes = read_property_metadata_tail(shader.graph, shader.graph.node_by_id("10")).attributes
+    assert attributes == ("[ASECLIEnableIf(_ReflectionSource,NotEqual,1)]",)
+
+
+def test_text_semantic_encoder_rejects_conditional_metadata():
+    with pytest.raises(ValueError, match="no text semantic encoder"):
+        semantic_attribute("EnableIfMzgui", "_Mode,Equal,1")
+
+
 def test_reads_legacy_foldout_tail_without_using_it_for_new_writes():
     # Unmodified node line from ASE 1.9.6.2 Examples/MZGUI_Test.shader.
     body = """Version=19602
@@ -177,7 +205,7 @@ def test_property_metadata_tail_roundtrips_on_verified_19602_layout():
     set_property_metadata_attribute(
         shader.graph,
         "10",
-        semantic_attribute("ASECLIHelpBox", "跨版本尾部能力探测"),
+        semantic_attribute("ASECLITooltip", "跨版本尾部能力探测"),
     )
     tail = read_property_metadata_tail(shader.graph, shader.graph.node_by_id("10"))
     assert len(tail.attributes) == 1
@@ -204,7 +232,7 @@ def test_unknown_future_version_rejects_custom_editor_and_tail_without_mutation(
         set_property_metadata_attribute(
             shader.graph,
             "10",
-            semantic_attribute("ASECLIHelpBox", "不得猜写"),
+            semantic_attribute("ASECLITooltip", "不得猜写"),
         )
     assert shader.serialize() == before
 
@@ -226,7 +254,7 @@ def test_cli_unknown_future_version_fails_before_backup_or_write(tmp_path):
         ASECLI_GUI_EDITOR,
         "--property",
         "_BaseColor",
-        "--help-box",
+        "--tooltip",
         "不得猜写",
         "--write",
     )
@@ -246,16 +274,16 @@ def test_unknown_property_tail_fails_closed_instead_of_guessing_an_index():
         set_property_metadata_attribute(
             shader.graph,
             "10",
-            semantic_attribute("ASECLIHelpBox", "不得猜写"),
+            semantic_attribute("ASECLITooltip", "不得猜写"),
         )
 
 
-def test_group_tooltip_helpbox_add_replace_remove_and_count():
+def test_group_tooltip_and_optional_helpbox_add_replace_remove_and_count():
     shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
     graph = shader.graph
     set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIFoldout", "基础参数"))
     set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLITooltip", "变量名：_BaseColor\n默认值：(1, 1, 1, 1)"))
-    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIHelpBox", "请按项目规范设置"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIHelpBox", "用户自定义说明"))
     set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLITooltip", "变量名：_BaseColor\n默认值：(0.5, 0.5, 0.5, 1)"))
     node = graph.node_by_id("10")
     tail = read_property_metadata_tail(graph, node)
@@ -264,25 +292,25 @@ def test_group_tooltip_helpbox_add_replace_remove_and_count():
     attrs = {item["type"]: item for item in state["properties"][0]["attributes"]}
     assert attrs["ASECLIFoldout"]["text"] == "基础参数"
     assert attrs["ASECLITooltip"]["text"] == "变量名：_BaseColor\n默认值：(0.5, 0.5, 0.5, 1)"
-    assert attrs["ASECLIHelpBox"]["text"] == "请按项目规范设置"
+    assert attrs["ASECLIHelpBox"]["text"] == "用户自定义说明"
     removed = remove_property_metadata_attribute(graph, "10", "ASECLITooltip")
     assert len(removed["removed"]) == 1
     assert graph.node_by_id("10").raw_fields[-3] == "2"
 
 
-def test_asecli_gui_editor_writes_its_own_foldout_tooltip_and_helpbox_protocol():
+def test_asecli_gui_editor_writes_all_three_compatible_metadata_names():
     shader = AseFile.from_text(sample_shader(ASECLI_GUI_EDITOR))
     graph = shader.graph
     set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIFoldout", "基础参数"))
     set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLITooltip", "基础颜色"))
-    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIHelpBox", "控制最终固有色。"))
+    set_property_metadata_attribute(graph, "10", semantic_attribute("ASECLIHelpBox", "用户说明"))
     state = inspect_custom_gui(shader)
     assert state["editor"]["graph"] == ASECLI_GUI_EDITOR
     attributes = {item["type"]: item["text"] for item in state["properties"][0]["attributes"]}
     assert attributes == {
         "ASECLIFoldout": "基础参数",
         "ASECLITooltip": "基础颜色",
-        "ASECLIHelpBox": "控制最终固有色。",
+        "ASECLIHelpBox": "用户说明",
     }
 
 
@@ -296,7 +324,10 @@ def test_compiled_property_metadata_sync_preserves_unrelated_attributes():
         shader.graph, "10", semantic_attribute("ASECLIFoldout", "基础参数")
     )
     set_property_metadata_attribute(
-        shader.graph, "10", semantic_attribute("ASECLIHelpBox", "控制最终固有色。")
+        shader.graph, "10", semantic_attribute("ASECLITooltip", "控制最终固有色。")
+    )
+    set_property_metadata_attribute(
+        shader.graph, "10", semantic_attribute("ASECLIHelpBox", "用户常驻说明。")
     )
 
     changes = sync_compiled_property_metadata(shader)
@@ -305,6 +336,7 @@ def test_compiled_property_metadata_sync_preserves_unrelated_attributes():
     declaration = next(line for line in shader.prefix.splitlines() if "_BaseColor(" in line)
     assert "[HDR]" in declaration
     assert "[ASECLIFoldout(" in declaration
+    assert "[ASECLITooltip(" in declaration
     assert "[ASECLIHelpBox(" in declaration
     assert "HelpBoxMzgui" not in declaration
 
@@ -322,7 +354,13 @@ def test_recompile_cli_restores_metadata_discarded_by_editor_save(tmp_path, monk
         shader.graph, "10", semantic_attribute("FoldoutMzgui", "基础参数")
     )
     set_property_metadata_attribute(
-        shader.graph, "10", semantic_attribute("HelpBoxMzgui", "控制最终固有色。")
+        shader.graph, "10", semantic_attribute("TooltipMzgui", "控制最终固有色。")
+    )
+    set_property_metadata_attribute(
+        shader.graph, "10", semantic_attribute("HelpBoxMzgui", "用户常驻说明。")
+    )
+    set_property_metadata_attribute(
+        shader.graph, "10", enable_if_attribute("_ReflectionSource", "Equal", 2)
     )
     path.write_text(fix_checksum(shader.serialize()), encoding="utf-8")
 
@@ -333,14 +371,18 @@ def test_recompile_cli_restores_metadata_discarded_by_editor_save(tmp_path, monk
     monkeypatch.setattr("asecli.cli.commands.recompile_via_mcp", fake_recompile)
     assert app(["recompile", str(path)]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["data"]["metadata_restored"] == 2
+    assert payload["data"]["metadata_restored"] == 4
     restored = AseFile.from_path(path)
     attrs = {
         item["type"]: item
         for item in inspect_custom_gui(restored)["properties"][0]["attributes"]
     }
     assert attrs["FoldoutMzgui"]["text"] == "基础参数"
-    assert attrs["HelpBoxMzgui"]["text"] == "控制最终固有色。"
+    assert attrs["TooltipMzgui"]["text"] == "控制最终固有色。"
+    assert attrs["HelpBoxMzgui"]["text"] == "用户常驻说明。"
+    assert attrs["EnableIfMzgui"]["condition"]["value"] == 2.0
     declaration = next(line for line in restored.prefix.splitlines() if "_BaseColor(" in line)
     assert "[FoldoutMzgui(" in declaration
+    assert "[TooltipMzgui(" in declaration
     assert "[HelpBoxMzgui(" in declaration
+    assert "[EnableIfMzgui(_ReflectionSource,Equal,2)]" in declaration

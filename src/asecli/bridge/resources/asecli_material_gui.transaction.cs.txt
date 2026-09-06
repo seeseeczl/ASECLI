@@ -13,6 +13,7 @@ namespace ASECLI.MaterialGUI.Authoring
     {
         internal static bool TryApply(
             UnityEngine.Object node, string foldout, string tooltip, string help,
+            string enabledIf,
             bool assignEditor, bool save, out string error)
         {
             List<string> attributes;
@@ -35,7 +36,8 @@ namespace ASECLI.MaterialGUI.Authoring
             string stage = "write_attributes";
             try
             {
-                if (!ASEAttributeStore.TryWrite(node, foldout, tooltip, help, out error))
+                if (!ASEAttributeStore.TryWrite(
+                        node, foldout, tooltip, help, enabledIf, out error))
                     throw new InvalidOperationException(error);
                 stage = "assign_editor";
                 if (assignEditor && !ASEReflection.TryAssignFallbackEditor(out error))

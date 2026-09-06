@@ -1,4 +1,4 @@
 def test_skeleton():
     import asecli
 
-    assert asecli.__version__ == "0.4.2"
+    assert asecli.__version__ == "0.5.0"

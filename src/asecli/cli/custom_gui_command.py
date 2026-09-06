@@ -11,6 +11,7 @@ from ..core import (
     MZGUI_EDITOR,
     SUPPORTED_GUI_EDITORS,
     apply_material_gui_spec,
+    enable_if_attribute,
     graph_custom_editor,
     inspect_custom_gui,
     remove_property_metadata_attribute,
@@ -25,6 +26,12 @@ from .commands import CliError, _commit_text, _load
 
 def cmd_custom_gui(args) -> dict:
     """Inspect or safely mutate ASE CustomEditor and ASECLI property metadata."""
+    if args.enabled_if is not None and args.enabled_if_value is None:
+        raise CliError("USAGE_ERROR", "--enabled-if requires --enabled-if-value")
+    if args.enabled_if is None and args.enabled_if_value is not None:
+        raise CliError("USAGE_ERROR", "--enabled-if-value requires --enabled-if")
+    if args.enabled_if is None and args.enabled_if_operator is not None:
+        raise CliError("USAGE_ERROR", "--enabled-if-operator requires --enabled-if")
     f = _load(args.file)
     changes = []
     node_actions = any(
@@ -35,6 +42,8 @@ def cmd_custom_gui(args) -> dict:
             args.clear_tooltip,
             args.help_box is not None,
             args.clear_help_box,
+            args.enabled_if is not None,
+            args.clear_enabled_if,
             bool(args.add_attribute),
             bool(args.remove_attribute),
         )
@@ -70,6 +79,14 @@ def cmd_custom_gui(args) -> dict:
                 additions.append(semantic_attribute("TooltipMzgui", args.tooltip))
             if args.help_box is not None:
                 additions.append(semantic_attribute("HelpBoxMzgui", args.help_box))
+            if args.enabled_if is not None:
+                additions.append(
+                    enable_if_attribute(
+                        args.enabled_if,
+                        args.enabled_if_operator or "Equal",
+                        args.enabled_if_value,
+                    )
+                )
             additions.extend(args.add_attribute or [])
 
             if additions and graph_custom_editor(f.graph) not in SUPPORTED_GUI_EDITORS:
@@ -81,7 +98,8 @@ def cmd_custom_gui(args) -> dict:
 
             removals = (
                 [(args.clear_group, "FoldoutMzgui"), (args.clear_tooltip, "TooltipMzgui"),
-                 (args.clear_help_box, "HelpBoxMzgui")]
+                 (args.clear_help_box, "HelpBoxMzgui"),
+                 (args.clear_enabled_if, "EnableIfMzgui")]
             )
             for enabled, type_name in removals:
                 if enabled:

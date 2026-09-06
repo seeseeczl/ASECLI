@@ -16,7 +16,7 @@ from .editor_spec import (
     SpecError,
     TemplateSpec,
 )
-from ..core import contains_han
+from ..core import contains_han, validate_enable_if
 
 
 GENERIC_NODE_TYPES = frozenset({"WorldPosInputsNode", "TextureCoordinatesNode", "BreakToComponentsNode"})
@@ -40,8 +40,8 @@ _NODE_KEYS_V1 = {
 }
 _NODE_KEYS_V2 = {
     **_NODE_KEYS_V1,
-    "property": _NODE_KEYS_V1["property"] | {"help"},
-    "sampler": _NODE_KEYS_V1["sampler"] | {"help"},
+    "property": _NODE_KEYS_V1["property"] | {"help", "tooltip", "enabled_if"},
+    "sampler": _NODE_KEYS_V1["sampler"] | {"help", "tooltip", "enabled_if"},
 }
 _ALIAS = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
@@ -149,19 +149,32 @@ def _parse_property_node(
     if not _PROPERTY_NAME.fullmatch(property_name):
         raise SpecError(f"{label} property_name must be an underscored identifier")
     inspector_name = _safe_text(obj.get("inspector_name"), f"{label} inspector_name", 128, False)
+    tooltip_text = None
     help_text = None
+    enabled_if = None
     if version == 2:
         if not contains_han(inspector_name):
             raise SpecError(f"{label} inspector_name must contain Chinese characters")
-        help_text = _safe_text(obj.get("help"), f"{label} help", 4096, True)
-        if not contains_han(help_text):
-            raise SpecError(f"{label} help must contain Chinese characters")
+        if "tooltip" in obj:
+            tooltip_text = _safe_text(obj.get("tooltip"), f"{label} tooltip", 4096, True)
+            if "help" in obj:
+                help_text = _safe_text(obj.get("help"), f"{label} help", 4096, True)
+        else:
+            tooltip_text = _safe_text(obj.get("help"), f"{label} tooltip", 4096, True)
+        if not contains_han(tooltip_text):
+            raise SpecError(f"{label} tooltip must contain Chinese characters")
+        if "enabled_if" in obj:
+            try:
+                enabled_if = validate_enable_if(obj["enabled_if"])
+            except ValueError as exc:
+                raise SpecError(f"{label} {exc}") from exc
     parameter_type = obj.get("parameter_type")
     if parameter_type not in PROPERTY_TYPES:
         raise SpecError(f"{label} parameter_type must be one of {sorted(PROPERTY_TYPES)}")
     return NodeSpec(alias, kind, position, type=None if kind == "sampler" else node_type,
                     property_name=property_name, inspector_name=inspector_name,
-                    help=help_text, parameter_type=parameter_type)
+                    tooltip=tooltip_text, help=help_text, enabled_if=enabled_if,
+                    parameter_type=parameter_type)
 
 
 def _parse_input(value: Any, node_label: str, index: int) -> InputSpec:
@@ -216,15 +229,11 @@ def _string(value: Any, label: str, limit: int) -> str:
     if not isinstance(value, str) or not value or len(value) > limit:
         raise SpecError(f"{label} must be a non-empty string of at most {limit} characters")
     return value
-
-
 def _safe_text(value: Any, label: str, limit: int, allow_newline: bool) -> str:
     text = _string(value, label, limit)
     if "\x00" in text or (not allow_newline and any(char in text for char in ("\r", "\n", ";"))):
         raise SpecError(f"{label} contains a forbidden control character or separator")
     return text
-
-
 def _position(value: Any, label: str) -> tuple[float, float]:
     if not isinstance(value, list) or len(value) != 2:
         raise SpecError(f"{label} must be [x, y]")

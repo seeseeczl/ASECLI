@@ -5,6 +5,7 @@ import re
 from .model import AseFile, AseGraph, NodeLine
 from .custom_gui_versions import CUSTOM_EDITOR_GRAPH_VERSIONS, PROPERTY_METADATA_TAIL_GRAPH_VERSIONS, TARGET_ASE_VERSION, TARGET_GRAPH_VERSION, require_custom_editor_version, require_property_metadata_tail_version
 from .material_gui_protocol import LEGACY_PROPERTY_METADATA_ATTRIBUTE_TYPES as _ALTERNATE_ASECLI_ATTRIBUTE_TYPES, MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES, PROPERTY_METADATA_ATTRIBUTE_TYPES, canonical_property_metadata_type, equivalent_property_metadata_types
+from .material_gui_condition import parse_enable_if_arguments
 from .property_presentation import inspect_property_presentation
 
 ASECLI_GUI_EDITOR = "ASECLI.MaterialGUI.ASECLIMaterialGUI"
@@ -19,8 +20,7 @@ _FALLBACK_LINE_RE = re.compile(r"(?im)^(?P<indent>[ \t]*)fallback\b")
 _GROUP_INVALID = frozenset("\r\n\\><'\";:[]{}=+`~/?!@#$%^&*")
 @dataclass(frozen=True)
 class PropertyMetadataTail:
-    count_index: int
-    attributes: tuple[str, ...]
+    count_index: int; attributes: tuple[str, ...]
 def validate_editor_class(name: str) -> str:
     if len(name) > 255 or not _EDITOR_CLASS_RE.fullmatch(name):
         raise ValueError(
@@ -29,13 +29,8 @@ def validate_editor_class(name: str) -> str:
     return name
 def main_master_node(graph: AseGraph) -> NodeLine:
     require_custom_editor_version(graph)
-    candidates = [
-        node
-        for node in graph.nodes
-        if node.type_name in _MASTER_TYPES
-        and len(node.raw_fields) > 9
-        and node.raw_fields[6].lower() == "true"
-    ]
+    candidates = [node for node in graph.nodes if node.type_name in _MASTER_TYPES
+                  and len(node.raw_fields) > 9 and node.raw_fields[6].lower() == "true"]
     if len(candidates) != 1:
         raise ValueError(f"expected exactly one main MasterNode, found {len(candidates)}")
     return candidates[0]
@@ -57,12 +52,8 @@ def set_custom_editor(ase_file: AseFile, editor: str | None) -> dict:
     node.raw_fields[9] = editor or ""
     ase_file.graph.replace_node(node)
     ase_file.prefix = _replace_compiled_editor(ase_file.prefix, editor)
-    return {
-        "kind": "custom_editor",
-        "main_node_id": node.node_id,
-        "before": {"graph": before_graph, "compiled": before_compiled},
-        "after": editor,
-    }
+    return {"kind": "custom_editor", "main_node_id": node.node_id,
+            "before": {"graph": before_graph, "compiled": before_compiled}, "after": editor}
 def _replace_compiled_editor(prefix: str, editor: str | None) -> str:
     matches = list(_CUSTOM_EDITOR_LINE_RE.finditer(prefix))
     if len(matches) > 1:
@@ -118,6 +109,8 @@ def parse_property_metadata_attribute(raw: str) -> dict:
     result = {"type": type_name, "raw": raw, "args": args}
     if args is not None and type_name in {"ASECLITooltip", "ASECLIHelpBox", "TooltipMzgui", "HelpBoxMzgui"}:
         result["text"] = decode_custom_unicode(args)
+    elif args is not None and type_name in {"ASECLIEnableIf", "EnableIfMzgui"}:
+        result["condition"] = parse_enable_if_arguments(args)
     elif args is not None and type_name in {"ASECLIFoldout", "FoldoutMzgui"}:
         result["text"] = decode_foldout_title(args)
     return result
@@ -201,6 +194,8 @@ def semantic_attribute(type_name: str, text: str) -> str:
         encoded = encode_foldout_title(text)
     elif canonical_type in {"TooltipMzgui", "HelpBoxMzgui"}:
         encoded = encode_custom_unicode(text)
+    else:
+        raise ValueError(f"no text semantic encoder for {type_name}")
     return f"[{type_name}({encoded})]"
 def inspect_custom_gui(ase_file: AseFile) -> dict:
     main = main_master_node(ase_file.graph)
@@ -244,7 +239,12 @@ def inspect_custom_gui(ase_file: AseFile) -> dict:
             "editor_suggestions": list(CUSTOM_EDITOR_SUGGESTIONS),
             "property_attribute_types": list(PROPERTY_METADATA_ATTRIBUTE_TYPES),
             "legacy_read_attribute_types": list(_ALTERNATE_ASECLI_ATTRIBUTE_TYPES),
-            "semantic_operations": {"group": "FoldoutMzgui", "tooltip": "TooltipMzgui", "help_box": "HelpBoxMzgui"},
+            "semantic_operations": {
+                "group": "FoldoutMzgui",
+                "tooltip": "TooltipMzgui",
+                "help_box": "HelpBoxMzgui",
+                "enabled_if": "EnableIfMzgui",
+            },
             "shader_drawer_only": ["ShowIf"],
         },
     }

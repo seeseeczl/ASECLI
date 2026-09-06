@@ -14,20 +14,13 @@ from ._gui_handoff_store import (
 from ._gui_project import unity_project
 from ._gui_resource_store import install_gui_resource
 from .gui_support import (
+    GUI_AUTHORING_SHA256,
+    GUI_AUTHORING_SOURCE,
     GUI_SUPPORT_ASSET_PATH,
     GUI_SUPPORT_KNOWN_PREVIOUS,
-    GUI_SUPPORT_RESOURCE_PARTS,
     GUI_SUPPORT_SHA256,
     inspect_gui_support,
 )
-from .resource_text import compose_resource_text
-
-
-GUI_AUTHORING_RESOURCE_PARTS = GUI_SUPPORT_RESOURCE_PARTS[2:]
-GUI_AUTHORING_SOURCE = compose_resource_text(
-    "asecli.bridge", "resources", GUI_AUTHORING_RESOURCE_PARTS
-)
-GUI_AUTHORING_SHA256 = hashlib.sha256(GUI_AUTHORING_SOURCE.encode("utf-8")).hexdigest()
 
 
 def handoff_gui_support(

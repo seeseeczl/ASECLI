@@ -1,0 +1,125 @@
+        internal static bool TryMergeRaw(
+            UnityEngine.Object node, IEnumerable<string> source, out bool changed, out string error)
+        {
+            changed = false;
+            bool handled;
+            if (!ASENativeMzguiReconciler.TryMerge(
+                    node, source, out handled, out changed, out error))
+                return false;
+            IList attributes;
+            FieldInfo listField;
+            FieldInfo countField;
+            if (!TryStorage(node, out attributes, out listField, out countField, out error))
+                return false;
+            HashSet<string> existing = new HashSet<string>(StringComparer.Ordinal);
+            foreach (object item in attributes)
+            {
+                Match match = Managed.Match(item as string ?? String.Empty);
+                if (match.Success) existing.Add(Canonical(match.Groups[1].Value));
+            }
+            foreach (string item in source)
+            {
+                string raw = (item ?? String.Empty).Trim();
+                if (raw.StartsWith("[", StringComparison.Ordinal) && raw.EndsWith("]", StringComparison.Ordinal))
+                    raw = raw.Substring(1, raw.Length - 2);
+                Match match = Managed.Match(raw);
+                if (!match.Success || existing.Contains(Canonical(match.Groups[1].Value))) continue;
+                if (handled && Canonical(match.Groups[1].Value) != "EnableIfMzgui") continue;
+                raw = Canonical(match.Groups[1].Value) +
+                    (match.Groups[2].Success ? "(" + match.Groups[2].Value + ")" : String.Empty);
+                if (!changed) Undo.RecordObject(node, "Restore ASE GUI attributes");
+                attributes.Add(raw);
+                existing.Add(Canonical(match.Groups[1].Value));
+                changed = true;
+            }
+            if (changed)
+            {
+                countField.SetValue(node, attributes.Count);
+                EditorUtility.SetDirty(node);
+            }
+            error = String.Empty;
+            return true;
+        }
+
+        internal static bool TryStorage(
+            object node, out IList values, out FieldInfo listField, out FieldInfo countField, out string error)
+        {
+            listField = ASEReflection.Field(node.GetType(), "m_customAttr", "m_customAttributes");
+            countField = ASEReflection.Field(node.GetType(), "m_customAttrCount", "m_customAttributesCount");
+            values = listField != null ? listField.GetValue(node) as IList : null;
+            if (values != null && countField != null)
+            {
+                error = String.Empty;
+                return true;
+            }
+            error = "当前 ASE 版本未暴露兼容的 Custom Attributes 存储；已停止写入";
+            return false;
+        }
+
+        private static string EncodeFoldout(string value)
+        {
+            StringBuilder output = new StringBuilder();
+            foreach (char c in value) output.Append(c <= 127 ? c.ToString() : "#" + ((int)c).ToString("x4"));
+            return output.ToString();
+        }
+
+        private static string EncodeUnicode(string value)
+        {
+            StringBuilder output = new StringBuilder();
+            foreach (char c in value) output.Append("#" + ((int)c).ToString("X4"));
+            return output.ToString();
+        }
+
+        private static string Decode(string value)
+        {
+            return Regex.Replace(value, @"#([0-9A-Fa-f]{4})", delegate(Match match)
+            {
+                return ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString();
+            });
+        }
+
+        private static string Canonical(string value)
+        {
+            if (value == "ASECLIFoldout") return "FoldoutMzgui";
+            if (value == "ASECLITooltip") return "TooltipMzgui";
+            if (value == "ASECLIHelpBox") return "HelpBoxMzgui";
+            if (value == "ASECLIEnableIf") return "EnableIfMzgui";
+            return value;
+        }
+
+        internal static string FormatCondition(
+            string propertyName, int operatorIndex, float value)
+        {
+            string comparison = operatorIndex >= 0 && operatorIndex < EnabledIfOperators.Length
+                ? EnabledIfOperators[operatorIndex] : "Equal";
+            return propertyName + "," + comparison + "," +
+                value.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        internal static bool TryParseCondition(
+            string raw, out string propertyName, out int operatorIndex,
+            out float value, out string error)
+        {
+            propertyName = String.Empty;
+            operatorIndex = 2;
+            value = 0f;
+            string[] parts = (raw ?? String.Empty).Split(',');
+            if (parts.Length != 3 ||
+                !Regex.IsMatch(parts[0].Trim(), @"^_[A-Za-z][A-Za-z0-9_]{0,127}$"))
+            {
+                error = "条件启用需要有效的控制属性、比较方式和数值";
+                return false;
+            }
+            propertyName = parts[0].Trim();
+            operatorIndex = Array.IndexOf(EnabledIfOperators, parts[1].Trim());
+            if (operatorIndex < 0 || !Single.TryParse(
+                    parts[2].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture,
+                    out value) || Single.IsNaN(value) || Single.IsInfinity(value))
+            {
+                error = "条件启用的比较方式或数值无效";
+                return false;
+            }
+            error = String.Empty;
+            return true;
+        }
+    }

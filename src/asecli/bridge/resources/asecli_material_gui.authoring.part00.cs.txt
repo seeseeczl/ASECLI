@@ -5,6 +5,7 @@ namespace ASECLI.MaterialGUI.Authoring
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Reflection;
     using System.Text;
     using System.Text.RegularExpressions;
@@ -22,12 +23,15 @@ namespace ASECLI.MaterialGUI.Authoring
         private bool useFoldout;
         private bool useTooltip;
         private bool useHelpBox;
+        private bool useEnabledIf;
         private bool assignFallbackEditor = true;
         private string foldout = String.Empty;
         private string tooltip = String.Empty;
         private string helpBox = String.Empty;
+        private string enabledIfProperty = String.Empty;
+        private int enabledIfOperatorIndex = 2;
+        private float enabledIfValue = 1f;
         private Vector2 scroll;
-
         [MenuItem("Window/Amplify Shader Editor/MZGUI Attributes (ASECLI)")]
         public static void Open()
         {
@@ -97,6 +101,16 @@ namespace ASECLI.MaterialGUI.Authoring
             using (new EditorGUI.DisabledScope(!useHelpBox))
                 helpBox = EditorGUILayout.TextArea(helpBox, GUILayout.MinHeight(80f));
             EditorGUILayout.Space(8f);
+            useEnabledIf = EditorGUILayout.ToggleLeft(
+                "条件启用（不满足时置灰）", useEnabledIf);
+            using (new EditorGUI.DisabledScope(!useEnabledIf))
+            {
+                enabledIfProperty = EditorGUILayout.TextField("控制属性", enabledIfProperty);
+                enabledIfOperatorIndex = EditorGUILayout.Popup(
+                    "比较", enabledIfOperatorIndex, ASEAttributeStore.EnabledIfOperators);
+                enabledIfValue = EditorGUILayout.FloatField("比较值", enabledIfValue);
+            }
+            EditorGUILayout.Space(8f);
             assignFallbackEditor = EditorGUILayout.ToggleLeft(
                 "使用 MZGUI.MZGUI 材质面板", assignFallbackEditor);
             EditorGUILayout.EndScrollView();
@@ -120,6 +134,15 @@ namespace ASECLI.MaterialGUI.Authoring
             useFoldout = values.TryGetValue("FoldoutMzgui", out foldout);
             useTooltip = values.TryGetValue("TooltipMzgui", out tooltip);
             useHelpBox = values.TryGetValue("HelpBoxMzgui", out helpBox);
+            string condition;
+            useEnabledIf = values.TryGetValue("EnableIfMzgui", out condition);
+            if (useEnabledIf && !ASEAttributeStore.TryParseCondition(
+                    condition, out enabledIfProperty, out enabledIfOperatorIndex,
+                    out enabledIfValue, out error))
+            {
+                adapterError = error;
+                selectedNode = null;
+            }
         }
 
         private void Apply(bool save)
@@ -128,6 +151,8 @@ namespace ASECLI.MaterialGUI.Authoring
             if (!ASEApplyTransaction.TryApply(
                 selectedNode, useFoldout ? foldout : null,
                 useTooltip ? tooltip : null, useHelpBox ? helpBox : null,
+                useEnabledIf ? ASEAttributeStore.FormatCondition(
+                    enabledIfProperty, enabledIfOperatorIndex, enabledIfValue) : null,
                 assignFallbackEditor, save, out error))
             { ShowNotification(new GUIContent(error)); return; }
             ShowNotification(new GUIContent(save ? "已应用并保存" : "已应用"));
@@ -136,8 +161,11 @@ namespace ASECLI.MaterialGUI.Authoring
 
     internal static class ASEAttributeStore
     {
+        internal static readonly string[] EnabledIfOperators = {
+            "Less", "LessEqual", "Equal", "NotEqual", "GreaterEqual", "Greater"
+        };
         private static readonly Regex Managed = new Regex(
-            @"^\[?(FoldoutMzgui|TooltipMzgui|HelpBoxMzgui|ASECLIFoldout|ASECLITooltip|ASECLIHelpBox)(?:\((.*)\))?\]?$",
+            @"^\[?(FoldoutMzgui|TooltipMzgui|HelpBoxMzgui|EnableIfMzgui|ASECLIFoldout|ASECLITooltip|ASECLIHelpBox|ASECLIEnableIf)(?:\((.*)\))?\]?$",
             RegexOptions.CultureInvariant);
 
         internal static bool TryRead(
@@ -170,7 +198,8 @@ namespace ASECLI.MaterialGUI.Authoring
         }
 
         internal static bool TryWrite(
-            UnityEngine.Object node, string foldout, string tooltip, string help, out string error)
+            UnityEngine.Object node, string foldout, string tooltip, string help,
+            string enabledIf, out string error)
         {
             IList attributes;
             FieldInfo listField;
@@ -182,6 +211,13 @@ namespace ASECLI.MaterialGUI.Authoring
                 error = "Foldout 标题包含 ASE 不接受的字符";
                 return false;
             }
+            if (enabledIf != null)
+            {
+                string propertyName; int operatorIndex; float value;
+                if (!TryParseCondition(
+                        enabledIf, out propertyName, out operatorIndex, out value, out error))
+                    return false;
+            }
             Undo.RecordObject(node, "Edit ASE GUI attributes");
             List<string> kept = new List<string>();
             foreach (object item in attributes)
@@ -192,6 +228,7 @@ namespace ASECLI.MaterialGUI.Authoring
             if (foldout != null) kept.Add("FoldoutMzgui(" + EncodeFoldout(foldout) + ")");
             if (tooltip != null) kept.Add("TooltipMzgui(" + EncodeUnicode(tooltip) + ")");
             if (help != null) kept.Add("HelpBoxMzgui(" + EncodeUnicode(help) + ")");
+            if (enabledIf != null) kept.Add("EnableIfMzgui(" + enabledIf + ")");
             attributes.Clear();
             foreach (string raw in kept) attributes.Add(raw);
             countField.SetValue(node, attributes.Count);
@@ -199,92 +236,3 @@ namespace ASECLI.MaterialGUI.Authoring
             error = String.Empty;
             return true;
         }
-
-        internal static bool TryMergeRaw(
-            UnityEngine.Object node, IEnumerable<string> source, out bool changed, out string error)
-        {
-            changed = false;
-            bool handled;
-            if (!ASENativeMzguiReconciler.TryMerge(
-                    node, source, out handled, out changed, out error))
-                return false;
-            if (handled) return true;
-            IList attributes;
-            FieldInfo listField;
-            FieldInfo countField;
-            if (!TryStorage(node, out attributes, out listField, out countField, out error))
-                return false;
-            HashSet<string> existing = new HashSet<string>(StringComparer.Ordinal);
-            foreach (object item in attributes)
-            {
-                Match match = Managed.Match(item as string ?? String.Empty);
-                if (match.Success) existing.Add(Canonical(match.Groups[1].Value));
-            }
-            foreach (string item in source)
-            {
-                string raw = (item ?? String.Empty).Trim();
-                if (raw.StartsWith("[", StringComparison.Ordinal) && raw.EndsWith("]", StringComparison.Ordinal))
-                    raw = raw.Substring(1, raw.Length - 2);
-                Match match = Managed.Match(raw);
-                if (!match.Success || existing.Contains(Canonical(match.Groups[1].Value))) continue;
-                raw = Canonical(match.Groups[1].Value) +
-                    (match.Groups[2].Success ? "(" + match.Groups[2].Value + ")" : String.Empty);
-                if (!changed) Undo.RecordObject(node, "Restore ASE GUI attributes");
-                attributes.Add(raw);
-                existing.Add(Canonical(match.Groups[1].Value));
-                changed = true;
-            }
-            if (changed)
-            {
-                countField.SetValue(node, attributes.Count);
-                EditorUtility.SetDirty(node);
-            }
-            error = String.Empty;
-            return true;
-        }
-
-        internal static bool TryStorage(
-            object node, out IList values, out FieldInfo listField, out FieldInfo countField, out string error)
-        {
-            listField = ASEReflection.Field(node.GetType(), "m_customAttr", "m_customAttributes");
-            countField = ASEReflection.Field(node.GetType(), "m_customAttrCount", "m_customAttributesCount");
-            values = listField != null ? listField.GetValue(node) as IList : null;
-            if (values != null && countField != null)
-            {
-                error = String.Empty;
-                return true;
-            }
-            error = "当前 ASE 版本未暴露兼容的 Custom Attributes 存储；已停止写入";
-            return false;
-        }
-
-        private static string EncodeFoldout(string value)
-        {
-            StringBuilder output = new StringBuilder();
-            foreach (char c in value) output.Append(c <= 127 ? c.ToString() : "#" + ((int)c).ToString("x4"));
-            return output.ToString();
-        }
-
-        private static string EncodeUnicode(string value)
-        {
-            StringBuilder output = new StringBuilder();
-            foreach (char c in value) output.Append("#" + ((int)c).ToString("X4"));
-            return output.ToString();
-        }
-
-        private static string Decode(string value)
-        {
-            return Regex.Replace(value, @"#([0-9A-Fa-f]{4})", delegate(Match match)
-            {
-                return ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString();
-            });
-        }
-
-        private static string Canonical(string value)
-        {
-            if (value == "ASECLIFoldout") return "FoldoutMzgui";
-            if (value == "ASECLITooltip") return "TooltipMzgui";
-            if (value == "ASECLIHelpBox") return "HelpBoxMzgui";
-            return value;
-        }
-    }

@@ -33,7 +33,7 @@ kickoff_completion: complete
 - MVP / 首个核心垂直切片：对项目内一个已有 ASE shader，Agent 完成"改一个属性值 → 校验 → 触发重新编译 → HLSL 更新"全链路。
 - 本期包含：FR-0001～FR-0011；图修改、材质 GUI 批量规范、节点 Comment 分组、文本创建/编译链路可用，Editor API 动态节点创建按 CR-0008 实施。
 - 本期不包含：CLI-Anything Hub 发布（ADR-0004 后置）、可视化界面、ASE 功能替代、通用 schema 覆盖 100% 节点（未知节点 passthrough）。
-- 成功指标：既有 REG-0001～REG-0036 保持全绿；REG-0037 覆盖 `asecli.property-presentation.v1` 的逐属性报告、治理、创建和写入失败关闭；ASE 1.9.6.2 MZGUI_Test 与 CommentaryNode 真实序列化样本可读；1000 个附加节点单轮 <1s（REG-0011）。
+- 成功指标：既有 REG-0001～REG-0036 保持全绿；REG-0037/REG-0049 覆盖 `asecli.property-presentation.v2` 的逐属性报告、治理、创建、条件置灰和写入失败关闭；ASE 1.9.6.2 MZGUI_Test 与 CommentaryNode 真实序列化样本可读；1000 个附加节点单轮 <1s（REG-0011）。
 
 ## 需求整理与验收
 
@@ -48,8 +48,8 @@ kickoff_completion: complete
 | FR-0007 | 功能 | CLI JSON 输出契约：stdout 恒为合法 JSON（含 ok 字段），统一错误码 | 所有子命令契约测试通过 | REG-0007 | 已确认 |
 | FR-0008 | 功能 | 节点精排：按数据流拓扑从左向右分层递进，同阶段严格列对齐、同列等距、重复分支复用同一模板，Master 最右；保持连线与参数不变 | 布局后连线集合不变；同输入确定性输出；仅 x/y 字段变化；DAG 边向右推进；给定间距下列/行网格精确；真实 ASE 画布具备人工精排感 | REG-0012 | 已确认 |
 | FR-0009 | 功能 | 为 ASE 提供 MZGUI-compatible 材质 GUI：原生 `MZGUI.MZGUI` 存在时直接使用；确认缺失时安装提供同名入口的独立 fallback，并在 Unity Editor 内可视化编辑 Foldout、Tooltip、HelpBox | 新写入统一为 `CustomEditor "MZGUI.MZGUI"` 与 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`；fallback 工程生成的 Shader 移入原生 MZGUI 工程无需改名；fallback 不修改 ASE 源码，通过运行时能力探测读写 ASE 原生 Custom Attributes；打开图时从编译 Shader 恢复三类属性，避免普通 Save 丢失；未知成员、双 provider 或冲突文件失败关闭 | REG-0022 REG-0030 REG-0035 REG-0036 REG-0047 | 已确认 |
-| FR-0010 | 功能 | 按参考规范整理材质属性与 ASE 图：每个导出属性强制使用中文显示名，Tooltip 自动展示英文变量名与 Shader 默认值，属性下方强制提供中文用途/调节说明，并按 ShaderLab 属性名批量排序和中文分组；用原生 Comment 框形成“外层功能、内层因果”的嵌套分组；跨区或多消费者结果用 Register/Get Local Var 治理复用；Master / Output 上方基础设置默认保持，下方功能开关按需选择 | `asecli.property-presentation.v1` 可查询且写前强制；JSON 可原子治理显示名/说明并保持未列属性；显示名、变量名、默认值与说明在真实 Inspector 一致；Comment 不移动节点/连线；同层或无父子关系的组不重叠，父子组仅允许完整包含；复用结果形成一个语义 Register/多个就近 Get，一次性相邻链路保持直连；失败可恢复 | REG-0010 REG-0023 REG-0024 REG-0037 | 已确认 |
-| FR-0011 | 功能 | 通过受控 ASE Editor API 创建包含动态/不透明节点的新 Shader；声明式规格只允许白名单节点/字段，ASE 自己生成 ShaderLab/HLSL/ASEBEGIN | CLI 使用 EditorGraphSpec v2，所有 Property/Sampler 必填中文显示名与中文说明；Caster-like/Receiver-like 保存重载 manifest 一致；不支持版本/字段零写入；失败无目标半写或暂存残留 | REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 REG-0040 REG-0044 REG-0045 | 已验证（v2 团结创建/重编译、Inspector 现场及完全退出后的新进程重开通过；验证资产已清理；CI 包版本路径与可移植校验清单已补强） |
+| FR-0010 | 功能 | 按参考规范整理材质属性与 ASE 图：每个导出属性强制使用中文显示名，Tooltip 自动展示英文变量名与 Shader 默认值，属性下方强制提供中文用途/调节说明，并按 ShaderLab 属性名批量排序和中文分组；用原生 Comment 框表达算法边界；只对真正跨模块、分散或布局无法解决的线路使用 Register/Get Local Var；Master / Output 上方基础设置默认保持，下方功能开关按需选择 | Local Var 决策同时检查模块边界、跨阶段/遮挡和消费者离散度；双扇出或像素长度不单独触发；同组相邻链路保持直连；已有 Register 的远端消费者必须用就近 Get；允许有明确模块边界的本地直连/远端 Get 混合；Comment 与 Shader 语义保持不变；失败可恢复 | REG-0010 REG-0023 REG-0024 REG-0037 | 已确认 |
+| FR-0011 | 功能 | 通过受控 ASE Editor API 创建包含动态/不透明节点的新 Shader；声明式规格只允许白名单节点/字段，ASE 自己生成 ShaderLab/HLSL/ASEBEGIN | CLI 使用 EditorGraphSpec v2，所有 Property/Sampler 必填中文显示名与中文 Tooltip，HelpBox 可选；Caster-like/Receiver-like 保存重载 manifest 一致；不支持版本/字段零写入；失败无目标半写或暂存残留 | REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 REG-0040 REG-0044 REG-0045 REG-0049 | 已验证（v2 团结创建/重编译、Inspector 现场及完全退出后的新进程重开通过；验证资产已清理；CI 包版本路径与可移植校验清单已补强） |
 | NFR-0001 | 非功能 | Roundtrip 保真：未修改字段逐字节不变 | roundtrip 测试断言 | REG-0001 | 已确认 |
 | NFR-0002 | 非功能 | 未知节点 passthrough：schema 未覆盖时保真透传 | 混合样本测试 | REG-0002 | 已确认 |
 | NFR-0003 | 非功能 | 性能：千节点级文件单命令 <1s | perf 基线测试 | REG-0011 | 已确认 |
@@ -95,7 +95,7 @@ kickoff_completion: complete
 - 安全：自定义类名仅接受命名空间限定的 C# 标识符；禁止分号、引号、换行注入；元数据只允许导出的 `Property` 节点；原始专家入口只接受三种 ASECLI 标记；无法确定唯一主 Master 或尾部时失败关闭。
 - 兼容/迁移：原生与 fallback 的公共 Editor 名统一为 `MZGUI.MZGUI`；原生存在时零注入，确认缺失时由 fallback 提供同名入口。旧 `ASECLI.MaterialGUI.ASECLIMaterialGUI` 只保留为读取兼容别名。已安装 `0.3.1` material-only 或 authoring preview 资源按已知哈希备份升级；未知内容不覆盖。
 - 运行边界：CLI 同步 ShaderLab `CustomEditor`、已确认版本的 PropertyNode 中文显示名和对应编译 Properties 标签；元数据写入后仍需 `recompile` 由真实 ASE 重新生成。内置 C# 的编译和属性读取需隔离 Editor 验证，真实 Foldout/悬停/HelpBox 外观仍需目标平台 UI 验收。
-- 呈现规范：`asecli.property-presentation.v1` 强制每个导出属性具有中文 `display_name` 和中文 `HelpBoxMzgui`；选中的 GUI 在显示时追加英文变量名与默认基线。常驻说明继续使用 `asecli.inline-help.v1`。
+- 呈现规范：`asecli.property-presentation.v2` 强制每个导出属性具有中文 `display_name` 和中文 `TooltipMzgui`；选中的 GUI 在 Tooltip 中追加英文变量名与默认基线。`HelpBoxMzgui` 是用户可选内容，存在不违规、缺失不阻断。
 
 ### FR-0010 影响分析与兼容边界
 
@@ -104,9 +104,9 @@ kickoff_completion: complete
 - 数据/格式：属性排序仅改 PropertyNode 字段 9；Comment 使用 ASE 1.9.6.2 原生 `<width>;<height>;<note>;<count>;<members...>;<title>;<color>;0;0`，不引入旁路注释文件。
 - 安全/失败：JSON 未知键、重复属性、错误类型、非 ASECLI 元数据新增、Comment 重复归属/缺失成员/注入字符均在写盘前失败；一个命令最多一次原子写入和一个 `.bak`。
 - 运行边界：普通节点尺寸不在 ASE 文本中序列化，Comment 自动框采用保守 `200x120` 估计；结构、成员和 CHKSM 可自动验证，真实边距与 Inspector 视觉仍需目标编辑器验收。
-- 操作顺序：先识别复用结果和算法边界；跨区/多消费者结果以一个语义 Register 和多个就近 Get 收敛长线；再布局节点并从内到外建立 Comment。现有全图 `layout` 不维护 Comment 层级，打组后禁止再次全图布局。
+- 操作顺序：先识别算法边界并把双扇出/长线列为候选；先用对齐、移动和留白通道解决局部问题，再按模块边界、跨阶段/遮挡和消费者离散度决定是否用一个语义 Register 和多个就近 Get；最后从内到外建立 Comment。不能按扇出次数或像素长度批量注册。
 - 视觉规范：严格对齐与阶段递进优先于机械追求零交叉。线与线可在空白通道中少量、简洁地交叉，但不得穿过无关节点；重复分支必须保持相同列、行距和内部模板，最终精排感必须由真实 ASE 画布验收。
-- Local Var 边界：Comment 表达算法职责，Local Var 表达模块间数据接口；Register 放生产者右侧、Get 放消费者输入侧。一次性同组相邻链路保持直连，禁止为表面整齐隐藏关键依赖或使用 `Value/Temp1/base` 等模糊名。
+- Local Var 边界：Comment 表达算法职责，Local Var 表达模块间数据接口；Register 放生产者右侧、Get 放远端消费者输入侧。同组相邻双扇出和清晰的一到两阶段连线保持直连；本地直连/远端 Get 可按模块边界混合；Register 已存在时禁止继续向模块外消费者拉长线。每个决定必须记录模块归属、最大跨阶段数、遮挡和理由。
 - 工具边界：真实 ASE 1.9.6.2 将 Register 端口类型随输入同步，当前 schema `layout_ok=false`；CLI 不通过不完整 schema猜造，必须由真实 ASE 创建或复用同版本同类型序列化样本后 validate/recompile。
 - Master / Output 边界：上方基础生成设置默认继承模板和现有 Shader，不主动缩窄平台或提高特性等级；下方功能开关按实际消费者、Pass / variant 成本和目标效果选择。Master 行仍按 opaque 管理，只能在真实 ASE Editor 或已登记的语义能力中修改；目标平台未实测时不得宣称兼容或性能通过。
 

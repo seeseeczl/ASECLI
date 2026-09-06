@@ -45,6 +45,13 @@ from .local_vars import (
     parse_register_local_var,
 )
 from .material_gui_spec import apply_material_gui_spec, material_property_nodes, resolve_property_node
+from .material_gui_condition import (
+    ENABLE_IF_ATTRIBUTE,
+    ENABLE_IF_OPERATORS,
+    enable_if_attribute,
+    parse_enable_if_arguments,
+    validate_enable_if,
+)
 from .model import AseFile, AseGraph, NodeLine, WireLine, _parse_node_line, parse_graph_text, parse_node_line
 
 __all__ = [
@@ -60,6 +67,8 @@ __all__ = [
     "remove_property_metadata_attribute", "semantic_attribute", "set_custom_editor", "set_property_metadata_attribute",
     "sync_compiled_property_metadata",
     "apply_material_gui_spec", "material_property_nodes", "resolve_property_node",
+    "ENABLE_IF_ATTRIBUTE", "ENABLE_IF_OPERATORS", "enable_if_attribute",
+    "parse_enable_if_arguments", "validate_enable_if",
     "COMMENTARY_TYPE", "comment_containment_issues", "create_comment_group",
     "inspect_comment_groups", "parse_commentary_node", "refit_comment_groups",
     "GET_LOCAL_VAR_TYPE", "REGISTER_LOCAL_VAR_TYPE", "local_var_edges",
