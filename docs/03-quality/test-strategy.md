@@ -13,7 +13,8 @@
 9. **自定义 GUI**：真实 `19109` 仅验证 CustomEditor；ASE 1.9.6.2 图版本 `19602` 验证 MZGUI canonical 标记、旧标记读取兼容、触碰迁移与未知未来版本/尾随数字歧义写前拒绝。`gui-support` 覆盖唯一 provider、原生 authoring/条件扩展、fallback 安装安全和已知旧哈希升级；未知内容、符号链接、冲突备份、并发变化或替换失败必须零覆盖。`custom-gui` 输出 `asecli.property-presentation.v2` 的逐属性状态。任何受管文件若缺中文显示名、中文 Tooltip 或一致 Editor，相关写入必须失败；HelpBox 可选，不参与门禁。真实编译和 Inspector 证据独立记录，不以静态资源测试冒充。
 10. **批量材质规范**：属性名/节点 ID 唯一定位；字段 9 排序；未列属性稳定追加；`display_name` 同步已确认的 PropertyNode 字段和编译 Properties；中文显示名、中文 `TooltipMzgui`、可选 `HelpBoxMzgui` 与 `EnableIfMzgui` 可在单份 JSON 内原子治理；JSON 重复、未知键、错误类型和非受管元数据全量失败且零写盘。
 11. **Comment 分组**：真实 CommentaryNode 行解码；自动边界、嵌套成员树、无关组重叠拒绝与检查、父子完整包含、非法标题/重复归属/缺失节点、dry-run、备份、CHKSM、roundtrip 与 CLI 单行 JSON。
-12. **Local Var 图治理**：Agent 设计审查必须为候选记录来源、扇出、生产者/消费者模块、最大跨阶段数和遮挡；验证“双扇出/像素长度不单独触发、同组相邻双扇出直连、真正跨模块或分散复用使用一个 Register/多个就近 Get、已有 Register 不再直拉远端、允许有边界的本地直连/远端 Get 混合、命名唯一明确”。当前以真实参考静态证据与 Skill 契约为准，下一个目标 Shader 任务补实际图验收。
+12. **Local Var 图治理**：Agent 设计审查必须为候选记录来源、Wire 扇出、去重后的消费组数量/组 ID 和生产者/消费者模块；验证“两个及以上不同组消费必须注册、同组内无论复用多少次均可不注册、生产者组内直连/其他消费组就近 Get、已有 Register 不再向模块外直连、命名唯一明确”。同组直连仍要验证不穿节点、线线交叉已通过节点/子树位置和已有 WireNode 尽量消除；新增 WireNode 需明确结构调整授权。当前以真实参考静态证据、自动审计与 Skill 契约为准，下一个目标 Shader 任务补实际图验收。
+13. **递归鱼骨与显式路由**：自动覆盖中位主骨、偶数主要数据链、真实端口水平、同层输出端口右对齐、Comment 保留/作用标题/组间通道和默认 WireNode 坐标不变。`--route-wires` 额外覆盖运行时 API 探测、每条最多 2 个新增锚点、只接受穿越/交叉下降的方案、折叠逻辑边等价及任意失败恢复写前备份。
 13. **Editor API 创建**：底层 v1 继续覆盖白名单、端口、参数编码和已验证的隔离团结结构 E2E；正式 CLI 只接受 EditorGraphSpec v2，并在 MCP 前强制每个 Property/Sampler 的中文 `inspector_name/tooltip`，`help` 可选。ASE 暂存 Save/Load 与 manifest 对账后提交，CLI 写入 MZGUI 元数据并执行文件级契约复验；目标图由独立 `recompile` 重载，避免 MCP 插件重连吞掉创建回执。覆盖 MCP 3.4.7 裸文本/`data.result`、`success=false`、固定事务 `safety_checks=false` 和零暂存残留；后验失败保留目标和 `.meta`。真实 Inspector 与新进程重开必须单独记录，不能复用结构 E2E 结论。
 14. **可复现交付**：锁定 build backend，双构建输出位于 checkout 外；比较 wheel/sdist hash，失败报告 gzip header、tar 成员元数据和内容差异，正式 artifact 继续阻塞。
 15. **真实 ASE 画布**：结构结果始终保持 `visual_validation=pending`，由团结 `2022.3.61t9` + ASE `1.9.6.2` 的正常缩放截图和人工清单独立签收；检查阶段、重复分支、Comment containment、连线不穿无关节点/端口/标题栏及语义 diff，证据固定在 REG-0041。
@@ -49,7 +50,7 @@
 - REG-0039 的失败优先证据来自 GitHub run 33623943475：双 Python verify 通过，但 package 使用硬编码 `0.1.0` wheel 路径而失败。修复后工作流只从 `uv version --short` 产生一个版本变量，SBOM 从 `uv.lock` 读取项目版本，CI governance 拒绝任何工作流中的 `asecli-X.Y.Z` 硬编码；远端 package 必须以修复提交重新通过。
 - REG-0040 的失败优先证据来自 run 33624498244 下载 artifact：CI 内 package 全绿，但 SHA256SUMS 条目含 `dist/` 工作区前缀，解压后无法直接校验。修复后必须在 `dist` 目录内生成只含文件名的清单，并以真实下载 artifact 的 `shasum -a 256 -c SHA256SUMS` 作为最终证据。
 - REG-0023/0024 自动测试证明规范的原子文本行为和原生 Comment 结构，不证明普通节点默认尺寸估计后的视觉边距；目标 ASE 编辑器仍需检查折叠顺序、说明可读性、框边距和连线可读性。
-- REG-0012 自动测试证明精确网格、左到右递进和重复分支模板，不证明真实节点宽高、端口锚点、贝塞尔曲线路径或整体“精排感”；线与线少量交叉是否简洁仍需在真实 ASE 画布验收。
+- REG-0012 自动测试证明精确网格、左到右递进和重复分支模板，不证明真实节点宽高、端口锚点、贝塞尔曲线路径或整体“精排感”；线线交叉是否已通过布局与 WireNode 尽量消除、剩余交叉是否确实不可避免，仍需在真实 ASE 画布验收。
 - CR-0007 当前只证明真实参考中 Register/Get 序列化与复用模式存在，以及 Agent Skill 已固化规则；尚未在用户指定的新目标 Shader 上执行 Local Var 改造，因此不宣称目标图已消除蜘蛛网。
 - REG-0026～0028 的 pytest/mock 不证明 ASE 私有字段或 GUI 生命周期在目标版本可用；REG-0029 已在隔离团结 2022.3.61t9 + ASE 1.9.6.2 完成 v1 创建与新进程回读；REG-0037/0038 的 v2 已在同版本隔离工程完成退出后新进程重开；REG-0041/0042 分别补齐真实画布和 Inspector UI 矩阵。目标工程运行时材质绑定、目标平台编译和最终渲染仍需具体 Shader 任务独立验收。
 - 已安装内容仅在命中 `GUI_SUPPORT_KNOWN_PREVIOUS` 时报告 `asecli_upgrade_available` 并允许可恢复升级；任意未知内容仍按 `target_conflict` 失败关闭，不放宽覆盖安全契约。REG-0045 已验证备份、复核、原子替换和失败保留。

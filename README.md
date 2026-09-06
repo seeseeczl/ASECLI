@@ -39,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.6.0`；需要回滚时可安装不可变的 `v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.6.1`；需要回滚时可安装不可变的 `v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -47,11 +47,11 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 gh auth login
-mkdir asecli-v0.6.0
-cd asecli-v0.6.0
-gh release download v0.6.0 --repo seeseeczl/ASECLI
+mkdir asecli-v0.6.1
+cd asecli-v0.6.1
+gh release download v0.6.1 --repo seeseeczl/ASECLI
 shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.6.0-py3-none-any.whl
+uv tool install ./asecli-0.6.1-py3-none-any.whl
 asecli install-skill
 asecli --help
 ```
@@ -59,7 +59,7 @@ asecli --help
 `uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
 
 ```bash
-uv tool install --force ./asecli-0.6.0-py3-none-any.whl
+uv tool install --force ./asecli-0.6.1-py3-none-any.whl
 asecli install-skill
 ```
 
@@ -68,7 +68,7 @@ asecli install-skill
 `v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
 
 ```bash
-uv tool install --force ./asecli-0.6.0-py3-none-any.whl && asecli install-skill
+uv tool install --force ./asecli-0.6.1-py3-none-any.whl && asecli install-skill
 ```
 
 `install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
@@ -78,8 +78,8 @@ Python wheel 安装遵循无 post-install 副作用的规范，`uv tool install`
 回滚到上一正式版：
 
 ```bash
-gh release download v0.5.0 --repo seeseeczl/ASECLI
-uv tool install --force ./asecli-0.5.0-py3-none-any.whl
+gh release download v0.6.0 --repo seeseeczl/ASECLI
+uv tool install --force ./asecli-0.6.0-py3-none-any.whl
 ```
 
 卸载：
@@ -88,7 +88,7 @@ uv tool install --force ./asecli-0.5.0-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.6.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+正式版本与校验资产见 [ASECLI v0.6.1（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.1)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
@@ -143,7 +143,7 @@ asecli connect MyShader.shader --from 99:0 --to 6:0 --write
 # 6. 兼容模式整理节点布局（只动 x/y）
 asecli layout MyShader.shader --write
 
-# 连接运行中的 ASE 后，使用真实节点/端口尺寸做脑图式精排
+# 连接运行中的 ASE 后，使用真实节点/端口尺寸做递归鱼骨式精排
 asecli layout MyShader.shader --mode meticulous --audit
 asecli layout MyShader.shader --mode meticulous --write
 
@@ -300,10 +300,16 @@ asecli recompile Assets/Example.shader
 asecli layout Assets/Example.shader --gap-x 280 --gap-y 120
 asecli layout Assets/Example.shader --gap-x 280 --gap-y 120 --write
 
-# 脑图式自适应精排：先只读审计，再一次性写入节点坐标和 Comment bounds
+# 递归鱼骨式精排：先只读审计，再一次性写入节点坐标、Comment bounds/缺失作用标题
 asecli layout Assets/Example.shader --mode meticulous --audit \
   --mcp-url http://127.0.0.1:8080/mcp
 asecli layout Assets/Example.shader --mode meticulous --write \
+  --mcp-url http://127.0.0.1:8080/mcp
+
+# 只有显式授权时才移动/新增 WireNode；新增锚点由当前 ASE Editor API 完成
+asecli layout Assets/Example.shader --mode meticulous --route-wires --audit \
+  --mcp-url http://127.0.0.1:8080/mcp
+asecli layout Assets/Example.shader --mode meticulous --route-wires --write \
   --mcp-url http://127.0.0.1:8080/mcp
 
 # 先离线预演 Comment，再在连接的 Editor 中以真实尺寸验收/收框
@@ -315,7 +321,7 @@ asecli comment-group Assets/Example.shader --check-bounds
 asecli comment-group Assets/Example.shader --fit --padding 30 --write
 ```
 
-先把多消费者、跨 Comment 和长线列为候选，再检查消费者是否分属独立模块、跨越多少阶段以及是否穿过无关区域。真正的模块接口在生产者右侧使用一个 `Register Local Var`，并在每个远端消费者输入侧使用 `Get Local Var`；同组相邻双扇出仍保持直连。普通 schema 不会猜造动态 `RegisterLocalVarNode`，应通过真实 ASE 创建或复用同版本、同类型的真实序列化样本。
+先按 Comment/算法组归类消费者。同一节点或算法结果被两个及以上不同组消费时，必须在生产者右侧使用一个 `Register Local Var`，并在各消费组输入侧使用就近的 `Get Local Var`；全部消费者都在同一组内时，无论复用多少次都允许直连。普通 schema 不会猜造动态 `RegisterLocalVarNode`，应通过真实 ASE 创建或复用同版本、同类型的真实序列化样本。
 
 #### 4. 创建与编译
 
@@ -446,16 +452,17 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 
 ### 节点图精排规范
 
-- `meticulous` 从最终 Output 向左递归展开上游：一个节点后无论有多少输入分支，都按 `in_port` 顺序组成完整子树带，并围绕输入端口组中心上下对称分布；三级及更深分支沿用同一规则。
+- `meticulous` 从最终 Output 向左递归形成局部鱼骨：每个节点都可成为上游的主骨；1 个来源直接水平，3/5/7 等奇数来源以中位分支水平，偶数来源在中间两支中优先选择更完整的主要数据链，其余完整子树平均分布到上下两侧。
+- 水平对齐以真实输入/输出端口为准；同一父节点的直属来源共享一条局部输出对齐线。每一级都重复同一规则，相邻层边界保持 `64–160px`（目标 `96px`），不会因无关并行模块宽度不同而拉成长线，也不会用最上方分支持续拉出长斜线。
 - 普通兄弟子树垂直间距至少 `32px`，父子节点边界水平间距为 `96px`，不同 Comment/语义模块之间至少 `96px`。真实节点尺寸决定列宽，不再使用 `200x120` 估算值做精排。
 - Editor 几何桥会把缩放后的 `GlobalPosition`/端口坐标还原为 `TruePosition` 图坐标；多 Pass 中没有连线且不参与当前画布的零尺寸 Master 占位保持原位，若零尺寸节点仍有连接则失败关闭。
 - Register 靠近生产者右侧，Get 靠近直接消费者左侧；布局器不会自动创建、删除或改写 Local Var。共享节点只选择一个主父级，其余连线作为次级边审计，不复制节点。
-- 精排完成后 Comment 自内向外收框：左右/底部 `30px`、顶部标题区 `48px`。空白率按节点本体及其必要走线/间距占用共同计算，避免把正常线路通道误判为空框；节点重叠、成员越界、无关 Comment 重叠、连线穿节点或空白率超过 `65%` 都会阻止 `--write`。
+- 精排完成后 Comment 自内向外收框：左右/底部 `30px`、顶部标题区 `48px`，无关组保留至少 `96px` 通道。已有 Comment、成员、嵌套和颜色不得删除或改变；有效标题原样保留，占位标题只在唯一 Register、唯一框外消费者或唯一局部终点可可靠推断时补齐，否则阻止写入。
 - 审计输出 `asecli.graph-layout.v2`，区分硬性失败与允许但需关注的线线交叉；自动通过后仍返回 `visual_validation=requires_editor_review`，不冒充正常缩放下的最终人工视觉签收。
 - 核心目标是“经过人工精心排列”的秩序感：主数据流从左向右层层递进，Master 最右；同阶段严格列对齐，主链尽量水平，重复分支使用完全一致的列、行距和内部模板。
 - 组内紧凑、组间留出明显通道，并列模块和 Comment 边框也要对齐；无父子关系的组不得重叠，父子组只允许完整包含。
-- 连线并非绝对不能交叉。允许少量线与线在空白通道中简洁、可追踪地交叉；但连线不得穿过无关节点本体、端口或标题栏，也不得形成蜘蛛网。不要用大幅绕线换取表面的零交叉。
-- 排版修复只能改变位置和必要的 Comment 边界，不得改变 Shader 参数、端口连接、计算顺序或引入重复计算。先通过对齐和通道解决局部双扇出；只有跨模块长线、分散复用或已有 Register 仍直拉远端消费者时才使用 `Register Local Var` / `Get Local Var`。扇出次数和像素长度都不能单独触发改造。
+- 同组直连也必须整理线路。普通 `meticulous` 保持既有 WireNode 坐标且不新增锚点；只有 `--route-wires` 才先移动既有 WireNode、再为仍有穿越/交叉的直连增加最多 2 个锚点。新增节点通过运行时能力探测后的 ASE Editor API 创建，折叠 WireNode 后逻辑连接必须完全等价，失败恢复写前备份。
+- Local Var 以去重后的消费组数量为准：两个及以上不同组必须注册；同组内多次使用允许不注册。跨阶段数、线长和遮挡只用于排版与 Get 放置，不覆盖这个门槛。
 - 完整规则与量化/视觉验收边界见 [`skills/asecli/references/layout-standard.md`](skills/asecli/references/layout-standard.md)。真实 ASE 画布仍需复核精排感、贝塞尔线路径和组间关系；编辑器或 MCP 不可用时应明确报告未验证。
 
 ### Master / Output 设置规范
@@ -474,10 +481,10 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 
 ### Local Var 防蜘蛛网规范
 
-- “同一输出被用两次以上”只表示需要审计，不表示必须注册。只有消费者分属独立模块且存在跨模块长线、直连穿越无关区域且布局无法解决，或已有 Register 仍向远端消费者直拉时，才使用一个 Register 和各消费模块就近的 Get。
+- 同一节点输出或算法结果被两个及以上不同 Comment/算法组消费时，必须使用一个 Register 和各消费组就近的 Get；判断按去重后的消费组数量，不按 Wire 数量。
 - Comment 表达“算法块做什么”，Local Var 表达“算法块之间传递什么”。两者配合，把跨区长线收敛成模块边界附近的短线。
-- 同组/同算法内即使有双扇出，只要集中在生产者附近、跨一到两个阶段且路径清晰，就保持直连。允许“本地消费者直连、远端消费者用 Get”的有边界混合，禁止 Register 已存在却仍给远端模块拉长线。
-- 变量名应唯一且语义明确，例如 `CoatFresnelMask`、`LitValueControl`；避免 `Value`、`Temp1`、`base`。治理记录必须说明模块归属、跨阶段数、遮挡情况和采用直连/Local Var/混合的理由。
+- 同组/同算法内无论使用多少次都允许不注册，但直连仍不得重叠节点或放任线线交叉；优先整理节点与已有 WireNode，必要时用最少锚点绕开。允许“生产者组内直连、其他消费组用 Get”的有边界混合，禁止 Register 已存在却仍给模块外消费者直连。
+- 变量名应唯一且语义明确，例如 `CoatFresnelMask`、`LitValueControl`；避免 `Value`、`Temp1`、`base`。治理记录必须说明去重后的消费组数量、组 ID、模块归属和采用直连/Local Var/混合的理由。
 - 当前 `RegisterLocalVarNode` 的端口类型会随输入变化，ASECLI 不允许用不完整 schema 猜造；优先在 ASE 编辑器创建，或只复用同 ASE 版本、同类型的真实序列化样本，随后执行 `validate` 和 `recompile`。
 
 完整操作手册见 [`skills/asecli/SKILL.md`](skills/asecli/SKILL.md)；材质属性四层信息规范见 [`skills/asecli/references/material-property-standard.md`](skills/asecli/references/material-property-standard.md)。

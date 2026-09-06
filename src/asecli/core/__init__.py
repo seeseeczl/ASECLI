@@ -40,6 +40,7 @@ from .layout import layout_positions, tidy
 from .meticulous_layout import MeticulousLayoutPlan, apply_meticulous_layout, meticulous_layout_positions
 from .layout_audit import REPORT_SCHEMA, audit_meticulous_layout
 from .comment_layout import refit_comments_for_layout
+from .comment_purpose import govern_comment_purposes
 from .local_vars import (
     GET_LOCAL_VAR_TYPE,
     REGISTER_LOCAL_VAR_TYPE,
@@ -62,7 +63,7 @@ __all__ = [
     "connect", "disconnect", "next_free_node_id", "node_from_schema", "remove_node", "set_node_field",
     "layout_positions", "tidy", "MeticulousLayoutPlan", "apply_meticulous_layout",
     "meticulous_layout_positions", "REPORT_SCHEMA", "audit_meticulous_layout",
-    "refit_comments_for_layout",
+    "govern_comment_purposes", "refit_comments_for_layout",
     "ASECLI_GUI_EDITOR", "MZGUI_EDITOR", "CUSTOM_EDITOR_SUGGESTIONS", "PROPERTY_METADATA_ATTRIBUTE_TYPES", "MANAGED_PROPERTY_METADATA_ATTRIBUTE_TYPES",
     "SUPPORTED_GUI_EDITORS",
     "compiled_custom_editor", "decode_custom_unicode", "decode_foldout_title",

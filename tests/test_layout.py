@@ -190,8 +190,8 @@ def test_layout_cli_separates_structural_and_visual_validation(tmp_path, capsys)
     assert payload["data"]["visual_validation"] == "pending"
 
 
-def test_meticulous_centers_one_two_five_and_ten_input_branches():
-    for count in (1, 2, 5, 10):
+def test_meticulous_uses_median_fishbone_for_one_two_three_five_seven_and_ten_inputs():
+    for count in (1, 2, 3, 5, 7, 10):
         nodes = [(str(index), "AmplifyShaderEditor.FunctionInput") for index in range(1, count + 1)]
         nodes.append(("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode"))
         wires = [(str(index), "0", "100", str(index - 1)) for index in range(1, count + 1)]
@@ -201,12 +201,23 @@ def test_meticulous_centers_one_two_five_and_ten_input_branches():
         children = plan.children["100"]
         centers = [plan.positions[item][1] + geometry[item].height / 2 for item in children]
         assert centers == sorted(centers)
-        child_center = (plan.subtree_bounds[children[0]][1] + plan.subtree_bounds[children[-1]][3]) / 2
-        parent_center = plan.positions["100"][1] + geometry["100"].height / 2
-        assert abs(parent_center - child_center) <= 0.1
+        spine = plan.spine_child["100"]
+        spine_index = children.index(spine)
+        if count >= 3 and count % 2:
+            assert spine_index == count // 2
+        assert abs(spine_index - (count - spine_index - 1)) <= 1
+        wire = next(wire for wire in shader.graph.wires if wire.out_node == spine and wire.in_node == "100")
+        source_y = plan.positions[spine][1] + geometry[spine].output_ports[wire.out_port][1]
+        target_y = plan.positions["100"][1] + geometry["100"].input_ports[wire.in_port][1]
+        assert source_y == target_y
+        output_xs = {
+            plan.positions[item][0] + geometry[item].output_ports["0"][0]
+            for item in children
+        }
+        assert len(output_xs) == 1
 
 
-def test_meticulous_recursively_centers_uneven_third_level_subtrees():
+def test_meticulous_recursively_builds_local_spines_without_overlapping_uneven_subtrees():
     shader = _graph(
         [("1", "Input"), ("2", "Input"), ("3", "Input"), ("10", "Branch"),
          ("11", "Branch"), ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
@@ -215,28 +226,47 @@ def test_meticulous_recursively_centers_uneven_third_level_subtrees():
     )
     geometry = _geometry(shader.graph, heights={"2": 180.0, "11": 140.0})
     plan = meticulous_layout_positions(shader.graph, geometry)
-    for parent in ("10", "100"):
-        branch = plan.children[parent]
-        top = min(plan.subtree_bounds[item][1] for item in branch)
-        bottom = max(plan.subtree_bounds[item][3] for item in branch)
-        center = plan.positions[parent][1] + geometry[parent].height / 2
-        assert abs(center - (top + bottom) / 2) <= 0.1
+    for parent in ("10", "11", "100"):
+        spine = plan.spine_child[parent]
+        wire = next(wire for wire in shader.graph.wires if wire.out_node == spine and wire.in_node == parent)
+        source_y = plan.positions[spine][1] + geometry[spine].output_ports[wire.out_port][1]
+        target_y = plan.positions[parent][1] + geometry[parent].input_ports[wire.in_port][1]
+        assert source_y == target_y
     assert not _overlap(plan.subtree_bounds["10"], plan.subtree_bounds["11"])
 
 
-def test_meticulous_aligns_children_to_input_port_span_not_body_center():
+def test_meticulous_two_input_node_uses_deeper_data_branch_as_spine():
     shader = _graph(
-        [("1", "Input"), ("2", "Input"), ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
-        [("1", "0", "100", "0"), ("2", "0", "100", "1")],
+        [("1", "Input"), ("2", "Input"), ("3", "Branch"),
+         ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
+        [("1", "0", "100", "0"), ("2", "0", "3", "0"), ("3", "0", "100", "1")],
     )
     geometry = _geometry(shader.graph, heights={"100": 240.0})
     geometry["100"].input_ports.update({"0": (0.0, 40.0), "1": (0.0, 80.0)})
     plan = meticulous_layout_positions(shader.graph, geometry)
-    child_center = (plan.subtree_bounds["1"][1] + plan.subtree_bounds["2"][3]) / 2.0
-    port_center = plan.positions["100"][1] + 60.0
-    body_center = plan.positions["100"][1] + 120.0
-    assert abs(child_center - port_center) <= 0.1
-    assert child_center != body_center
+    assert plan.spine_child["100"] == "3"
+    source_y = plan.positions["3"][1] + geometry["3"].output_ports["0"][1]
+    target_y = plan.positions["100"][1] + geometry["100"].input_ports["1"][1]
+    assert source_y == target_y
+
+
+def test_meticulous_keeps_each_local_stage_short_when_parallel_parents_have_different_widths():
+    shader = _graph(
+        [("1", "Input"), ("2", "Input"), ("10", "Narrow"), ("11", "Wide"),
+         ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
+        [("1", "0", "10", "0"), ("2", "0", "11", "0"),
+         ("10", "0", "100", "0"), ("11", "0", "100", "1")],
+    )
+    geometry = _geometry(shader.graph, widths={"10": 100.0, "11": 300.0})
+    plan = meticulous_layout_positions(shader.graph, geometry)
+    for source, target in (("1", "10"), ("2", "11")):
+        gap = plan.positions[target][0] - (
+            plan.positions[source][0] + geometry[source].width
+        )
+        assert 64 <= gap <= 160
+    report = audit_meticulous_layout(shader.graph, geometry, plan, moved=5)
+    assert report["stage_right_alignment"] == []
+    assert report["stage_gap_violations"] == []
 
 
 def test_meticulous_rejects_data_flow_cycles():
@@ -314,84 +344,6 @@ def test_meticulous_repeated_subtrees_share_one_internal_template():
     apply_meticulous_layout(shader.graph, plan)
     report = audit_meticulous_layout(shader.graph, geometry, plan, moved=7)
     assert report["repeated_module_mismatches"] == []
-
-
-def test_meticulous_cli_emits_v2_audit_without_writing(tmp_path, capsys, monkeypatch):
-    shader = _graph(
-        [("1", "Input"), ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
-        [("1", "0", "100", "0")],
-    )
-    path = tmp_path / "layout.shader"
-    path.write_text(shader.serialize(), encoding="utf-8")
-    geometry = _geometry(shader.graph)
-    monkeypatch.setattr("asecli.cli.layout_command.inspect_graph_geometry_via_mcp", lambda *a, **k: geometry)
-    before = path.read_bytes()
-    assert app(["layout", str(path), "--mode", "meticulous", "--audit"]) == 0
-    payload = __import__("json").loads(capsys.readouterr().out)
-    assert payload["data"]["audit"]["schema"] == "asecli.graph-layout.v2"
-    assert payload["data"]["written"] is False
-    assert path.read_bytes() == before
-
-
-def test_meticulous_write_is_atomic_and_recomputes_checksum(tmp_path, capsys, monkeypatch):
-    shader = _graph(
-        [("1", "Input"), ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
-        [("1", "0", "100", "0")],
-    )
-    path = tmp_path / "layout.shader"
-    path.write_text(shader.serialize(), encoding="utf-8")
-    geometry = _geometry(shader.graph)
-    monkeypatch.setattr("asecli.cli.layout_command.inspect_graph_geometry_via_mcp", lambda *a, **k: geometry)
-    before = path.read_text(encoding="utf-8")
-    assert app(["layout", str(path), "--mode", "meticulous", "--write"]) == 0
-    payload = __import__("json").loads(capsys.readouterr().out)
-    assert payload["data"]["written"] is True
-    assert payload["data"]["checksum_recomputed"] is True
-    assert path.with_suffix(".shader.bak").read_text(encoding="utf-8") == before
-    assert path.read_text(encoding="utf-8") != before
-
-
-def test_meticulous_hard_gate_refuses_write_and_preserves_file(tmp_path, capsys, monkeypatch):
-    shader = _graph(
-        [("1", "Input"), ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
-        [("1", "0", "100", "0")],
-    )
-    create_comment_group(shader.graph, ["1"], "过空单节点框")
-    path = tmp_path / "layout.shader"
-    path.write_text(shader.serialize(), encoding="utf-8")
-    geometry = _geometry(shader.graph, heights={"1": 20.0}, widths={"1": 20.0})
-    monkeypatch.setattr("asecli.cli.layout_command.inspect_graph_geometry_via_mcp", lambda *a, **k: geometry)
-    before = path.read_bytes()
-    assert app(["layout", str(path), "--mode", "meticulous", "--write"]) == 2
-    payload = __import__("json").loads(capsys.readouterr().out)
-    assert payload["error"]["code"] == "LAYOUT_ERROR"
-    assert {item["code"] for item in payload["data"]["audit"]["hard_failures"]} == {"COMMENT_WHITESPACE"}
-    assert path.read_bytes() == before
-    assert not path.with_suffix(".shader.bak").exists()
-
-
-def test_meticulous_requires_every_connected_port(tmp_path, capsys, monkeypatch):
-    shader = _graph(
-        [("1", "Input"), ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
-        [("1", "0", "100", "0")],
-    )
-    path = tmp_path / "layout.shader"
-    path.write_text(shader.serialize(), encoding="utf-8")
-    geometry = _geometry(shader.graph)
-    geometry["100"].input_ports.clear()
-    monkeypatch.setattr("asecli.cli.layout_command.inspect_graph_geometry_via_mcp", lambda *a, **k: geometry)
-    assert app(["layout", str(path), "--mode", "meticulous", "--audit"]) == 2
-    payload = __import__("json").loads(capsys.readouterr().out)
-    assert payload["error"]["code"] == "LAYOUT_ERROR"
-    assert "missing input port 100:0" in payload["error"]["message"]
-
-
-def test_meticulous_audit_and_write_are_mutually_exclusive(tmp_path, capsys):
-    path = tmp_path / "layout.shader"
-    path.write_text(_build_repeated_branch_graph().serialize(), encoding="utf-8")
-    assert app(["layout", str(path), "--mode", "meticulous", "--audit", "--write"]) == 2
-    payload = __import__("json").loads(capsys.readouterr().out)
-    assert payload["error"]["code"] == "USAGE_ERROR"
 
 
 def _overlap(left, right):

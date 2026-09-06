@@ -101,6 +101,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("file")
     s.add_argument("--mode", choices=("legacy", "meticulous"), default="legacy")
     s.add_argument("--audit", action="store_true", help="report meticulous layout quality without writing")
+    s.add_argument(
+        "--route-wires", action="store_true",
+        help="explicitly allow meticulous mode to move or add WireNode routing anchors",
+    )
     s.add_argument("--gap-x", type=float, default=280.0)
     s.add_argument("--gap-y", type=float, default=120.0)
     s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")

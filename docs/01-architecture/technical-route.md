@@ -96,8 +96,8 @@
 
 #### CR-0007：以 Local Var 作为算法模块间的数据接口
 
-- 增量语义：同一结果被分散复用、跨 Comment 或产生长距离交叉线时，使用一个 `Register Local Var` 和各消费块就近的 `Get Local Var`；Comment 负责算法职责，Local Var 负责模块数据接口。
-- 约束：一次性同组相邻链路保持直连；变量名必须唯一且语义明确；禁止以 Local Var 隐藏关键单次依赖、重复计算或制造同名 Register。
+- 增量语义：同一结果被两个及以上不同 Comment/算法组消费时，使用一个 `Register Local Var` 和各消费块就近的 `Get Local Var`；Comment 负责算法职责，Local Var 负责模块数据接口。
+- 约束：全部消费者位于同组时，无论复用多少次都允许直连；判断按去重消费组数量而非 Wire 数、跨阶段数或像素长度；变量名必须唯一且语义明确，禁止重复计算或制造同名 Register。
 - 实现边界：`RegisterLocalVarNode` 的端口类型随输入变化，现有 runtime schema 明确 `layout_ok=false`，因此不开放不完整的 schema add-node；由真实 ASE 创建或复用同版本/同类型真实行，随后 validate/recompile。
 - 证据：真实参考文件包含 31 个 Register、47 个 Get，`SunShadow` 5 次、`Saturation`/`LitValueControl` 各 4 次获取，验证该模式用于跨区复用而非单纯装饰。
 
@@ -158,3 +158,12 @@
 - 保存恢复：fallback/原生扩展在 ASE 图打开后读取编译 Shader 的 Foldout、Tooltip、HelpBox、EnableIf 标准属性；无原生 authoring 时补齐 Custom Attributes，有唯一原生 provider 且 `m_mzguiAttribs`/`m_selectedMzguiAttribs` 能力完整时迁入原生状态并删除双存储。Apply 预检并快照节点、Master 和 Shader 文件，Save 异常恢复内存与磁盘。
 - 跨环境兼容：fallback 实现 `MZGUI.MZGUI` 同名代理，新 Shader 只写该公共类名和四种标准 `*Mzgui` Attribute；移入原生 MZGUI 工程后由原生类无迁移接管。旧 `ASECLI.MaterialGUI.ASECLIMaterialGUI` 仅保留为历史读取别名。
 - 安全/升级：V2 runtime probe 枚举全部同名 provider，外部 fallback 复用、冲突拒写；V1 保持兼容。显式 `--handoff-native` 默认 dry-run，只将已知 fallback 备份并替换为不声明 `MZGUI.MZGUI` 的 authoring-only bridge，唯一 native 复验失败可恢复；未知文件不移动或删除。
+
+### ADR-0018 meticulous 使用递归局部鱼骨与显式 WireNode 路由
+
+- 状态：已实现；自动回归与真实大图 V3 只读 Editor 审计通过，正常缩放视觉待签收（2026-09-07，CR-0021）
+- 背景：旧 `meticulous` 将整个直属子树带围绕父节点几何居中，无法复现人工示范中“每个节点继续成为下一层主骨、同层右对齐、各级短水平线生长”的鱼骨节奏；默认移动走线锚点也会侵犯用户已有路由意图。
+- 决策：Output 从右向左递归。单来源直接水平；奇数多来源取中位；偶数从中间两支中按上游深度、实际计算链、端口语义和既有水平意图选择主骨。主骨按真实端口 y 对齐，每个父节点的直属来源共享局部输出对齐线，避免异宽并行模块被全图深度列拉成长线；层间边界目标 96px、允许 64–160px。
+- Comment：已有 ID、成员、嵌套和颜色不可改变；从内向外收框，无关组通道至少 96px。有效标题不改，占位标题只按唯一 Register、唯一框外消费者或唯一局部终点补齐；无法可靠推断则失败关闭。
+- WireNode：普通 `meticulous` 折叠 WireNode 参与逻辑排版但保持其坐标与拓扑。`--route-wires` 才可先移动既有锚点，再为确有改进的直连新增每条最多两个锚点；固定 Editor 事务运行时探测 CreateNode/CreateConnection/DeleteConnection/SaveToDisk，写后折叠锚点验证逻辑边等价，失败恢复 `.bak`。
+- 兼容与回滚：`asecli.graph-layout.v2` 只做字段扩展，`legacy` 不变；禁用 `meticulous`/`--route-wires` 即回退旧路径，不迁移 Shader，不自动创建或删除 Local Var。

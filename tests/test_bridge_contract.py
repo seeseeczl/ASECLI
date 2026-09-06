@@ -59,7 +59,11 @@ def test_geometry_probe_requires_true_position_header_and_port_anchors():
     assert "type = type.BaseType" in GEOMETRY_SNIPPET
     assert "node.InputPorts" in GEOMETRY_SNIPPET
     assert "node.OutputPorts" in GEOMETRY_SNIPPET
-    assert "ASECLI_GEOMETRY_V2" in GEOMETRY_SNIPPET
+    assert "ASECLI_GEOMETRY_V3" in GEOMETRY_SNIPPET
+    assert "probeNode.OnNodeLogicUpdate(probeDraw)" in GEOMETRY_SNIPPET
+    assert "probeNode.OnNodeLayout(probeDraw)" in GEOMETRY_SNIPPET
+    assert "probeDraw.CameraArea" in GEOMETRY_SNIPPET
+    assert "input_port_labels" not in GEOMETRY_SNIPPET  # labels are transported, not hard-coded
     assert "AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow" in GEOMETRY_SNIPPET
     assert "DestroyImmediate(win)" in GEOMETRY_SNIPPET
 
@@ -130,6 +134,27 @@ def test_geometry_probe_returns_relative_port_offsets(tmp_path, monkeypatch):
     assert (geometry.width, geometry.height, geometry.title_height) == (180.0, 90.0, 24.0)
     assert geometry.input_ports == {"0": (0.0, 30.0)}
     assert geometry.output_ports == {"2": (180.0, 40.0)}
+
+
+def test_geometry_v3_probe_decodes_optional_node_and_port_labels(tmp_path, monkeypatch):
+    shader = _shader_project(tmp_path)
+
+    class SuccessClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            payload = "ASECLI_GEOMETRY_V3\nN|1|100|200|180|90|24|Q3VzdG9tIEZ1bmN0aW9u\nI|1|0|100|230|U3RyZW5ndGg=\nO|1|2|280|240|T3V0\n"
+            return {"content": [{"type": "text", "text": json.dumps({"success": True, "data": {"result": payload}})}]}
+
+    monkeypatch.setattr("asecli.bridge.graph_geometry.McpClient", SuccessClient)
+    geometry = inspect_graph_geometry_via_mcp(str(shader))["1"]
+    assert geometry.node_title == "Custom Function"
+    assert geometry.input_port_labels == {"0": "Strength"}
+    assert geometry.output_port_labels == {"2": "Out"}
 
 
 def test_layout_ignores_unrendered_disconnected_multipass_master_placeholder():

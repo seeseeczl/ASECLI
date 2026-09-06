@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .mcp_client import McpClient, McpError, tool_text
 from .recompile import _detect_project_root
+from .graph_geometry_parser import parse_geometry_payload
 
 
 GEOMETRY_SNIPPET = r'''
@@ -35,6 +36,22 @@ try
         }}
         return null;
     }};
+    System.Func<System.Reflection.MemberInfo, object, object> readMember = (member, owner) =>
+    {{
+        if (member is System.Reflection.PropertyInfo)
+            return ((System.Reflection.PropertyInfo)member).GetValue(owner, null);
+        if (member is System.Reflection.FieldInfo)
+            return ((System.Reflection.FieldInfo)member).GetValue(owner);
+        return null;
+    }};
+    System.Func<object, string> displayText = value =>
+    {{
+        if (value == null) return "";
+        if (value is UnityEngine.GUIContent) return ((UnityEngine.GUIContent)value).text ?? "";
+        return value.ToString() ?? "";
+    }};
+    System.Func<string, string> encodeText = value => System.Convert.ToBase64String(
+        System.Text.Encoding.UTF8.GetBytes(value ?? ""));
     var uiTextInfo = typeof(AmplifyShaderEditor.UIUtils).GetField(
         "m_textInfo", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
     if (uiTextInfo != null && uiTextInfo.GetValue(null) == null)
@@ -51,8 +68,29 @@ try
     if (win.CurrentGraph == null || win.CurrentGraph.CurrentMasterNode == null)
         throw new System.Exception("ASE graph did not load in GUI event");
 
+    // ASE only fills TruePosition size, HeaderPosition and port rectangles
+    // while a node participates in a layout pass. Large graphs leave
+    // off-screen nodes unmeasured, so run one non-drawing, all-visible layout
+    // pass in the temporary window before collecting geometry.
+    var probeDraw = win.CameraDrawInfo;
+    if (probeDraw == null)
+        throw new System.Exception("ASE camera draw-info is unavailable");
+    // ParentNode visibility compares against CameraArea width/height and does
+    // not use its x/y origin, so translate graph coordinates into the positive
+    // probe viewport instead of using a negative-origin rectangle.
+    probeDraw.CameraArea = new UnityEngine.Rect(0f, 0f, 20000000f, 20000000f);
+    probeDraw.TransformedCameraArea = probeDraw.CameraArea;
+    probeDraw.CameraOffset = new UnityEngine.Vector2(10000000f, 10000000f);
+    probeDraw.InvertedZoom = 1f;
+    probeDraw.CurrentEventType = UnityEngine.EventType.Repaint;
+    foreach (var probeNode in win.CurrentGraph.AllNodes)
+    {{
+        probeNode.OnNodeLogicUpdate(probeDraw);
+        probeNode.OnNodeLayout(probeDraw);
+    }}
+
     var inv = System.Globalization.CultureInfo.InvariantCulture;
-    var sb = new System.Text.StringBuilder("ASECLI_GEOMETRY_V2\n");
+    var sb = new System.Text.StringBuilder("ASECLI_GEOMETRY_V3\n");
     foreach (var node in win.CurrentGraph.AllNodes)
     {{
         var rect = node.TruePosition;
@@ -66,6 +104,9 @@ try
         if (scaleX <= 0 || scaleY <= 0)
             throw new System.Exception("ASE node coordinate transform unavailable for node " + node.UniqueId);
         var nodeType = node.GetType();
+        var titleMember = findMember(nodeType, "TitleContent") ?? findMember(nodeType, "m_content") ??
+                          findMember(nodeType, "Title") ?? findMember(nodeType, "m_title");
+        string nodeTitle = displayText(readMember(titleMember, node));
         var headerMember = findMember(nodeType, "HeaderPosition") ?? findMember(nodeType, "m_headerPosition");
         object headerValue = headerMember is System.Reflection.PropertyInfo
             ? ((System.Reflection.PropertyInfo)headerMember).GetValue(node, null)
@@ -77,7 +118,8 @@ try
         sb.Append("N|").Append(node.UniqueId).Append('|')
           .Append(rect.x.ToString("R", inv)).Append('|').Append(rect.y.ToString("R", inv)).Append('|')
           .Append(rect.width.ToString("R", inv)).Append('|').Append(rect.height.ToString("R", inv)).Append('|')
-          .Append((header.height / scaleY).ToString("R", inv)).Append('\n');
+          .Append((header.height / scaleY).ToString("R", inv)).Append('|')
+          .Append(encodeText(nodeTitle)).Append('\n');
         foreach (var port in node.InputPorts)
         {{
             var portType = port.GetType();
@@ -85,6 +127,7 @@ try
                            findMember(portType, "m_portId");
             var posMember = findMember(portType, "Position") ?? findMember(portType, "PortPosition") ??
                             findMember(portType, "m_position");
+            var nameMember = findMember(portType, "Name") ?? findMember(portType, "m_name");
             object idValue = idMember is System.Reflection.PropertyInfo
                 ? ((System.Reflection.PropertyInfo)idMember).GetValue(port, null)
                 : idMember is System.Reflection.FieldInfo ? ((System.Reflection.FieldInfo)idMember).GetValue(port) : null;
@@ -98,12 +141,14 @@ try
             if (posValue is UnityEngine.Vector2 && ((UnityEngine.Vector2)posValue) == UnityEngine.Vector2.zero)
                 continue;
             var screenCenter = posValue is UnityEngine.Rect ? ((UnityEngine.Rect)posValue).center : (UnityEngine.Vector2)posValue;
+            string portName = displayText(readMember(nameMember, port));
             var portCenter = new UnityEngine.Vector2(
                 rect.x + (screenCenter.x - global.x) / scaleX,
                 rect.y + (screenCenter.y - global.y) / scaleY);
             sb.Append("I|").Append(node.UniqueId).Append('|').Append(idValue).Append('|')
               .Append(portCenter.x.ToString("R", inv)).Append('|')
-              .Append(portCenter.y.ToString("R", inv)).Append('\n');
+              .Append(portCenter.y.ToString("R", inv)).Append('|')
+              .Append(encodeText(portName)).Append('\n');
         }}
         foreach (var port in node.OutputPorts)
         {{
@@ -112,6 +157,7 @@ try
                            findMember(portType, "m_portId");
             var posMember = findMember(portType, "Position") ?? findMember(portType, "PortPosition") ??
                             findMember(portType, "m_position");
+            var nameMember = findMember(portType, "Name") ?? findMember(portType, "m_name");
             object idValue = idMember is System.Reflection.PropertyInfo
                 ? ((System.Reflection.PropertyInfo)idMember).GetValue(port, null)
                 : idMember is System.Reflection.FieldInfo ? ((System.Reflection.FieldInfo)idMember).GetValue(port) : null;
@@ -125,12 +171,14 @@ try
             if (posValue is UnityEngine.Vector2 && ((UnityEngine.Vector2)posValue) == UnityEngine.Vector2.zero)
                 continue;
             var screenCenter = posValue is UnityEngine.Rect ? ((UnityEngine.Rect)posValue).center : (UnityEngine.Vector2)posValue;
+            string portName = displayText(readMember(nameMember, port));
             var portCenter = new UnityEngine.Vector2(
                 rect.x + (screenCenter.x - global.x) / scaleX,
                 rect.y + (screenCenter.y - global.y) / scaleY);
             sb.Append("O|").Append(node.UniqueId).Append('|').Append(idValue).Append('|')
               .Append(portCenter.x.ToString("R", inv)).Append('|')
-              .Append(portCenter.y.ToString("R", inv)).Append('\n');
+              .Append(portCenter.y.ToString("R", inv)).Append('|')
+              .Append(encodeText(portName)).Append('\n');
         }}
     }}
     return sb.ToString();
@@ -153,6 +201,9 @@ class EditorNodeGeometry:
     title_height: float
     input_ports: dict[str, tuple[float, float]]
     output_ports: dict[str, tuple[float, float]]
+    node_title: str = ""
+    input_port_labels: dict[str, str] | None = None
+    output_port_labels: dict[str, str] | None = None
 
 
 def inspect_graph_geometry_via_mcp(
@@ -188,39 +239,11 @@ def inspect_graph_geometry_via_mcp(
         payload = envelope["data"]["result"]
     except (KeyError, TypeError) as exc:
         raise McpError("MCP graph-geometry result has an unexpected envelope") from exc
-    if not isinstance(payload, str) or not payload.startswith("ASECLI_GEOMETRY_V2\n"):
+    if not isinstance(payload, str) or not payload.startswith(("ASECLI_GEOMETRY_V2\n", "ASECLI_GEOMETRY_V3\n")):
         raise McpError("MCP graph-geometry result has an unexpected payload")
-    return _parse_geometry_payload(payload)
+    return parse_geometry_payload(payload, EditorNodeGeometry)
 
 
 def _parse_geometry_payload(payload: str) -> dict[str, EditorNodeGeometry]:
-    nodes: dict[str, dict] = {}
-    ports: list[tuple[str, str, str, float, float]] = []
-    for row in payload.splitlines()[1:]:
-        parts = row.split("|")
-        if parts[0] == "N" and len(parts) == 7:
-            try:
-                values = [float(value) for value in parts[2:]]
-            except ValueError as exc:
-                raise McpError("MCP graph-geometry result contains non-numeric node geometry") from exc
-            if parts[1] in nodes or min(values[2:]) <= 0:
-                raise McpError(f"MCP graph-geometry result contains invalid node geometry for {parts[1]}")
-            nodes[parts[1]] = dict(x=values[0], y=values[1], width=values[2], height=values[3],
-                                    title_height=values[4], input_ports={}, output_ports={})
-        elif parts[0] in {"I", "O"} and len(parts) == 5:
-            try:
-                ports.append((parts[0], parts[1], parts[2], float(parts[3]), float(parts[4])))
-            except ValueError as exc:
-                raise McpError("MCP graph-geometry result contains non-numeric port geometry") from exc
-        elif row:
-            raise McpError("MCP graph-geometry result contains a malformed row")
-    for direction, node_id, port_id, x, y in ports:
-        if node_id not in nodes:
-            raise McpError(f"MCP graph-geometry port references missing node {node_id}")
-        key = "input_ports" if direction == "I" else "output_ports"
-        if port_id in nodes[node_id][key]:
-            raise McpError(f"MCP graph-geometry result contains duplicate port {node_id}:{port_id}")
-        nodes[node_id][key][port_id] = (x - nodes[node_id]["x"], y - nodes[node_id]["y"])
-    if not nodes:
-        raise McpError("MCP graph-geometry result is empty")
-    return {node_id: EditorNodeGeometry(**values) for node_id, values in nodes.items()}
+    """Compatibility wrapper retained for focused parser tests/importers."""
+    return parse_geometry_payload(payload, EditorNodeGeometry)

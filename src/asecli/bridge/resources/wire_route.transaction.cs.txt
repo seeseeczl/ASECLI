@@ -1,0 +1,140 @@
+var payloadJson = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String("{payload_base64}"));
+var payload = Newtonsoft.Json.Linq.JObject.Parse(payloadJson);
+string assetPath = (string)payload["asset_path"];
+var routes = (Newtonsoft.Json.Linq.JArray)payload["routes"];
+var previousWindow = AmplifyShaderEditor.UIUtils.CurrentWindow;
+var previousSelection = UnityEditor.Selection.activeObject;
+AmplifyShaderEditor.AmplifyShaderEditorWindow win = null;
+byte[] diskSnapshot = null;
+bool saved = false;
+try
+{
+    if ((int)payload["version"] != 1)
+        throw new System.Exception("unsupported WireNode route version");
+    if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/") ||
+        !assetPath.EndsWith(".shader") || assetPath.Contains("..") || assetPath.Contains("\\"))
+        throw new System.Exception("unsafe target asset path");
+    string diskPath = System.IO.Path.GetFullPath(assetPath);
+    diskSnapshot = System.IO.File.ReadAllBytes(diskPath);
+    var shader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(assetPath);
+    if (shader == null) throw new System.Exception("shader not found: " + assetPath);
+
+    var publicInstance = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+    var windowCreate = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetMethod(
+        "CreateNode", publicInstance, null,
+        new System.Type[] { typeof(System.Type), typeof(UnityEngine.Vector2), typeof(AmplifyShaderFunction), typeof(bool) }, null);
+    var graphCreateConnection = typeof(AmplifyShaderEditor.ParentGraph).GetMethod(
+        "CreateConnection", publicInstance, null,
+        new System.Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool) }, null);
+    var graphDeleteConnection = typeof(AmplifyShaderEditor.ParentGraph).GetMethod(
+        "DeleteConnection", publicInstance, null,
+        new System.Type[] { typeof(bool), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(bool) }, null);
+    var saveMethod = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetMethod(
+        "SaveToDisk", publicInstance, null, new System.Type[] { typeof(bool) }, null);
+    if (windowCreate == null || graphCreateConnection == null || graphDeleteConnection == null || saveMethod == null)
+        throw new System.Exception("required WireNode routing API is unavailable in this ASE version");
+
+    win = UnityEditor.EditorWindow.CreateInstance<AmplifyShaderEditor.AmplifyShaderEditorWindow>();
+    AmplifyShaderEditor.UIUtils.CurrentWindow = win;
+    var delayedLoad = typeof(AmplifyShaderEditor.AmplifyShaderEditorWindow).GetField(
+        "m_delayedLoadObject", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+    if (delayedLoad == null) throw new System.Exception("ASE delayed-load field not found");
+    delayedLoad.SetValue(win, shader);
+    win.Show();
+    var layoutEvent = new UnityEngine.Event(); layoutEvent.type = UnityEngine.EventType.Layout; win.SendEvent(layoutEvent);
+    var repaintEvent = new UnityEngine.Event(); repaintEvent.type = UnityEngine.EventType.Repaint; win.SendEvent(repaintEvent);
+    var graph = win.CurrentGraph;
+    if (graph == null || graph.CurrentMasterNode == null)
+        throw new System.Exception("ASE graph did not load in GUI event");
+
+    var createdIds = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject route in routes)
+    {
+        string action = (string)route["action"];
+        var logical = (Newtonsoft.Json.Linq.JObject)route["logical_wire"];
+        int sourceNodeId = (int)logical["from_node"];
+        int sourcePortId = (int)logical["from_port"];
+        int targetNodeId = (int)logical["to_node"];
+        int targetPortId = (int)logical["to_port"];
+        var sourceNode = graph.GetNode(sourceNodeId);
+        var targetNode = graph.GetNode(targetNodeId);
+        if (sourceNode == null || targetNode == null ||
+            sourceNode.GetOutputPortByUniqueId(sourcePortId) == null ||
+            targetNode.GetInputPortByUniqueId(targetPortId) == null)
+            throw new System.Exception("WireNode route endpoint not found");
+
+        var anchors = (Newtonsoft.Json.Linq.JArray)route["anchors"];
+        if (action == "move")
+        {
+            foreach (Newtonsoft.Json.Linq.JObject anchor in anchors)
+            {
+                int wireNodeId = (int)anchor["wire_node_id"];
+                var node = graph.GetNode(wireNodeId);
+                if (node == null || node.GetType() != typeof(AmplifyShaderEditor.WireNode))
+                    throw new System.Exception("existing WireNode route anchor not found");
+                var point = (Newtonsoft.Json.Linq.JArray)anchor["to"];
+                node.Vec2Position = new UnityEngine.Vector2((float)point[0], (float)point[1]);
+            }
+        }
+        else if (action == "add")
+        {
+            var targetPort = targetNode.GetInputPortByUniqueId(targetPortId);
+            if (!targetPort.IsConnectedTo(sourceNodeId, sourcePortId))
+                throw new System.Exception("logical wire is no longer a direct connection");
+            graphDeleteConnection.Invoke(
+                graph, new object[] { true, targetNodeId, targetPortId, false, true, false });
+            int previousNodeId = sourceNodeId;
+            int previousPortId = sourcePortId;
+            foreach (Newtonsoft.Json.Linq.JArray point in anchors)
+            {
+                var created = (AmplifyShaderEditor.ParentNode)windowCreate.Invoke(
+                    win, new object[] {
+                        typeof(AmplifyShaderEditor.WireNode),
+                        new UnityEngine.Vector2((float)point[0], (float)point[1]), null, false
+                    });
+                if (created == null || created.GetType() != typeof(AmplifyShaderEditor.WireNode))
+                    throw new System.Exception("ASE failed to create WireNode");
+                graphCreateConnection.Invoke(
+                    graph, new object[] {
+                        created.UniqueId, created.InputPorts[0].PortId,
+                        previousNodeId, previousPortId, false
+                    });
+                if (!created.InputPorts[0].IsConnectedTo(previousNodeId, previousPortId))
+                    throw new System.Exception("ASE rejected source-to-WireNode connection");
+                previousNodeId = created.UniqueId;
+                previousPortId = created.OutputPorts[0].PortId;
+                createdIds.Add(created.UniqueId);
+            }
+            graphCreateConnection.Invoke(
+                graph, new object[] { targetNodeId, targetPortId, previousNodeId, previousPortId, false });
+            if (!targetPort.IsConnectedTo(previousNodeId, previousPortId))
+                throw new System.Exception("ASE rejected WireNode-to-target connection");
+        }
+        else throw new System.Exception("unknown WireNode route action");
+    }
+    saved = (bool)saveMethod.Invoke(win, new object[] { false });
+    if (!saved) throw new System.Exception("ASE SaveToDisk returned false");
+    var response = new Newtonsoft.Json.Linq.JObject();
+    response["protocol"] = "ASECLI_WIRE_ROUTE_V1";
+    response["asset_path"] = assetPath;
+    response["ase_version"] = AmplifyShaderEditor.VersionInfo.StaticToString();
+    response["saved"] = true;
+    response["applied_routes"] = routes.Count;
+    response["created_node_ids"] = createdIds;
+    return "ASECLI_WIRE_ROUTE_V1:" + response.ToString(Newtonsoft.Json.Formatting.None);
+}
+catch
+{
+    if (diskSnapshot != null)
+    {
+        System.IO.File.WriteAllBytes(System.IO.Path.GetFullPath(assetPath), diskSnapshot);
+        UnityEditor.AssetDatabase.ImportAsset(assetPath, UnityEditor.ImportAssetOptions.ForceUpdate);
+    }
+    throw;
+}
+finally
+{
+    UnityEditor.Selection.activeObject = previousSelection;
+    AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+    if (win != null) { win.Close(); UnityEngine.Object.DestroyImmediate(win); }
+}

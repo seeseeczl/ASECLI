@@ -73,6 +73,20 @@ def atomic_write(
         _fsync_directory(target.parent)
 
 
+def restore_from_backup(path: str | Path) -> None:
+    """Restore the exact ``.bak`` snapshot without replacing that evidence."""
+    target = Path(path)
+    backup = target.with_suffix(target.suffix + ".bak")
+    if not target.parent.is_dir():
+        raise FileNotFoundError(f"parent directory not found: {target.parent}")
+    with _exclusive_lock(target):
+        _reject_symlink(target, "target")
+        _reject_symlink(backup, "backup")
+        backup_bytes, backup_mode = _read_regular_file(backup)
+        _replace_bytes(target, backup_bytes, backup_mode)
+        _fsync_directory(target.parent)
+
+
 def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
