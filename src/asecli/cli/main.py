@@ -15,7 +15,6 @@ from .commands import (
     cmd_connect,
     cmd_disconnect,
     cmd_fix_checksum,
-    cmd_layout,
     cmd_parse,
     cmd_recompile,
     cmd_set_field,
@@ -27,6 +26,7 @@ from .gui_support_command import cmd_gui_support
 from .commentary_command import cmd_comment_group
 from .skill_command import cmd_install_skill
 from .usage_command import cmd_graph_audit, cmd_remove_node
+from .layout_command import cmd_layout
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -97,10 +97,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_fix_checksum)
 
-    s = sub.add_parser("layout", help="auto-arrange node positions (tidy)")
+    s = sub.add_parser("layout", help="auto-arrange nodes using legacy or meticulous DAG layout")
     s.add_argument("file")
+    s.add_argument("--mode", choices=("legacy", "meticulous"), default="legacy")
+    s.add_argument("--audit", action="store_true", help="report meticulous layout quality without writing")
     s.add_argument("--gap-x", type=float, default=280.0)
     s.add_argument("--gap-y", type=float, default=120.0)
+    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    s.add_argument("--unity-instance", help="target Name@hash when multiple Unity/Tuanjie instances are connected")
+    s.add_argument("--allow-remote-mcp", action="store_true")
+    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_layout)
 

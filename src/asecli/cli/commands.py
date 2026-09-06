@@ -21,7 +21,6 @@ from ..core import (
     parse_node_line,
     require_managed_property_presentation,
     set_node_field,
-    tidy,
 )
 from ..schema import allows_mutation, is_version_compatible, schema_for, schema_version
 from .io import (
@@ -210,16 +209,6 @@ def cmd_fix_checksum(args) -> dict:
     if args.write:
         _commit_text(args.file, fixed, source_digest)
     return {"was_valid": ok, "stored": stored, "fixed_to": actual, "written": bool(args.write)}
-
-
-def cmd_layout(args) -> dict:
-    f = _load(args.file)
-    try:
-        moved = tidy(f.graph, gap_x=args.gap_x, gap_y=args.gap_y)
-    except ValueError as exc:
-        raise CliError("LAYOUT_ERROR", str(exc)) from exc
-    saved = _save(f, args.file, args.write)
-    return {"moved": moved, "structural_validation": "passed", "visual_validation": "pending", **saved}
 
 
 def cmd_recompile(args) -> dict:

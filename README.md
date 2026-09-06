@@ -39,7 +39,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.5.0`；需要回滚时可安装不可变的 `v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.6.0`；需要回滚时可安装不可变的 `v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
 
 ### 方式一：安装正式 CLI（试用者推荐）
 
@@ -47,11 +47,11 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 gh auth login
-mkdir asecli-v0.5.0
-cd asecli-v0.5.0
-gh release download v0.5.0 --repo seeseeczl/ASECLI
+mkdir asecli-v0.6.0
+cd asecli-v0.6.0
+gh release download v0.6.0 --repo seeseeczl/ASECLI
 shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.5.0-py3-none-any.whl
+uv tool install ./asecli-0.6.0-py3-none-any.whl
 asecli install-skill
 asecli --help
 ```
@@ -59,7 +59,7 @@ asecli --help
 `uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
 
 ```bash
-uv tool install --force ./asecli-0.5.0-py3-none-any.whl
+uv tool install --force ./asecli-0.6.0-py3-none-any.whl
 asecli install-skill
 ```
 
@@ -68,7 +68,7 @@ asecli install-skill
 `v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
 
 ```bash
-uv tool install --force ./asecli-0.5.0-py3-none-any.whl && asecli install-skill
+uv tool install --force ./asecli-0.6.0-py3-none-any.whl && asecli install-skill
 ```
 
 `install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
@@ -78,8 +78,8 @@ Python wheel 安装遵循无 post-install 副作用的规范，`uv tool install`
 回滚到上一正式版：
 
 ```bash
-gh release download v0.4.2 --repo seeseeczl/ASECLI
-uv tool install --force ./asecli-0.4.2-py3-none-any.whl
+gh release download v0.5.0 --repo seeseeczl/ASECLI
+uv tool install --force ./asecli-0.5.0-py3-none-any.whl
 ```
 
 卸载：
@@ -88,7 +88,7 @@ uv tool install --force ./asecli-0.4.2-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.5.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.5.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+正式版本与校验资产见 [ASECLI v0.6.0（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.0)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
@@ -140,8 +140,12 @@ asecli add-node MyShader.shader --type AmplifyShaderEditor.SaturateNode --id 99 
 # 5. 连线：把 99 的输出 0 接到 6 的输入 0
 asecli connect MyShader.shader --from 99:0 --to 6:0 --write
 
-# 6. 整理节点布局（分层对齐等距，只动 x/y）
+# 6. 兼容模式整理节点布局（只动 x/y）
 asecli layout MyShader.shader --write
+
+# 连接运行中的 ASE 后，使用真实节点/端口尺寸做脑图式精排
+asecli layout MyShader.shader --mode meticulous --audit
+asecli layout MyShader.shader --mode meticulous --write
 
 # 7. 修复 checksum（默认只预览，显式写入才落盘并保留 .bak）
 asecli fix-checksum MyShader.shader --write
@@ -201,7 +205,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `disconnect <file> --from A:P --to B:P [--write]` | 删除一条精确连线。 | 默认预演；找不到该连线会失败。 |
 | `remove-node <file> --node N [--force-external] [--write]` | 删除节点及附属连线。 | 默认预演；外部源码仍引用的 Property 默认拒删。`--force-external` 只用于已迁移消费者的明确操作。 |
 | `fix-checksum <file> [--write]` | 重算 `//CHKSM`，并报告旧值、实际值和是否已有效。 | 默认预演；`--write` 后写入并备份原文件。 |
-| `layout <file> [--gap-x X] [--gap-y Y] [--write]` | 按左到右数据流排列节点，保持连线和非位置字段不变。 | 默认预演；只改坐标。真实画布的节点宽高和贝塞尔线仍需 Editor 验收。 |
+| `layout <file> [--mode legacy\|meticulous] [--audit] [--write]` | `legacy` 保留原分层布局；`meticulous` 以 Output 为根递归展开上游子树，按输入端口顺序居中分布，并联动收紧 Comment。 | 默认仍为 `legacy` 且只预演。`meticulous` 单次连接 Editor 获取真实节点、标题栏和端口几何；硬门禁失败或几何缺失时不写盘。 |
 | `gui-support <project> [--runtime-probe] [--handoff-native] [--write]` | 优先检测并选用原生 MZGUI；原生环境只安装 authoring/条件置灰扩展，缺失时安装 fallback；原生后来加入时可恢复交接。 | 不创建第二个原生 provider；V2 枚举全部 provider；handoff 默认预演，只处理已知哈希并保留 authoring-only bridge，复验失败可恢复。 |
 | `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；设置或清除 Foldout、Tooltip、用户 HelpBox 和由另一数值属性控制的置灰条件。 | 条件写为 `EnableIfMzgui(source,operator,value)`；不满足时只禁用控件，不清空材质值。`--clear-enabled-if` 可清除。 |
 | `install-skill [--skill-root DIR]` | 安装 wheel 内置的 ASECLI Agent Skill。 | 相同内容幂等；目标已有不同内容时拒绝覆盖，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
@@ -292,9 +296,15 @@ asecli recompile Assets/Example.shader
 #### 3. 整理图布局、Local Var 与 Comment
 
 ```bash
-# layout 只移动 x/y，不改参数或连线
+# 兼容布局只移动 x/y，不改参数或连线
 asecli layout Assets/Example.shader --gap-x 280 --gap-y 120
 asecli layout Assets/Example.shader --gap-x 280 --gap-y 120 --write
+
+# 脑图式自适应精排：先只读审计，再一次性写入节点坐标和 Comment bounds
+asecli layout Assets/Example.shader --mode meticulous --audit \
+  --mcp-url http://127.0.0.1:8080/mcp
+asecli layout Assets/Example.shader --mode meticulous --write \
+  --mcp-url http://127.0.0.1:8080/mcp
 
 # 先离线预演 Comment，再在连接的 Editor 中以真实尺寸验收/收框
 asecli comment-group Assets/Example.shader --nodes 1212,1218 \
@@ -436,6 +446,12 @@ asecli comment-group My.shader --fit --padding 30 --mcp-url http://127.0.0.1:908
 
 ### 节点图精排规范
 
+- `meticulous` 从最终 Output 向左递归展开上游：一个节点后无论有多少输入分支，都按 `in_port` 顺序组成完整子树带，并围绕输入端口组中心上下对称分布；三级及更深分支沿用同一规则。
+- 普通兄弟子树垂直间距至少 `32px`，父子节点边界水平间距为 `96px`，不同 Comment/语义模块之间至少 `96px`。真实节点尺寸决定列宽，不再使用 `200x120` 估算值做精排。
+- Editor 几何桥会把缩放后的 `GlobalPosition`/端口坐标还原为 `TruePosition` 图坐标；多 Pass 中没有连线且不参与当前画布的零尺寸 Master 占位保持原位，若零尺寸节点仍有连接则失败关闭。
+- Register 靠近生产者右侧，Get 靠近直接消费者左侧；布局器不会自动创建、删除或改写 Local Var。共享节点只选择一个主父级，其余连线作为次级边审计，不复制节点。
+- 精排完成后 Comment 自内向外收框：左右/底部 `30px`、顶部标题区 `48px`。空白率按节点本体及其必要走线/间距占用共同计算，避免把正常线路通道误判为空框；节点重叠、成员越界、无关 Comment 重叠、连线穿节点或空白率超过 `65%` 都会阻止 `--write`。
+- 审计输出 `asecli.graph-layout.v2`，区分硬性失败与允许但需关注的线线交叉；自动通过后仍返回 `visual_validation=requires_editor_review`，不冒充正常缩放下的最终人工视觉签收。
 - 核心目标是“经过人工精心排列”的秩序感：主数据流从左向右层层递进，Master 最右；同阶段严格列对齐，主链尽量水平，重复分支使用完全一致的列、行距和内部模板。
 - 组内紧凑、组间留出明显通道，并列模块和 Comment 边框也要对齐；无父子关系的组不得重叠，父子组只允许完整包含。
 - 连线并非绝对不能交叉。允许少量线与线在空白通道中简洁、可追踪地交叉；但连线不得穿过无关节点本体、端口或标题栏，也不得形成蜘蛛网。不要用大幅绕线换取表面的零交叉。
@@ -530,7 +546,7 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.5.0` 按用户 2026-09-06 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.6.0` 按用户 2026-09-06 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
 
 ### 供应链、许可证与密钥
 

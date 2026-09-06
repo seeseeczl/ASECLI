@@ -41,8 +41,12 @@ asecli connect <file> --from 99:0 --to 6:0 --write
 # 删节点（自动清理附属连线）
 asecli remove-node <file> --node 99 --write
 
-# 整理布局（分层对齐等距，只动 x/y）
+# 兼容布局（分层对齐等距，只动 x/y）
 asecli layout <file> --write
+
+# 脑图式自适应精排：单次读取 ASE 真实节点/标题/端口尺寸
+asecli layout <file> --mode meticulous --audit --mcp-url http://127.0.0.1:8080/mcp
+asecli layout <file> --mode meticulous --write --mcp-url http://127.0.0.1:8080/mcp
 
 # 修复 checksum（默认只预览；显式写入会保留 .bak）
 asecli fix-checksum <file> --write
@@ -151,7 +155,7 @@ asecli comment-group <file> --nodes 1069,1215,1216 \
   --title "控制不同颜色明度下的不同灯光强度" --write
 ```
 
-- `layout` 把已有 Comment 及其成员视为固定复合单元；打组后仍应以 `--check-bounds` 和真实 ASE 界面复核框选关系。
+- `layout --mode legacy` 把已有 Comment 及其成员视为固定复合单元；`--mode meticulous` 则使用真实尺寸移动成员，并在同一内存事务中自内向外重算 Comment bounds。
 - 整理和连线清晰优先于分组数量。默认单层小组，只包围紧密算法单元；不建立大总框、不强求组套组。若分组造成交叉线、蜘蛛网或大量留白，则缩小组或不分组。
 - 同层或无父子关系的 Comment 组之间禁止重叠；边框可以相邻但不得相交或互相遮挡。只有显式“外层功能、内层因果”的父子组允许嵌套，且必须完整包含，禁止部分交叠和边框穿插。完成前执行 `--check-bounds`，结果不得包含 `COMMENT_GROUP_OVERLAP`。
 - 标题回答“这一块做什么”或“参数如何影响结果”，应具体，不使用“处理1”“临时”等无语义名称。
@@ -160,6 +164,11 @@ asecli comment-group <file> --nodes 1069,1215,1216 \
 
 ### 精排与画布验收规范
 
+- `meticulous` 以最终 Output 为根，从右向左递归排布上游子树。兄弟分支严格按目标 `in_port` 顺序排列，完整子树围绕父节点输入端口组中心居中；更深层级重复同一规则。
+- 真实节点宽高决定列距。父子边界默认相隔 `96px`，普通兄弟子树至少 `32px`，跨 Comment/模块至少 `96px`；相同输入必须得到稳定坐标。
+- MCP 返回的端口位置属于缩放后的 Editor 窗口坐标，精排桥必须依据 `GlobalPosition / TruePosition` 还原到图坐标。多 Pass 的无连接零尺寸 Master 只是休眠占位，应保持原位；带连接的零尺寸节点仍须失败关闭。
+- Register/Get 作为局部接口处理：Register 贴近生产者右侧，Get 贴近消费者左侧。布局只报告远端直连，不自动创建、删除或改写 Local Var。
+- Comment 在节点完成后自内向外收框，左右/底部留 `30px`、顶部标题区留 `48px`。空白率将节点本体与必要走线/间距占用视为有效足迹；精排报告使用 `asecli.graph-layout.v2`，节点重叠、成员越界、无关框重叠、连线穿节点和空白率大于 `65%` 会阻止写入。
 - 排版首先表达数据结构：主数据流从左向右逐层递进，Master 位于最右；同阶段节点严格列对齐，主链尽量水平，重复分支复用相同列坐标、行距和内部模板。
 - 组内紧凑、组间留出清楚通道；并列模块及其 Comment 边框也要对齐。同层或无父子关系的组不得重叠，父子组只允许完整包含。
 - 连线不是绝对不能交叉。少量线与线可以在空白通道中简洁交叉，但不得穿过无关节点本体、端口或标题栏，也不得形成难以追踪的蜘蛛网。不要用大幅绕行换取表面的零交叉。

@@ -1,12 +1,15 @@
 """REG-0016: MCP transport and tool failures must not become false success."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from asecli.bridge.mcp_client import McpClient, McpError
 from asecli.bridge.recompile import RECOMPILE_SNIPPET, recompile_via_mcp
 from asecli.bridge.graph_inspect import BOUNDS_SNIPPET, measure_node_bounds_via_mcp
+from asecli.bridge.graph_geometry import GEOMETRY_SNIPPET, inspect_graph_geometry_via_mcp
+from asecli.core import AseFile, meticulous_layout_positions
 
 
 def _shader_project(tmp_path):
@@ -44,6 +47,21 @@ def test_bounds_probe_uses_true_position_inside_real_gui_event_and_closes_window
     assert "AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow" in BOUNDS_SNIPPET
     assert "win.Close()" in BOUNDS_SNIPPET
     assert "DestroyImmediate(win)" in BOUNDS_SNIPPET
+
+
+def test_geometry_probe_requires_true_position_header_and_port_anchors():
+    assert "node.TruePosition" in GEOMETRY_SNIPPET
+    assert "node.GlobalPosition" in GEOMETRY_SNIPPET
+    assert "global.width / rect.width" in GEOMETRY_SNIPPET
+    assert "(screenCenter.x - global.x) / scaleX" in GEOMETRY_SNIPPET
+    assert "if (rect.width <= 0 || rect.height <= 0) continue" in GEOMETRY_SNIPPET
+    assert 'findMember(nodeType, "HeaderPosition")' in GEOMETRY_SNIPPET
+    assert "type = type.BaseType" in GEOMETRY_SNIPPET
+    assert "node.InputPorts" in GEOMETRY_SNIPPET
+    assert "node.OutputPorts" in GEOMETRY_SNIPPET
+    assert "ASECLI_GEOMETRY_V2" in GEOMETRY_SNIPPET
+    assert "AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow" in GEOMETRY_SNIPPET
+    assert "DestroyImmediate(win)" in GEOMETRY_SNIPPET
 
 
 def test_bounds_probe_routes_to_explicit_unity_instance(tmp_path, monkeypatch):
@@ -91,6 +109,42 @@ def test_bounds_probe_surfaces_multiple_instance_refusal(tmp_path, monkeypatch):
     monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", RefusingClient)
     with pytest.raises(McpError, match="available instances: A@111, B@222"):
         measure_node_bounds_via_mcp(str(shader))
+
+
+def test_geometry_probe_returns_relative_port_offsets(tmp_path, monkeypatch):
+    shader = _shader_project(tmp_path)
+
+    class SuccessClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            payload = "ASECLI_GEOMETRY_V2\nN|1|100|200|180|90|24\nI|1|0|100|230\nO|1|2|280|240\n"
+            return {"content": [{"type": "text", "text": json.dumps({"success": True, "data": {"result": payload}})}]}
+
+    monkeypatch.setattr("asecli.bridge.graph_geometry.McpClient", SuccessClient)
+    geometry = inspect_graph_geometry_via_mcp(str(shader))["1"]
+    assert (geometry.width, geometry.height, geometry.title_height) == (180.0, 90.0, 24.0)
+    assert geometry.input_ports == {"0": (0.0, 30.0)}
+    assert geometry.output_ports == {"2": (180.0, 40.0)}
+
+
+def test_layout_ignores_unrendered_disconnected_multipass_master_placeholder():
+    shader = AseFile.from_text("""/*ASEBEGIN
+Version=19602
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;0;0,0
+Node;AmplifyShaderEditor.RangedFloatNode;1;0,0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;100;0,0
+WireConnection;100;0;1;0
+ASEEND*/""")
+    geometry = {
+        "1": SimpleNamespace(width=180, height=100, title_height=24, input_ports={}, output_ports={"0": (180, 40)}),
+        "100": SimpleNamespace(width=180, height=100, title_height=24, input_ports={"0": (0, 40)}, output_ports={}),
+    }
+    assert set(meticulous_layout_positions(shader.graph, geometry).positions) == {"1", "100"}
 
 
 def test_json_rpc_error_is_bridge_failure(monkeypatch):

@@ -4,6 +4,7 @@ from .mcp_client import McpClient, McpError
 from .editor_create import create_shader_via_mcp
 from .editor_spec import EditorGraphSpec, SpecError, load_editor_graph_spec, route_create_backend
 from .graph_inspect import measure_node_bounds_via_mcp
+from .graph_geometry import EditorNodeGeometry, inspect_graph_geometry_via_mcp
 from .gui_support import (
     ASECLI_GUI_EDITOR,
     GUI_SUPPORT_ASSET_PATH,
@@ -30,6 +31,8 @@ __all__ = [
     "install_gui_support",
     "probe_native_mzgui_via_mcp",
     "measure_node_bounds_via_mcp",
+    "EditorNodeGeometry",
+    "inspect_graph_geometry_via_mcp",
     "recompile_via_mcp",
     "route_create_backend",
 ]
