@@ -33,23 +33,25 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 环境要求
 
-- Python >= 3.10，[uv](https://docs.astral.sh/uv/)
 - 查看/修改/校验/布局：不需要 Unity
 - Editor 创建/编译（`create --backend editor` / `recompile`）：Unity/团结引擎打开目标工程 + MCP for Unity 会话已启动
+- 安装脚本会自动安装 [uv](https://docs.astral.sh/uv/) 和 Python >= 3.10，不必预先配置
 
 ## 安装与运行
 
-项目以 MIT 许可证发布到 [PyPI](https://pypi.org/project/asecli/)，源码在 [seeseeczl/ASECLI](https://github.com/seeseeczl/ASECLI)。当前版本为 `v0.6.2`。
-
-先安装 [uv](https://docs.astral.sh/uv/)，再执行：
+macOS / Linux 一条命令：
 
 ```bash
-uv tool install asecli
-asecli install-skill
-asecli --help
+curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/install.sh | sh
 ```
 
-`uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 放到用户命令路径，不污染现有项目环境。也可以使用 `pipx install asecli`。`install-skill` 会把随包携带的 Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）；同内容幂等，目标已有不同内容时拒绝覆盖。`uv tool install` 本身不会写入 Codex 目录。
+Windows PowerShell 一条命令：
+
+```powershell
+irm https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/install.ps1 | iex
+```
+
+脚本会安装 uv、当前 GitHub Release 的 `asecli`，以及 Agent Skill。Skill 装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）；同内容幂等，已有不同内容时跳过覆盖。
 
 升级与卸载：
 
