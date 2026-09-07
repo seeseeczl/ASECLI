@@ -43,8 +43,8 @@ def main(argv: list[str] | None = None) -> int:
         "versionInfo": project_version,
         "downloadLocation": "NOASSERTION",
         "filesAnalyzed": False,
-        "licenseConcluded": "LicenseRef-ASECLI-Proprietary",
-        "licenseDeclared": "LicenseRef-ASECLI-Proprietary",
+        "licenseConcluded": "MIT",
+        "licenseDeclared": "MIT",
         "copyrightText": "Copyright (c) 2026 AseCLI contributors",
     }]
     for name, version in locked:

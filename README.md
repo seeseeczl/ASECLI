@@ -39,14 +39,28 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目当前是内部专有工具，正式版本通过私有 GitHub Release 分发；未上传 PyPI、CLI Hub 或公开包仓。试用者必须先获得 `seeseeczl/ASECLI` 私有仓库权限。当前版本为 `v0.6.1`；需要回滚时可安装不可变的 `v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目以 MIT 许可证开源，源码在 [seeseeczl/ASECLI](https://github.com/seeseeczl/ASECLI)。当前版本为 `v0.6.1`；尚未上传 PyPI 或 CLI Hub。需要回滚时可安装不可变的 `v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
 
-### 方式一：安装正式 CLI（试用者推荐）
+### 方式一：从 GitHub 安装（推荐）
 
-先安装 [GitHub CLI](https://cli.github.com/) 与 [uv](https://docs.astral.sh/uv/)，并使用已获仓库权限的 GitHub 账号登录：
+先安装 [uv](https://docs.astral.sh/uv/)：
 
 ```bash
-gh auth login
+uv tool install git+https://github.com/seeseeczl/ASECLI.git
+asecli install-skill
+asecli --help
+```
+
+锁定正式版本：
+
+```bash
+uv tool install git+https://github.com/seeseeczl/ASECLI.git@v0.6.1
+asecli install-skill
+```
+
+或从 GitHub Release 安装已校验的 wheel：
+
+```bash
 mkdir asecli-v0.6.1
 cd asecli-v0.6.1
 gh release download v0.6.1 --repo seeseeczl/ASECLI
@@ -56,10 +70,10 @@ asecli install-skill
 asecli --help
 ```
 
-`uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级同一版本或覆盖本机安装时使用：
+`uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级或覆盖本机安装时使用：
 
 ```bash
-uv tool install --force ./asecli-0.6.1-py3-none-any.whl
+uv tool install --force git+https://github.com/seeseeczl/ASECLI.git
 asecli install-skill
 ```
 
@@ -68,7 +82,7 @@ asecli install-skill
 `v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
 
 ```bash
-uv tool install --force ./asecli-0.6.1-py3-none-any.whl && asecli install-skill
+uv tool install --force git+https://github.com/seeseeczl/ASECLI.git && asecli install-skill
 ```
 
 `install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
@@ -88,12 +102,12 @@ uv tool install --force ./asecli-0.6.0-py3-none-any.whl
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.6.1（内部正式版）](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.1)。该链接和下载命令仅对已获私有仓库权限的账号可用。`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+正式版本与校验资产见 [ASECLI v0.6.1](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.1)。`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
 ### 方式二：源码开发运行
 
 ```bash
-git clone git@github.com:seeseeczl/ASECLI.git
+git clone https://github.com/seeseeczl/ASECLI.git
 cd ASECLI
 uv sync --frozen
 uv run --frozen asecli --help
@@ -104,7 +118,7 @@ uv run --frozen asecli --help
 ### 方式三：从源码安装为本机命令
 
 ```bash
-git clone git@github.com:seeseeczl/ASECLI.git
+git clone https://github.com/seeseeczl/ASECLI.git
 cd ASECLI
 uv tool install .
 asecli --help
@@ -557,7 +571,7 @@ CI 通过只证明远端自动门禁通过。进入“已交付”还需要真�
 
 ### 供应链、许可证与密钥
 
-- 当前许可证为 `LicenseRef-ASECLI-Proprietary`；未经书面批准不得公开发布、转授权或上传公共包仓。
+- 当前许可证为 MIT；源码与 GitHub Release 公开。上传 PyPI、CLI Hub 或其他包仓仍须单独书面授权。
 - 当前生产运行时依赖为 0；新增运行时依赖、改许可证或改分发方式均是单独 CR，必须完成许可证与漏洞评估。
 - `uv.lock` 固定开发依赖的来源、版本和 SHA-256；CI 中所有 GitHub Actions 必须固定为 40 位 commit SHA。
 - `tools/supply_chain_check.py` 会检查 lock、Action pin、常见高置信密钥模式与许可证；`tools/generate_sbom.py` 生成 artifact 清单。离线检查不等同于真实漏洞数据库或 Dependabot 状态。
@@ -593,4 +607,4 @@ src/asecli/
 
 ## License
 
-内部专有工具，见 [`LICENSE`](LICENSE)；未获书面授权不得公开分发。
+MIT License，见 [`LICENSE`](LICENSE)。

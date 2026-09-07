@@ -69,7 +69,7 @@
 ### ADR-0009 内部发布采用零运行时依赖、可复现 artifact 与 SPDX
 
 - 状态：已确认（2026-09-01，CR-0006）
-- 决策：内部专有许可；Python 3.10/3.12 矩阵；uv/lock frozen；固定 commit 的 Actions；固定 epoch 双构建；wheel/sdist SHA-256；SPDX 2.3；隔离安装/卸载/恢复。
+- 决策：零运行时依赖与可复现交付；Python 3.10/3.12 矩阵；uv/lock frozen；固定 commit 的 Actions；固定 epoch 双构建；wheel/sdist SHA-256；SPDX 2.3；隔离安装/卸载/恢复。许可证已由 ADR-0019 改为 MIT 公开源码。
 - 可复现实现：Hatchling 版本进入 dev lock，CI 使用 `--no-build-isolation`；两次构建输出写入 runner 临时目录，禁止第一次产物进入第二个 sdist。比较失败时保存 hash、gzip header 与 tar 成员元数据/内容差异，但正式 dist 仍阻塞。
 - 安全：离线高置信 secret、Action pin、lock hash 门禁；生产依赖为 0。在线漏洞数据库必须用真实 CI/Dependabot 证据单独解除“未验证”。
 - 发布：本地 REL draft 不等于远程 Release；没有 push/run/artifact 链接时不得标 released。
@@ -167,3 +167,10 @@
 - Comment：已有 ID、成员、嵌套和颜色不可改变；从内向外收框，无关组通道至少 96px。有效标题不改，占位标题只按唯一 Register、唯一框外消费者或唯一局部终点补齐；无法可靠推断则失败关闭。
 - WireNode：普通 `meticulous` 折叠 WireNode 参与逻辑排版但保持其坐标与拓扑。`--route-wires` 才可先移动既有锚点，再为确有改进的直连新增每条最多两个锚点；固定 Editor 事务运行时探测 CreateNode/CreateConnection/DeleteConnection/SaveToDisk，写后折叠锚点验证逻辑边等价，失败恢复 `.bak`。
 - 兼容与回滚：`asecli.graph-layout.v2` 只做字段扩展，`legacy` 不变；禁用 `meticulous`/`--route-wires` 即回退旧路径，不迁移 Shader，不自动创建或删除 Local Var。
+
+### ADR-0019 以 MIT 许可证公开 GitHub 源码
+
+- 状态：已确认（2026-09-07，CR-0022）
+- 决策：将许可证从 `LicenseRef-ASECLI-Proprietary` 改为 MIT；GitHub 仓库 `seeseeczl/ASECLI` 转为 public。安装入口改为公开 `uv tool install git+https://github.com/seeseeczl/ASECLI.git`，并保留 GitHub Release wheel。
+- 非目标：本次不上传 PyPI 或 CLI-Anything Hub；不改 CLI 行为、版本号或既有私有 Release 的历史记录。
+- 回滚：恢复专有 LICENSE 与私有可见性属于单独授权，不自动执行。

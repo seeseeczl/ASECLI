@@ -74,3 +74,4 @@
 | 2026-09-07 | 递归鱼骨精排验证 | 定向 `70 passed`、全量 `313 passed, 3 skipped`，CI governance/REG/diff 通过；团结 2022.3.62t13 + ASE 1.9.6.2 对真实 248 节点图（230 个活动节点参与布局）执行 V3 只读审计，实测修复离屏节点未刷新 `TruePosition`/端口的问题，并将全图深度列纠正为每个父节点的局部鱼骨输出线；最终全部硬门禁为 0。隔离副本空路由事务进一步确认真实 API 探测和 `SaveToDisk`，原 Shader 哈希不变，临时资产已移入废纸篓；未反复截图 | CR-0021 TASK-0050 REG-0051 ADR-0018 |
 | 2026-09-07 | v0.6.1 发布准备 | 用户明确授权推送、私有发布和本机安装递归鱼骨布局补丁；保留 `v0.6.0` 不可变回滚点，不上传 PyPI/CLI Hub、不公开分发、不重复启动 Editor 或截图 | REL-0011 TASK-0051 CR-0020 CR-0021 REG-0051 |
 | 2026-09-07 | v0.6.1 正式发布与安装 | `v0.6.1@9cdc1ee` 经 GitHub Actions run 34045894959 三项 job 全绿后发布到私有 GitHub Release；五项载荷与 SHA256SUMS、六项资产与 GitHub digest 一致。本机正式 wheel 返回 `asecli 0.6.1`，新版 Skill 安装/幂等通过，隔离环境完成 `0.6.1 → 0.6.0 → 0.6.1` 回滚验证；未启动 Editor、未截图、未修改生产 Shader | REL-0011 TASK-0051 CR-0020 CR-0021 REG-0051 |
+| 2026-09-07 | 开源 | 用户明确要求将项目开源并提供同事安装命令；许可证改为 MIT，GitHub 仓库转为 public，README 安装入口改为公开 `uv tool install`；不上传 PyPI/CLI Hub，不改 CLI 行为或版本号 | CR-0022 ADR-0019 REG-0021 |

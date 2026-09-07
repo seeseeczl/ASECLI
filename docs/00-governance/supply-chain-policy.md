@@ -14,9 +14,9 @@ evidence: [uv.lock, LICENSE, SECURITY.md, tools/supply_chain_check.py, tools/gen
 
 ## 分发与许可
 
-- AseCLI 当前是内部专有工具，许可证标识为 `LicenseRef-ASECLI-Proprietary`；未获得书面批准不得公开发布、上传 PyPI/Hub 或转授权。
+- AseCLI 以 MIT 许可证开源，标识为 `MIT`；源码与 GitHub Release 托管于公开仓库 `seeseeczl/ASECLI`。上传 PyPI、CLI Hub 或其他包仓仍须单独 CR。
 - 当前生产运行时依赖为 0；开发依赖由 `uv.lock` 固定来源、版本和 SHA-256。第三方依赖继续遵守其自身许可证。
-- 新增生产依赖、修改许可或公开分发属于单独 CR，必须先完成许可证与漏洞评估。
+- 新增生产依赖、修改许可或改变分发渠道属于单独 CR，必须先完成许可证与漏洞评估。
 
 ## 自动门禁
 
