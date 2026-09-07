@@ -12,6 +12,12 @@ NODE24_ACTION_REFS = {
     "actions/checkout": "93cb6efe18208431cddfb8368fd83d5badbf9bfd",
     "astral-sh/setup-uv": "20cfd1bf945f4377ade1205e4dbc17946fc9a30d",
     "actions/upload-artifact": "b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+    "actions/download-artifact": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+}
+REQUIRED_CI_ACTIONS = {
+    "actions/checkout",
+    "astral-sh/setup-uv",
+    "actions/upload-artifact",
 }
 
 
@@ -26,7 +32,9 @@ def _loc_exemptions(config: dict) -> dict[str, dict]:
     return result
 
 
-def _action_runtime_findings(workflow_text: str) -> list[str]:
+def _action_runtime_findings(
+    workflow_text: str, *, required_actions: set[str] | None = None
+) -> list[str]:
     findings: list[str] = []
     action_refs = re.findall(r"^\s*-?\s*uses:\s*([^\s@]+)@([0-9a-f]{40})", workflow_text, re.MULTILINE)
     seen: set[str] = set()
@@ -39,7 +47,7 @@ def _action_runtime_findings(workflow_text: str) -> list[str]:
             findings.append(
                 f"{action} must use the approved Node 24 commit {expected}, got {sha}"
             )
-    for action in NODE24_ACTION_REFS:
+    for action in required_actions or ():
         if action not in seen:
             findings.append(f"approved Node 24 action is missing: {action}")
     return findings
@@ -192,7 +200,8 @@ def main() -> int:
     hardcoded_artifact_version = re.compile(r"asecli-\d+\.\d+\.\d+")
     for path in (root / ".github/workflows").glob("*.yml"):
         workflow = path.read_text(encoding="utf-8")
-        findings.extend(_action_runtime_findings(workflow))
+        required = REQUIRED_CI_ACTIONS if path.name == "ci.yml" else None
+        findings.extend(_action_runtime_findings(workflow, required_actions=required))
         if hardcoded_artifact_version.search(workflow):
             findings.append(f"hard-coded asecli artifact version: {path.relative_to(root)}")
         if "shasum -a 256 dist/*.whl dist/*.tar.gz" in workflow:

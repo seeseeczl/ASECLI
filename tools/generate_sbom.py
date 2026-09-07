@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         "SPDXID": "SPDXRef-Package-asecli",
         "name": "asecli",
         "versionInfo": project_version,
-        "downloadLocation": "NOASSERTION",
+        "downloadLocation": f"https://pypi.org/project/asecli/{project_version}/",
         "filesAnalyzed": False,
         "licenseConcluded": "MIT",
         "licenseDeclared": "MIT",

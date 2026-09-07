@@ -39,72 +39,29 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ## 安装与运行
 
-项目以 MIT 许可证开源，源码在 [seeseeczl/ASECLI](https://github.com/seeseeczl/ASECLI)。当前版本为 `v0.6.1`；尚未上传 PyPI 或 CLI Hub。需要回滚时可安装不可变的 `v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 或 `v0.1.0`。
+项目以 MIT 许可证发布到 [PyPI](https://pypi.org/project/asecli/)，源码在 [seeseeczl/ASECLI](https://github.com/seeseeczl/ASECLI)。当前版本为 `v0.6.2`。
 
-### 方式一：从 GitHub 安装（推荐）
-
-先安装 [uv](https://docs.astral.sh/uv/)：
+先安装 [uv](https://docs.astral.sh/uv/)，再执行：
 
 ```bash
-uv tool install git+https://github.com/seeseeczl/ASECLI.git
+uv tool install asecli
 asecli install-skill
 asecli --help
 ```
 
-锁定正式版本：
+`uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 放到用户命令路径，不污染现有项目环境。也可以使用 `pipx install asecli`。`install-skill` 会把随包携带的 Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）；同内容幂等，目标已有不同内容时拒绝覆盖。`uv tool install` 本身不会写入 Codex 目录。
+
+升级与卸载：
 
 ```bash
-uv tool install git+https://github.com/seeseeczl/ASECLI.git@v0.6.1
+uv tool upgrade asecli
 asecli install-skill
-```
-
-或从 GitHub Release 安装已校验的 wheel：
-
-```bash
-mkdir asecli-v0.6.1
-cd asecli-v0.6.1
-gh release download v0.6.1 --repo seeseeczl/ASECLI
-shasum -a 256 -c SHA256SUMS
-uv tool install ./asecli-0.6.1-py3-none-any.whl
-asecli install-skill
-asecli --help
-```
-
-`uv tool install` 会为 ASECLI 创建独立 Python 环境，并把 `asecli` 命令放到用户命令路径，不污染现有项目环境。升级或覆盖本机安装时使用：
-
-```bash
-uv tool install --force git+https://github.com/seeseeczl/ASECLI.git
-asecli install-skill
-```
-
-### 配套安装 Agent Skill（后续正式版本）
-
-`v0.3.1` 起，正式 wheel 会同时携带 `asecli` Agent Skill；安装时使用下面的一条命令即可把 CLI 与 Skill 一并安装：
-
-```bash
-uv tool install --force git+https://github.com/seeseeczl/ASECLI.git && asecli install-skill
-```
-
-`install-skill` 会把随 wheel 校验并打包的 `asecli` Agent Skill 安装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）。其中包含正式的 ASE 节点图精排规范：左到右阶段列、重复分支模板、Comment 边界、连线通道与真实 ASE 画布验收边界。它是幂等的；若目标已有不同内容会拒绝覆盖，避免改写用户自定义 Skill。
-
-Python wheel 安装遵循无 post-install 副作用的规范，`uv tool install` 本身不会擅自写入 Codex 配置目录；上面的命令将两个受控安装步骤串成一次操作，不依赖隐藏的安装副作用。
-
-回滚到上一正式版：
-
-```bash
-gh release download v0.6.0 --repo seeseeczl/ASECLI
-uv tool install --force ./asecli-0.6.0-py3-none-any.whl
-```
-
-卸载：
-
-```bash
 uv tool uninstall asecli
 ```
 
-正式版本与校验资产见 [ASECLI v0.6.1](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.1)。`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)。`v0.6.1`、`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
 
-### 方式二：源码开发运行
+### 源码开发运行
 
 ```bash
 git clone https://github.com/seeseeczl/ASECLI.git
@@ -115,7 +72,7 @@ uv run --frozen asecli --help
 
 后续所有示例中的 `asecli` 都可替换为 `uv run --frozen asecli`，无需向全局环境安装任何内容。
 
-### 方式三：从源码安装为本机命令
+### 从源码安装为本机命令
 
 ```bash
 git clone https://github.com/seeseeczl/ASECLI.git
@@ -124,7 +81,7 @@ uv tool install .
 asecli --help
 ```
 
-### 方式四：安装受控的本地 wheel
+### 安装受控的本地 wheel
 
 适用于管理员通过其他受控渠道交付 wheel 的情况。只安装同时提供 `SHA256SUMS` 且校验通过的文件：
 
@@ -567,11 +524,11 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。项目禁止自动发布；每次 GitHub Release、PyPI、Hub 上传或对外分发均须获得单独书面授权。`v0.6.0` 按用户 2026-09-06 的明确授权发布为私有正式 Release，后续版本不会因此自动发布。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。普通 push 不会发版。推送 `vX.Y.Z` 版本 tag 后，`publish.yml` 通过 PyPI Trusted Publishing 上传 wheel/sdist；CLI Hub 仍不自动提交。
 
 ### 供应链、许可证与密钥
 
-- 当前许可证为 MIT；源码与 GitHub Release 公开。上传 PyPI、CLI Hub 或其他包仓仍须单独书面授权。
+- 当前许可证为 MIT；源码公开，正式安装入口为 PyPI 上的 `asecli`。CLI Hub 仍须单独书面授权。
 - 当前生产运行时依赖为 0；新增运行时依赖、改许可证或改分发方式均是单独 CR，必须完成许可证与漏洞评估。
 - `uv.lock` 固定开发依赖的来源、版本和 SHA-256；CI 中所有 GitHub Actions 必须固定为 40 位 commit SHA。
 - `tools/supply_chain_check.py` 会检查 lock、Action pin、常见高置信密钥模式与许可证；`tools/generate_sbom.py` 生成 artifact 清单。离线检查不等同于真实漏洞数据库或 Dependabot 状态。

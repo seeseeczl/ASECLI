@@ -171,6 +171,6 @@
 ### ADR-0019 以 MIT 许可证公开 GitHub 源码
 
 - 状态：已确认（2026-09-07，CR-0022）
-- 决策：将许可证从 `LicenseRef-ASECLI-Proprietary` 改为 MIT；GitHub 仓库 `seeseeczl/ASECLI` 转为 public。安装入口改为公开 `uv tool install git+https://github.com/seeseeczl/ASECLI.git`，并保留 GitHub Release wheel。
-- 非目标：本次不上传 PyPI 或 CLI-Anything Hub；不改 CLI 行为、版本号或既有私有 Release 的历史记录。
-- 回滚：恢复专有 LICENSE 与私有可见性属于单独授权，不自动执行。
+- 决策：将许可证从 `LicenseRef-ASECLI-Proprietary` 改为 MIT；GitHub 仓库 `seeseeczl/ASECLI` 转为 public。
+- 2026-09-07 修订（CR-0023）：PyPI 项目 `asecli` 成为用户默认安装入口；`uv tool install asecli` 为规范命令。GitHub Release 保留为校验与回滚资产。CLI-Anything Hub 仍按 ADR-0004 后置。
+- 回滚：恢复专有 LICENSE 与私有可见性属于单独授权，不自动执行。从 PyPI 撤回发行版同样需要单独授权。

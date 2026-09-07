@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tools.check_ci_governance import (
     NODE24_ACTION_REFS,
+    REQUIRED_CI_ACTIONS,
     _action_runtime_findings,
     _audit_supplement_findings,
     _loc_exemption_governance_findings,
@@ -149,9 +150,20 @@ def test_ci_actions_use_approved_node24_commits():
     root = Path(__file__).parents[1]
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
+    assert _action_runtime_findings(workflow, required_actions=REQUIRED_CI_ACTIONS) == []
+    for action in REQUIRED_CI_ACTIONS:
+        assert f"{action}@{NODE24_ACTION_REFS[action]}" in workflow
+
+
+def test_publish_workflow_pins_download_artifact():
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+
     assert _action_runtime_findings(workflow) == []
-    for action, sha in NODE24_ACTION_REFS.items():
-        assert f"{action}@{sha}" in workflow
+    assert (
+        f"actions/download-artifact@{NODE24_ACTION_REFS['actions/download-artifact']}"
+        in workflow
+    )
 
 
 def test_ci_action_runtime_gate_rejects_sha_regression():

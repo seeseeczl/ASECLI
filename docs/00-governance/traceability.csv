@@ -53,4 +53,5 @@ CR-0018,变更,已发布,ADR-0015 ADR-0017,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BR
 CR-0019,变更,已发布,ADR-0005,MOD-LAYOUT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0047 TASK-0048,REG-0050,2026-09-06 自动回归与真实图集中验收通过；v0.6.0@a54795d 经 run 34033313137 三项 job、六项正式资产摘要、本机安装和隔离回滚验证完成私有发布,REL-0010,long,脑图式 DAG 精排；缩放几何归一；休眠多 Pass Master 兼容；Comment 联动收框；asecli.graph-layout.v2；失败关闭
 CR-0020,变更,已发布,ADR-0005,MOD-LAYOUT MOD-SKILL,TASK-0049 TASK-0051,REG-0050,2026-09-07 v0.6.1@9cdc1ee 经 run 34045894959、正式资产和本机安装/回滚验证通过,REL-0011,long,Local Var 按去重消费组计数；两个及以上组必须注册；同组复用次数不限但仍须尽量零交叉
 CR-0021,变更,已发布（视觉待签收）,ADR-0018,MOD-LAYOUT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0050 TASK-0051,REG-0051,2026-09-07 定向 70 passed；全量 313 passed/3 skipped；真实 248 节点 V3 审计零硬失败；run 34045894959、正式资产和本机安装/回滚通过,REL-0011,long,递归局部鱼骨；真实端口水平；局部同层输出右对齐；Comment 保留与作用标题；显式 WireNode 路由事务；正常缩放视觉与新增/移动锚点实机待签收
-CR-0022,变更,进行中,ADR-0019,交付链,main,REG-0021,2026-09-07 用户明确授权 MIT 开源与公开 GitHub 仓库；不上传 PyPI/CLI Hub,,long,MIT 许可证；公开 GitHub 源码与 Release；uv tool install 从 git 安装
+CR-0022,变更,已发布,ADR-0019,交付链,8239df8,REG-0021,2026-09-07 MIT 开源与公开 GitHub 仓库完成,,long,MIT 许可证；公开 GitHub 源码与 Release
+CR-0023,变更,进行中,ADR-0019,交付链,main,REG-0021,2026-09-07 用户明确授权 PyPI 作为规范安装入口,,long,uv tool install asecli；Trusted Publishing；v0.6.2

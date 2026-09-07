@@ -75,3 +75,4 @@
 | 2026-09-07 | v0.6.1 发布准备 | 用户明确授权推送、私有发布和本机安装递归鱼骨布局补丁；保留 `v0.6.0` 不可变回滚点，不上传 PyPI/CLI Hub、不公开分发、不重复启动 Editor 或截图 | REL-0011 TASK-0051 CR-0020 CR-0021 REG-0051 |
 | 2026-09-07 | v0.6.1 正式发布与安装 | `v0.6.1@9cdc1ee` 经 GitHub Actions run 34045894959 三项 job 全绿后发布到私有 GitHub Release；五项载荷与 SHA256SUMS、六项资产与 GitHub digest 一致。本机正式 wheel 返回 `asecli 0.6.1`，新版 Skill 安装/幂等通过，隔离环境完成 `0.6.1 → 0.6.0 → 0.6.1` 回滚验证；未启动 Editor、未截图、未修改生产 Shader | REL-0011 TASK-0051 CR-0020 CR-0021 REG-0051 |
 | 2026-09-07 | 开源 | 用户明确要求将项目开源并提供同事安装命令；许可证改为 MIT，GitHub 仓库转为 public，README 安装入口改为公开 `uv tool install`；不上传 PyPI/CLI Hub，不改 CLI 行为或版本号 | CR-0022 ADR-0019 REG-0021 |
+| 2026-09-07 | 分发 | 用户要求做成最终、最常见安装形态；规范入口改为 PyPI `uv tool install asecli`，版本 `0.6.2`，版本 tag 经 Trusted Publishing 上传；不上 CLI Hub | CR-0023 ADR-0019 REG-0021 |
