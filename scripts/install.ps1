@@ -21,13 +21,18 @@ if ($env:ASECLI_REF) {
     $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name
 }
 if (-not $tag) {
-    $tag = "v0.6.2"
+    $tag = "v0.6.3"
 }
 
 $version = $tag.TrimStart("v")
 $wheel = "https://github.com/$repo/releases/download/$tag/asecli-$version-py3-none-any.whl"
 uv tool install --force $wheel
-& asecli install-skill
+$skillHelp = (& asecli install-skill --help 2>&1 | Out-String)
+if ($skillHelp -match "--agent") {
+    & asecli install-skill --agent all
+} else {
+    & asecli install-skill
+}
 if ($LASTEXITCODE -ne 0) {
     Write-Host "CLI is installed. Skill was skipped because a different copy already exists."
 }

@@ -118,10 +118,10 @@
             var targets = recipeInputTargets[destinationAlias];
             if (!targets.ContainsKey(destinationPortId) || targets[destinationPortId].Count == 0)
                 throw new System.Exception("recipe input port has no consumer");
-            foreach (System.Tuple<int, int> target in targets[destinationPortId])
+            foreach (System.Collections.Generic.KeyValuePair<int, int> target in targets[destinationPortId])
             {
-                graph.CreateConnection(target.Item1, target.Item2, sourceNodeId, sourceOutPort, false);
-                if (!graph.GetNode(target.Item1).GetInputPortByUniqueId(target.Item2).IsConnectedTo(sourceNodeId, sourceOutPort))
+                graph.CreateConnection(target.Key, target.Value, sourceNodeId, sourceOutPort, false);
+                if (!graph.GetNode(target.Key).GetInputPortByUniqueId(target.Value).IsConnectedTo(sourceNodeId, sourceOutPort))
                     throw new System.Exception("ASE rejected recipe input connection");
             }
         }

@@ -32,13 +32,17 @@ else
   TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1)
 fi
 if [ -z "$TAG" ]; then
-  TAG="v0.6.2"
+  TAG="v0.6.3"
 fi
 VERSION=${TAG#v}
 WHEEL="https://github.com/${REPO}/releases/download/${TAG}/asecli-${VERSION}-py3-none-any.whl"
 
 uv tool install --force "$WHEEL"
-asecli install-skill || echo "CLI is installed. Skill was skipped because a different copy already exists."
+if asecli install-skill --help 2>&1 | grep -q -- "--agent"; then
+    asecli install-skill --agent all || echo "CLI is installed. Skill was skipped because a different copy already exists."
+else
+    asecli install-skill || echo "CLI is installed. Skill was skipped because a different copy already exists."
+fi
 echo
 echo "Done. Try: asecli --help"
 echo "If the command is not found, open a new terminal."

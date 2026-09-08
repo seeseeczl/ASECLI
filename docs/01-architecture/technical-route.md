@@ -184,3 +184,11 @@
 - 安全与边界：未知 spec/primitive 版本、顶层未知操作、前向引用、非法 HLSL/C# 标记、模板/端口/类型不匹配均在 MCP 前失败关闭。SGCLI、Shader Graph 解析和映射表不进入 ASECLI；不支持整图黑盒、任意 C# 或未知 ASE 版本猜写。
 - 兼容与回滚：`create` 的文本默认和 v2 语义不变；禁用 v3 输入即可回退发布基线。尚未发布时可整体回退 CR-0024，不迁移或修改既有 Shader。
 - 运行证据：隔离团结 `2022.3.61t9` + ASE `1.9.6.2` 创建并由全新进程重载；`world_position`、`sphere_mask` 的 6 个原生节点、Half/Float 精度、默认值、范围和 Master 连接均回读一致，0 Shader/CS error、0 `ASECLI-Temp-*`。证据见 `docs/03-quality/evidence/REG-0053/README.md`。
+
+### ADR-0021 使用开放 Agent Skills 目录加 Claude 原生目录覆盖主流 Agent
+
+- 状态：已实现，自动与治理验证通过，尚未发布（2026-09-08，CR-0027）
+- 背景：CR-0015 的 Skill 内容本身是标准 Markdown，但安装命令和帮助只默认 Codex 路径，不能让 Claude Code、Cursor、Gemini CLI 与 GitHub Copilot 用户直接选择其原生用户级或项目级目录。
+- 决策：新增 `--agent agents|codex|claude|cursor|gemini|copilot|all`、`--scope user|project` 和 `--project-root`。`.agents/skills` 是 Codex、Cursor、Gemini CLI 与 GitHub Copilot 共同识别的开放目录；Claude Code 另用 `.claude/skills`。因此 `all` 只安装这两个根，避免向每个兼容别名重复复制同名 Skill。单一 Agent 仍可选择其原生目录。
+- 兼容与安全：无参数继续解析 `$CODEX_HOME/skills` 或 `~/.codex/skills`，`--skill-root` 保持显式覆盖。所有目标沿用完整树 digest、幂等、符号链接保护与不同内容拒绝覆盖；`all` 在创建任一目标前预检全部已有 Skill 内容冲突。
+- 边界：Skill 只约定 shell 与单行 JSON，不假设 Agent 专属工具、权限或消息格式。Editor、目标工程和视觉验收能力仍由实际运行环境决定；本 CR 不发布版本、不修改 Shader、不启动 Editor。

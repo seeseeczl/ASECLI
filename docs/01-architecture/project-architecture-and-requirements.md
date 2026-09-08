@@ -2,10 +2,10 @@
 id: ARCH-REQ-0001
 type: project-architecture-and-requirements
 status: 已确认
-version: 1.9.0
+version: 1.10.0
 created_at: 2026-08-31T23:25:00+08:00
 owner: long
-related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, CR-0013, BUG-0015, BUG-0017, BUG-0018, FR-0009, FR-0010, FR-0011, AUD-20260901]
+related: [PRJ-ASECLI, CR-0002, CR-0003, CR-0004, CR-0005, CR-0007, CR-0008, CR-0010, CR-0011, CR-0012, CR-0013, CR-0027, BUG-0015, BUG-0017, BUG-0018, FR-0009, FR-0010, FR-0011, AUD-20260901]
 supersedes: 无（首次启动）
 evidence: [ASE 源码分析; MCP for Unity 桥接实验; 2026-09-01 标准审计与整改]
 kickoff_completion: complete
@@ -18,7 +18,7 @@ kickoff_completion: complete
 | 项目启动问卷项 | 答案 | 状态（已确认/假设/未决/风险） |
 | --- | --- | --- |
 | 项目目标 | 让 AI Agent 通过自然语言创建/修改 ASE Shader 文件并触发编译 | 已确认 |
-| 目标用户与角色 | 用户本人（long）：Unity/团结引擎开发者；直接使用者是 AI Agent（Codex/Claude Code/Codely） | 已确认 |
+| 目标用户与角色 | 用户本人（long）：Unity/团结引擎开发者；直接使用者是支持 Agent Skills 的主流编码 Agent（Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 等） | 已确认 |
 | 首个场景 / MVP | 用户说"给这个 shader 加一个可调描边"，Agent 完成设计节点图、连线、写文件、校验、触发编译 | 已确认 |
 | 产品形态 | 本地 Python CLI（`asecli`）+ Agent 技能文档 + MCP for Unity 桥接；无 UI | 已确认 |
 | 数据与集成 | 读写用户指定 .shader/.asset；默认仅调用 loopback MCP；远程需显式授权；token 仅从环境注入 | 已确认 |

@@ -43,8 +43,34 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 
 ```bash
 uv tool install asecli
-asecli install-skill
+asecli install-skill --agent all
 ```
+
+`--agent all` 使用最少的非重复目录覆盖当前主流 Agent：
+
+- `~/.agents/skills/asecli`：Codex、Cursor、Gemini CLI、GitHub Copilot。
+- `~/.claude/skills/asecli`：Claude Code。
+
+Skill 使用通用 `SKILL.md`、相对引用和 CLI 子进程，不依赖某一家 Agent 的专属工具 API。需要把 Skill 随仓库共享时，使用：
+
+```bash
+asecli install-skill --agent all --scope project --project-root /path/to/project
+```
+
+项目级安装会写入 `<project>/.agents/skills/asecli` 与 `<project>/.claude/skills/asecli`。也可只安装一个原生目标：
+
+| `--agent` | 用户级目录 | 项目级目录 |
+| --- | --- | --- |
+| `agents` | `~/.agents/skills` | `.agents/skills` |
+| `codex` | `~/.agents/skills` | `.agents/skills` |
+| `claude` | `~/.claude/skills` | `.claude/skills` |
+| `cursor` | `~/.cursor/skills` | `.cursor/skills` |
+| `gemini` | `~/.gemini/skills` | `.gemini/skills` |
+| `copilot` | `~/.copilot/skills` | `.github/skills` |
+
+不带新参数的 `asecli install-skill` 继续安装到原有 Codex 用户目录，保证旧脚本兼容；`--skill-root DIR` 仍可精确指定任意 Skill 根目录。所有目标都保持同内容幂等、不同内容拒绝覆盖；`--agent all` 会先检查全部目标，发现内容冲突时不会先写入其他目录。
+
+目录矩阵依据各产品当前公开文档：[Codex](https://developers.openai.com/codex/skills)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code/skills)、[Cursor](https://cursor.com/docs/context/skills)、[Gemini CLI](https://geminicli.com/docs/cli/skills/) 与 [GitHub Copilot](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills)。
 
 也可使用 GitHub Release 一键脚本同时安装 uv、CLI 与 Agent Skill。macOS / Linux：
 
@@ -58,14 +84,14 @@ Windows PowerShell 一条命令：
 irm https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/install.ps1 | iex
 ```
 
-脚本会安装 uv、当前 GitHub Release 的 `asecli`，以及 Agent Skill。Skill 装到 `$CODEX_HOME/skills/asecli`（未设置时为 `~/.codex/skills/asecli`）；同内容幂等，已有不同内容时跳过覆盖。
+脚本会安装 uv、当前 GitHub Release 的 `asecli`，以及该版本支持的 Agent Skill。支持 `--agent` 的版本会采用上面的主流 Agent 通用安装；旧 Release 仍回退到原有 Codex 目录。同内容幂等，已有不同内容时跳过覆盖。
 
 升级与卸载：
 
 ```bash
 # PyPI 安装的升级
 uv tool upgrade asecli
-asecli install-skill
+asecli install-skill --agent all
 
 # GitHub Release 一键安装的升级
 curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/install.sh | sh
@@ -74,7 +100,9 @@ curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/insta
 uv tool uninstall asecli
 ```
 
-当前正式版本为 [`asecli 0.6.2`](https://pypi.org/project/asecli/0.6.2/)，并同步保留 [`v0.6.2` GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.2)。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)；`v0.6.1`、`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 保留为回滚点。
+本次发布版本为 `0.6.3`（跨 Agent Skill 安装与 MCP 方法体编译兼容修复）；发布完成后可从 [PyPI](https://pypi.org/project/asecli/0.6.3/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.3) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.6.2` 保留为回滚点。
+
+已知限制：真实 MCP 下，属性+纹理 v2 和 Reciprocal 降级 v2 的 create、manifest、validate、独立 recompile 已通过；SGCLI SphereMask v3 spec 在重载时仍可能返回 `node missing after reload: Radius` 并回滚。本次不承诺该 recipe 端到端可用，也不改变 SGCLI v2 默认值契约。
 
 ### 源码开发运行
 
@@ -194,7 +222,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `layout <file> [--mode legacy\|meticulous] [--audit] [--write]` | `legacy` 保留原分层布局；`meticulous` 以 Output 为根递归展开上游子树，按输入端口顺序居中分布，并联动收紧 Comment。 | 默认仍为 `legacy` 且只预演。`meticulous` 单次连接 Editor 获取真实节点、标题栏和端口几何；硬门禁失败或几何缺失时不写盘。 |
 | `gui-support <project> [--runtime-probe] [--handoff-native] [--write]` | 优先检测并选用原生 MZGUI；原生环境只安装 authoring/条件置灰扩展，缺失时安装 fallback；原生后来加入时可恢复交接。 | 不创建第二个原生 provider；V2 枚举全部 provider；handoff 默认预演，只处理已知哈希并保留 authoring-only bridge，复验失败可恢复。 |
 | `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；设置或清除 Foldout、Tooltip、用户 HelpBox 和由另一数值属性控制的置灰条件。 | 条件写为 `EnableIfMzgui(source,operator,value)`；不满足时只禁用控件，不清空材质值。`--clear-enabled-if` 可清除。 |
-| `install-skill [--skill-root DIR]` | 安装 wheel 内置的 ASECLI Agent Skill。 | 相同内容幂等；目标已有不同内容时拒绝覆盖，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
+| `install-skill [--agent A] [--scope user\|project] [--project-root DIR] [--skill-root DIR]` | 将 wheel 内置的通用 ASECLI Agent Skill 安装到开放 `.agents` 目录或 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 原生目录。 | 无参数保持旧 Codex 目录；`all` 以两个非重复目标覆盖五类 Agent；相同内容幂等，任一冲突先整体拒绝，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
 | `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
 | `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
 | `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2/v3` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。v3 另支持版本化 primitive/recipe 与属性精度、默认值和范围。 |

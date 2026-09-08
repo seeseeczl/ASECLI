@@ -1,6 +1,6 @@
 [project]
 name = "asecli"
-version = "0.6.2"
+version = "0.6.3"
 description = "Agent-native CLI for reading, modifying, validating and compiling Amplify Shader Editor assets"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -53,6 +53,7 @@ exclude = [
   "/docs/03-quality/evidence",
   "/docs/04-delivery/releases",
   "/docs/05-audits",
+  "/e2e-results",
 ]
 
 [tool.pytest.ini_options]

@@ -81,7 +81,7 @@
                 idToNode[pid] = pn;
                 idToClass[pid] = resolved.Name;
             }
-            var targets = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<System.Tuple<int, int>>>();
+            var targets = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, int>>>();
             foreach (Newtonsoft.Json.Linq.JObject primitiveSpec in primitiveSpecs)
             {
                 string pid = (string)primitiveSpec["id"];
@@ -95,8 +95,8 @@
                     {
                         int inputPort = inputIndexByName[argRef];
                         if (!targets.ContainsKey(inputPort))
-                            targets[inputPort] = new System.Collections.Generic.List<System.Tuple<int, int>>();
-                        targets[inputPort].Add(System.Tuple.Create(pn.UniqueId, argIndex));
+                            targets[inputPort] = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, int>>();
+                        targets[inputPort].Add(new System.Collections.Generic.KeyValuePair<int, int>(pn.UniqueId, argIndex));
                         continue;
                     }
                     int sourceNodeId = idToNode[argRef].UniqueId;

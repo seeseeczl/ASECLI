@@ -10,7 +10,7 @@
 
 ## 一句话使命
 
-让 AI Agent（Codex / Claude Code / Codely）通过自然语言驱动，可靠地解析、修改、校验、编译与创建 ASE Shader 文件；用户只提需求与验收效果。
+让支持 Agent Skills 的主流编码 Agent（Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 等）通过自然语言驱动，可靠地解析、修改、校验、编译与创建 ASE Shader 文件；用户只提需求与验收效果。
 
 ## 边界
 

@@ -144,9 +144,9 @@
             var targets = recipeInputTargets[destinationAlias];
             if (!targets.ContainsKey(destinationPortId) || targets[destinationPortId].Count == 0)
                 throw new System.Exception("recipe input port has no consumer after reload");
-            foreach (System.Tuple<int, int> target in targets[destinationPortId])
+            foreach (System.Collections.Generic.KeyValuePair<int, int> target in targets[destinationPortId])
             {
-                if (!graph.GetNode(target.Item1).GetInputPortByUniqueId(target.Item2).IsConnectedTo(sourceNodeId, sourceOutPort))
+                if (!graph.GetNode(target.Key).GetInputPortByUniqueId(target.Value).IsConnectedTo(sourceNodeId, sourceOutPort))
                     throw new System.Exception("recipe input connection missing after reload");
             }
         }

@@ -24,7 +24,7 @@ from .create_command import cmd_create
 from .custom_gui_command import cmd_custom_gui
 from .gui_support_command import cmd_gui_support
 from .commentary_command import cmd_comment_group
-from .skill_command import cmd_install_skill
+from .skill_command import AGENT_CHOICES, SCOPE_CHOICES, cmd_install_skill
 from .usage_command import cmd_graph_audit, cmd_remove_node
 from .layout_command import cmd_layout
 
@@ -159,11 +159,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--write", action="store_true", help="install the fallback into Assets/Editor only when MZGUI is absent")
     s.set_defaults(func=cmd_gui_support)
 
-    s = sub.add_parser("install-skill", help="install the bundled ASECLI Agent Skill for Codex")
-    s.add_argument(
-        "--skill-root",
-        help="Codex skills directory; defaults to $CODEX_HOME/skills or ~/.codex/skills",
+    s = sub.add_parser("install-skill", help="install the bundled ASECLI Skill for supported coding agents")
+    destination = s.add_mutually_exclusive_group()
+    destination.add_argument("--skill-root", help="explicit skills directory; preserves the legacy Codex default")
+    destination.add_argument(
+        "--agent", choices=AGENT_CHOICES,
+        help="target agent; 'agents' uses the open .agents/skills location and 'all' covers all supported agents"
     )
+    s.add_argument("--scope", choices=SCOPE_CHOICES, help="install for the current user or a project; defaults to user")
+    s.add_argument("--project-root", help="project directory used with --scope project; defaults to the current directory")
     s.set_defaults(func=cmd_install_skill)
 
     s = sub.add_parser("comment-group", help="inspect or create native ASE Comment frames")

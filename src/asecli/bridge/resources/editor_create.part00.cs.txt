@@ -138,10 +138,10 @@ try
         int b = value.IndexOf(')');
         if (a < 0 || b < 0 || b <= a) return new float[0];
         string[] parts = value.Substring(a + 1, b - a - 1).Split(',');
-        float[] result = new float[parts.Length];
+        float[] values = new float[parts.Length];
         for (int i = 0; i < parts.Length; i++)
-            result[i] = float.Parse(parts[i].Trim(), System.Globalization.CultureInfo.InvariantCulture);
-        return result;
+            values[i] = float.Parse(parts[i].Trim(), System.Globalization.CultureInfo.InvariantCulture);
+        return values;
     };
     System.Action<AmplifyShaderEditor.ParentNode, string> writeConst = delegate (AmplifyShaderEditor.ParentNode node, string value) {
         if (node is AmplifyShaderEditor.RangedFloatNode)
@@ -171,6 +171,6 @@ try
     var recipePrimitiveIds = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, int>>();
     var recipePrimitiveClasses = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>>();
     var recipeOutputIds = new System.Collections.Generic.Dictionary<string, int>();
-    var recipeInputTargets = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<System.Tuple<int, int>>>>();
+    var recipeInputTargets = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, int>>>>();
     int masterId = graph.CurrentMasterNode.UniqueId;
     foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)

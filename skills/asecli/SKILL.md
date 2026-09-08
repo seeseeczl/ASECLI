@@ -7,6 +7,17 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 
 当任务涉及节点图新建、转换、整理或验收时，先读取本文引用的“ASE 节点图精排规范”；它是 ASECLI 交付物的一部分，不是临时 Agent 记忆。离线结构检查和真实 ASE 画布视觉验收必须分开报告。
 
+## Agent 兼容性
+
+本 Skill 遵循通用 Agent Skills 目录结构：标准 YAML frontmatter、`SKILL.md` 正文和相对路径引用。它只要求 Agent 能运行本地 shell 命令并读取 ASECLI 的单行 JSON，不依赖 Codex、Claude Code、Cursor、Gemini CLI 或 GitHub Copilot 的专属工具名、权限模型或消息格式。
+
+- Codex、Cursor、Gemini CLI 与 GitHub Copilot 可从 `.agents/skills` / `~/.agents/skills` 发现本 Skill。
+- Claude Code 使用 `.claude/skills` / `~/.claude/skills`。
+- 安装到所有主流 Agent：`asecli install-skill --agent all`。
+- 随仓库共享：`asecli install-skill --agent all --scope project --project-root <项目目录>`。
+
+执行下文命令时，使用当前 Agent 自带的 shell/terminal 能力即可；不要假定存在某一家 Agent 的专属调用 API。若当前运行环境不允许写文件、连接 Editor 或访问目标工程，应明确报告该层未执行，不得把静态检查冒充实际写入或 Editor 验收。
+
 ## 核心事实（必读）
 
 1. ASE 节点图以纯文本嵌在 `.shader` 文件的 `/*ASEBEGIN ... ASEEND*/` 块中，行式格式。

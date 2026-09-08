@@ -13,15 +13,17 @@ def test_posix_installer_is_valid_shell_and_installs_the_release_wheel():
     text = script.read_text(encoding="utf-8")
     assert "uv tool install --force" in text
     assert "asecli install-skill" in text
+    assert "asecli install-skill --agent all" in text
     assert "py3-none-any.whl" in text
     assert "astral.sh/uv/install.sh" in text
-    assert 'TAG="v0.6.2"' in text
+    assert 'TAG="v0.6.3"' in text
 
 
 def test_windows_installer_installs_the_same_release_wheel():
     text = (ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8")
     assert "uv tool install --force" in text
     assert "asecli install-skill" in text
+    assert "asecli install-skill --agent all" in text
     assert "py3-none-any.whl" in text
     assert "astral.sh/uv/install.ps1" in text
-    assert '$tag = "v0.6.2"' in text
+    assert '$tag = "v0.6.3"' in text

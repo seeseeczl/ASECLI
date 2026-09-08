@@ -99,6 +99,8 @@ kickoff_completion: complete
 | TASK-0056 | AUD-MOD-002 | layout CLI 只依赖 core 公共契约 | 2026-09-08 fitness 4 个私有导入 | core facade；layout_command；契约测试 | 改布局算法或 CLI JSON | TASK-0055/long/2026-09-08 | REG-0055；59 个布局/契约测试；fitness strict | 输出或布局结果变化时回滚 facade | fitness 0 error；59 passed | 已完成 |
 | TASK-0057 | AUD-SIZE-002 | 阻止 C# 预警片段增长并拆分 Editor 资源族 | TASK-0054；确定性资源拼装 | project-architect config；LOC checker；Editor 资源分片；治理测试 | 改单 payload/nonce/rollback；新增永久例外 | TASK-0056/long/2026-09-08 | REG-0056；LOC 负例、拼装 SHA、bridge pytest、隔离 Editor E2E | 拼装字节或真实事务行为变化时回滚分片 | Editor 资源 5 段均低于 250；MaterialGUI 300/290 冻结基线 | 已完成（Editor 实机随 REG-0053） |
 | TASK-0058 | CR-0023 CR-0024 CR-0025 CR-0026 | 发布并安装公开版本 `v0.6.2` | 用户明确要求推送、发布新版本并安装本机，先收敛为 GitHub Release，取得 PyPI 账号后授权继续配置；TASK-0053 TASK-0054 TASK-0057 | `main`、REL-0012、GitHub/PyPI 正式资产、本机 CLI/Skill | CLI Hub；修改生产 Shader；覆盖不同内容 Skill；绕过失败门禁；保存 API Token | TASK-0057/long/2026-09-08 | REG-0057；双 Python全量、完整治理、双构建、远端 verify/package/OIDC publish、双渠道匿名摘要、官方 PyPI 隔离安装、本机安装与 `v0.6.1` 回滚恢复 | 冲突、门禁、OIDC、摘要、匿名回读、安装或回滚任一失败即停止 | `v0.6.2@7f98356`；run 34192454152 attempt 3 全成功；GitHub 五项资产与 PyPI wheel/sdist 摘要一致；本机 CLI/Skill、PyPI `uvx` 与隔离回滚恢复通过；REL-0012 | 已发布 |
+| TASK-0059 | CR-0027 | 将 ASECLI Skill 与安装入口扩展为 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 通用 | 用户要求改成主流 Agent 通用；CR-0015 安全安装基线 | `skill_command.py`、CLI 参数、Skill/README、一键安装脚本、测试与治理追溯 | 覆盖不同内容 Skill；删除旧 Codex 默认；修改 Shader/Editor；推送、tag 或发布 | TASK-0058/long/2026-09-08 | REG-0058；目标矩阵、旧行为、幂等/冲突预检、wheel、Skill validator、完整治理 | 路径未经官方支持、旧调用破坏、冲突后部分内容写入或 Skill 校验失败即回滚 | 定向 46 passed；Skill validator、Project Architect strict、隔离 wheel 安装通过；BUG-0023 已解除编译与 SHA 阻塞，全量 358 passed/3 skipped | 已完成（发布见 TASK-0060/REL-0013） |
+| TASK-0060 | CR-0027 BUG-0023 | 发布 v0.6.3 主流 Agent Skill 与 MCP 编译补丁 | 用户推送发布授权、真实 MCP 证据 | 版本/安装脚本、CLI/Skill、C# 分片、测试、REL-0013 | 修改 SGCLI、覆盖用户 Skill、移动旧 tag | TASK-0059/long/2026-09-08 | REG-0058 REG-0059；双 Python 全量、治理、双构建、远端 CI、双渠道摘要和安装回滚 | CI、摘要或安装失败停止 | 两类真实 v2 create/recompile 已验证；SphereMask 已知限制；远端验证随发布进行 | 进行中 |
 
 ## 验证、风险与回滚
 
@@ -110,6 +112,6 @@ kickoff_completion: complete
 ## 启动完成确认
 
 - [x] 上游架构文档已确认且本计划仅从其派生
-- [x] 58 张原子任务卡全部可执行；本次新增 CR/BUG/REG 双向链接完整
+- [x] 60 张原子任务卡全部可执行；本次新增 CR/BUG/REG 双向链接完整
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立
