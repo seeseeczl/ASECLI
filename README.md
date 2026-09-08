@@ -56,12 +56,14 @@ irm https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/install.ps1 
 升级与卸载：
 
 ```bash
-uv tool upgrade asecli
-asecli install-skill
+# 升级：重新运行一键安装，自动解析最新 GitHub Release
+curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/install.sh | sh
+
+# 卸载
 uv tool uninstall asecli
 ```
 
-历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)。`v0.6.1`、`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 仍保留为不可变回滚点。
+当前正式版本为 [`v0.6.2`](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.2)。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)；`v0.6.1`、`v0.6.0`、`v0.5.0`、`v0.4.2`、`v0.4.1`、`v0.4.0`、`v0.3.1`、`v0.3.0`、`v0.2.0` 与 `v0.1.0` 保留为回滚点。
 
 ### 源码开发运行
 
@@ -527,11 +529,11 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。普通 push 不会发版。当前一键安装脚本使用最新 GitHub Release；PyPI Trusted Publishing 仍处于 CR-0023 的发布准备阶段，在完整 tag 门禁和首次公开发布验证完成前不作为当前可用入口。CLI Hub 仍不自动提交。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。普通 push 不会发版。当前一键安装脚本使用最新 GitHub Release；PyPI 因尚无发布账号而延后，默认关闭对应 job，也不作为当前安装入口。CLI Hub 仍不自动提交。
 
 ### 供应链、许可证与密钥
 
-- 当前许可证为 MIT；源码公开，当前正式安装入口是上文的一键脚本及其使用的 GitHub Release wheel。PyPI 项目 `asecli` 是 CR-0023 已批准但尚未发布的目标入口；CLI Hub 仍须单独书面授权。
+- 当前许可证为 MIT；源码公开，正式安装入口是上文的一键脚本及其使用的 GitHub Release wheel。PyPI 与 CLI Hub 均不是当前分发入口，后续启用需要新的明确授权与对应账号配置。
 - 当前生产运行时依赖为 0；新增运行时依赖、改许可证或改分发方式均是单独 CR，必须完成许可证与漏洞评估。
 - `uv.lock` 固定开发依赖的来源、版本和 SHA-256；CI 中所有 GitHub Actions 必须固定为 40 位 commit SHA。
 - `tools/supply_chain_check.py` 会检查 lock、Action pin、常见高置信密钥模式与许可证；`tools/generate_sbom.py` 生成 artifact 清单。离线检查不等同于真实漏洞数据库或 Dependabot 状态。

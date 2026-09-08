@@ -32,7 +32,7 @@ else
   TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1)
 fi
 if [ -z "$TAG" ]; then
-  TAG="v0.6.1"
+  TAG="v0.6.2"
 fi
 VERSION=${TAG#v}
 WHEEL="https://github.com/${REPO}/releases/download/${TAG}/asecli-${VERSION}-py3-none-any.whl"

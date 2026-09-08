@@ -91,6 +91,7 @@ jobs:
 
   publish:
     needs: package
+    if: ${{ vars.ASECLI_PYPI_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: pypi

@@ -185,6 +185,7 @@ def main() -> int:
         "tools/check_regression_catalog.py", "tools/check_ci_governance.py",
         "tools/compare_build_artifacts.py", "tools/generate_sbom.py",
         "tools/supply_chain_check.py", "shasum -a 256 -c SHA256SUMS",
+        "vars.ASECLI_PYPI_ENABLED == 'true'",
         "uv publish dist/*.whl dist/*.tar.gz",
     )
     for marker in release_markers:

@@ -104,6 +104,7 @@ def test_publish_workflow_keeps_all_gates_before_oidc_publish():
         "tools/generate_sbom.py",
         "tools/supply_chain_check.py",
         "shasum -a 256 -c SHA256SUMS",
+        "vars.ASECLI_PYPI_ENABLED == 'true'",
         "uv publish dist/*.whl dist/*.tar.gz",
     )
     for marker in required:

@@ -172,12 +172,12 @@
 
 - 状态：已确认（2026-09-07，CR-0022）
 - 决策：将许可证从 `LicenseRef-ASECLI-Proprietary` 改为 MIT；GitHub 仓库 `seeseeczl/ASECLI` 转为 public。
-- 2026-09-07 修订（CR-0023，进行中）：目标是在首次受控发布并完成匿名安装回读后，让 PyPI 项目 `asecli` 成为默认入口，`uv tool install asecli` 成为规范命令。完成前继续由 GitHub Release 一键脚本承担当前安装，GitHub Release 后续仍作为校验与回滚资产。CLI-Anything Hub 仍按 ADR-0004 后置。
-- 回滚：恢复专有 LICENSE 与私有可见性属于单独授权，不自动执行。从 PyPI 撤回发行版同样需要单独授权。
+- 2026-09-08 修订（CR-0025，已发布）：当前规范入口为公开 GitHub Release wheel，由仓库一键安装脚本解析 Latest；PyPI 因没有发布账号而延后，只有配置匹配的 Trusted Publisher 并再次明确授权后才启用。CLI-Anything Hub 仍按 ADR-0004 后置。
+- 回滚：恢复专有 LICENSE 与私有可见性属于单独授权，不自动执行。GitHub Release 回滚通过选择保留的历史版本 wheel 完成，不移动既有 tag。
 
 ### ADR-0020 EditorGraphSpec v3 使用版本化算法 primitive 闭包
 
-- 状态：已验证、未发布；自动回归与真实 Editor 双进程后验通过（2026-09-08，CR-0024）
+- 状态：已发布；自动回归、真实 Editor 双进程后验和 `v0.6.2` GitHub Release 安装/回滚通过（2026-09-08，CR-0024）
 - 背景：SGCLI 只把 ASECLI 当作受控写手，需要平移属性精度、默认值和范围，并将算法节点映射为真实可编辑 ASE 节点；v2 只能表达少量普通节点和 Custom Expression。
 - 决策：保留 v1/v2 兼容，v3 必填 `primitives_version: 1`。顶层 `primitive` 必须来自绑定 ASE 1.9.6.2 的闭包；`recipe` 按拓扑顺序声明多个 primitive，闭包完整时由真实 ASE API 展开，存在未知操作时才降级为单个、逐节点范围的 Custom Expression。Property 支持已验证的 `precision/default/min/max`，保存重载后的 manifest 从真实节点回读，不回抄 spec。
 - 安全与边界：未知 spec/primitive 版本、顶层未知操作、前向引用、非法 HLSL/C# 标记、模板/端口/类型不匹配均在 MCP 前失败关闭。SGCLI、Shader Graph 解析和映射表不进入 ASECLI；不支持整图黑盒、任意 C# 或未知 ASE 版本猜写。
