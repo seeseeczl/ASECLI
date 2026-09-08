@@ -49,6 +49,9 @@ from .local_vars import (
     parse_register_local_var,
 )
 from .wire_router import WIRE_NODE_TYPE, logical_wire_manifest
+from .graph_review import computation_wires, graph_baseline, compare_graph_baselines
+from .reuse_plan import plan_local_var_reuse
+from .island_layout import pack_calculation_islands
 from .material_gui_spec import apply_material_gui_spec, material_property_nodes, resolve_property_node
 from .material_gui_condition import (
     ENABLE_IF_ATTRIBUTE,
@@ -81,4 +84,6 @@ __all__ = [
     "GET_LOCAL_VAR_TYPE", "REGISTER_LOCAL_VAR_TYPE", "local_var_edges",
     "parse_get_local_var", "parse_register_local_var",
     "WIRE_NODE_TYPE", "logical_wire_manifest",
+    "computation_wires", "graph_baseline", "compare_graph_baselines",
+    "plan_local_var_reuse", "pack_calculation_islands",
 ]

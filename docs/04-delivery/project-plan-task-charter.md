@@ -101,6 +101,9 @@ kickoff_completion: complete
 | TASK-0058 | CR-0023 CR-0024 CR-0025 CR-0026 | 发布并安装公开版本 `v0.6.2` | 用户明确要求推送、发布新版本并安装本机，先收敛为 GitHub Release，取得 PyPI 账号后授权继续配置；TASK-0053 TASK-0054 TASK-0057 | `main`、REL-0012、GitHub/PyPI 正式资产、本机 CLI/Skill | CLI Hub；修改生产 Shader；覆盖不同内容 Skill；绕过失败门禁；保存 API Token | TASK-0057/long/2026-09-08 | REG-0057；双 Python全量、完整治理、双构建、远端 verify/package/OIDC publish、双渠道匿名摘要、官方 PyPI 隔离安装、本机安装与 `v0.6.1` 回滚恢复 | 冲突、门禁、OIDC、摘要、匿名回读、安装或回滚任一失败即停止 | `v0.6.2@7f98356`；run 34192454152 attempt 3 全成功；GitHub 五项资产与 PyPI wheel/sdist 摘要一致；本机 CLI/Skill、PyPI `uvx` 与隔离回滚恢复通过；REL-0012 | 已发布 |
 | TASK-0059 | CR-0027 | 将 ASECLI Skill 与安装入口扩展为 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 通用 | 用户要求改成主流 Agent 通用；CR-0015 安全安装基线 | `skill_command.py`、CLI 参数、Skill/README、一键安装脚本、测试与治理追溯 | 覆盖不同内容 Skill；删除旧 Codex 默认；修改 Shader/Editor；推送、tag 或发布 | TASK-0058/long/2026-09-08 | REG-0058；目标矩阵、旧行为、幂等/冲突预检、wheel、Skill validator、完整治理 | 路径未经官方支持、旧调用破坏、冲突后部分内容写入或 Skill 校验失败即回滚 | 定向 46 passed；Skill validator、Project Architect strict、隔离 wheel 安装通过；BUG-0023 已解除编译与 SHA 阻塞，全量 358 passed/3 skipped | 已完成（发布见 TASK-0060/REL-0013） |
 | TASK-0060 | CR-0027 BUG-0023 | 发布 v0.6.3 主流 Agent Skill 与 MCP 编译补丁 | 用户推送发布授权、真实 MCP 证据 | 版本/安装脚本、CLI/Skill、C# 分片、测试、REL-0013 | 修改 SGCLI、覆盖用户 Skill、移动旧 tag | TASK-0059/long/2026-09-08 | REG-0058 REG-0059；双 Python 全量、治理、双构建、远端 CI、双渠道摘要和安装回滚 | CI、摘要或安装失败停止 | v0.6.3@a758d0f；run 34205409407 全成功；双渠道摘要、正式安装/回滚通过；SphereMask 已知限制；REL-0013 | 已发布 |
+| TASK-0061 | CR-0028 | 核对转换图计算基线及端口级复用计划 | 用户缺口补齐授权 | graph_review.py/reuse_plan.py/core 公共导出/layout_audit.py 与相关测试 | SGCLI、生成 HLSL、猜写 Local Var | long/2026-09-08 | REG-0060；错误端口和常量变化必须失败，默认策略保持 | 折叠丢分量或误吞默认值即停止 | 定向 94 passed；自动环节已验证；只读，不宣称自动创建接口 | 自动验证完成，实机待验 |
+| TASK-0062 | CR-0028 | 独立计算岛刚性多列摆放 | TASK-0061；已有鱼骨与真实几何契约 | island_layout.py/meticulous_layout.py 与测试 | 拆改岛内连接、自动 WireNode 路由、虚构几何 | long/2026-09-08 | REG-0061；相对位置、依赖与二次幂等 | 几何缺失/布局硬失败时零写入 | 定向 94 passed；自动环节已验证；实机待验 | 自动验证完成，实机待验 |
+| TASK-0063 | CR-0028 | 将转换后交付流程接入 CLI 与 Skill | TASK-0061 TASK-0062；用户完整过程 | graph_review_command.py/main.py/layout_command.py；Skill/README/治理 | 发布、覆盖用户 Skill、改并行创建器、生产 Shader | long/2026-09-08 | REG-0060 REG-0061；CLI JSON/只读/失败码、Skill validator | 计划冒充创建或结构冒充视觉时停止 | 定向 94 passed；自动环节已验证；未接入自动 Local Var Editor 创建 | 自动验证完成，实机待验 |
 
 ## 验证、风险与回滚
 
@@ -112,6 +115,6 @@ kickoff_completion: complete
 ## 启动完成确认
 
 - [x] 上游架构文档已确认且本计划仅从其派生
-- [x] 60 张原子任务卡全部可执行；本次新增 CR/BUG/REG 双向链接完整
+- [x] 63 张原子任务卡已定义；本次新增 CR/REG 双向链接完整（实机项保持待验）
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立

@@ -172,15 +172,15 @@ def _remote_direct_wires(graph, plan) -> list[dict]:
         if types.get(item.wire.out_node) != GET_LOCAL_VAR_TYPE
         and types.get(item.wire.in_node) != REGISTER_LOCAL_VAR_TYPE
     ]
-    consumer_groups: dict[str, set[str]] = {}
+    consumer_groups: dict[tuple[str, str], set[str]] = {}
     for wire in direct_wires:
         owner = owners.get(wire.in_node)
         if owner is not None:
-            consumer_groups.setdefault(wire.out_node, set()).add(owner)
+            consumer_groups.setdefault((wire.out_node, wire.out_port), set()).add(owner)
 
     result = []
     for wire in direct_wires:
-        groups = consumer_groups.get(wire.out_node, set())
+        groups = consumer_groups.get((wire.out_node, wire.out_port), set())
         consumer_group = owners.get(wire.in_node)
         producer_group = owners.get(wire.out_node)
         if len(groups) < 2 or consumer_group is None:

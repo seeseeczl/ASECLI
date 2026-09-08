@@ -7,6 +7,8 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 
 当任务涉及节点图新建、转换、整理或验收时，先读取本文引用的“ASE 节点图精排规范”；它是 ASECLI 交付物的一部分，不是临时 Agent 记忆。离线结构检查和真实 ASE 画布视觉验收必须分开报告。
 
+从 SG JSON/EditorGraphSpec 创建或整理转换图时，还必须读取 [转换后图交付流程](references/conversion-workflow.md)。以当前 Shader 为基线，先 `graph-review` 锁定计算连接/常量，再处理复用、递归鱼骨与计算岛；不得把 JSON 初排或创建成功当作完成。`graph-review` 是只读计划与对照，不是自动 Local Var 创建器。用户明确指定按输出端口两次消费注册时，用 `--reuse-policy fanout` 覆盖本任务默认门槛，不修改其他任务的消费组策略。
+
 ## Agent 兼容性
 
 本 Skill 遵循通用 Agent Skills 目录结构：标准 YAML frontmatter、`SKILL.md` 正文和相对路径引用。它只要求 Agent 能运行本地 shell 命令并读取 ASECLI 的单行 JSON，不依赖 Codex、Claude Code、Cursor、Gemini CLI 或 GitHub Copilot 的专属工具名、权限模型或消息格式。

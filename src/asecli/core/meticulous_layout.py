@@ -9,6 +9,7 @@ from .commentary import inspect_comment_groups
 from .fishbone_placement import place_fishbone
 from .fishbone_topology import build_fishbone_topology
 from .layout import apply_positions
+from .island_layout import pack_calculation_islands
 from .layout_graph import id_key, node_rect
 from .model import AseGraph
 from .wire_router import WIRE_NODE_TYPE, plan_wire_routes
@@ -37,6 +38,7 @@ class MeticulousLayoutPlan:
     secondary_edges: tuple[tuple[str, str, str, str], ...]
     comment_snapshot: tuple[tuple[str, tuple[str, ...], str], ...]
     wire_route_changes: tuple[dict, ...] = ()
+    islands: tuple[dict, ...] = ()
 
 
 def meticulous_layout_positions(
@@ -44,9 +46,17 @@ def meticulous_layout_positions(
     geometry: Mapping[str, Geometry],
     *,
     route_wires: bool = False,
+    island_columns: int = 1,
 ) -> MeticulousLayoutPlan:
     topology = build_fishbone_topology(graph, geometry)
     positions, roots, stage_output_x = place_fishbone(graph, geometry, topology)
+    islands = []
+    if island_columns != 1:
+        positions, islands = pack_calculation_islands(graph, geometry, positions, columns=island_columns)
+        stage_output_x = {
+            child: positions[child][0] + geometry[child].output_ports[wire.out_port][0]
+            for (child, _), wire in topology.primary_wire.items()
+        }
     subtree_bounds = {}
     for node_id in sorted(topology.ids, key=id_key):
         members = _descendants(node_id, topology.children)
@@ -89,6 +99,7 @@ def meticulous_layout_positions(
         secondary_edges=secondary,
         comment_snapshot=comments,
         wire_route_changes=route_changes,
+        islands=tuple(islands),
     )
 
 

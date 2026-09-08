@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import os
 
@@ -25,8 +26,29 @@ from .commands import CliError, _commit_text, _load, _save
 from .io import restore_from_backup
 
 
+def configure_layout_parser(sub):
+    s = sub.add_parser("layout", help="auto-arrange nodes using legacy or meticulous DAG layout")
+    s.add_argument("file")
+    s.add_argument("--mode", choices=("legacy", "meticulous"), default="legacy")
+    s.add_argument("--audit", action="store_true", help="report meticulous layout quality without writing")
+    s.add_argument("--island-columns", type=int, choices=range(1, 9), default=1,
+                   help="pack physical calculation islands into columns after recursive fishbone layout")
+    s.add_argument("--route-wires", action="store_true",
+                   help="explicitly allow meticulous mode to move or add WireNode routing anchors")
+    s.add_argument("--gap-x", type=float, default=280.0)
+    s.add_argument("--gap-y", type=float, default=120.0)
+    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    s.add_argument("--unity-instance", help="target Name@hash when multiple Unity/Tuanjie instances are connected")
+    s.add_argument("--allow-remote-mcp", action="store_true")
+    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    s.add_argument("--write", action="store_true")
+    s.set_defaults(func=cmd_layout)
+
+
 def cmd_layout(args) -> dict:
     if args.mode == "legacy":
+        if getattr(args, "island_columns", 1) != 1:
+            raise CliError("USAGE_ERROR", "--island-columns requires --mode meticulous")
         if args.route_wires:
             raise CliError("USAGE_ERROR", "--route-wires requires --mode meticulous")
         if args.audit:
@@ -61,7 +83,10 @@ def _meticulous(args) -> dict:
             unity_instance=args.unity_instance,
             allow_remote_mcp=args.allow_remote_mcp,
         )
-        plan = meticulous_layout_positions(f.graph, geometry, route_wires=args.route_wires)
+        plan = meticulous_layout_positions(
+            f.graph, geometry, route_wires=args.route_wires,
+            island_columns=getattr(args, "island_columns", 1),
+        )
         moved = apply_meticulous_layout(f.graph, plan)
         # Audit/dry-run reports a proposed title without mutating the in-memory
         # graph.  Only an explicitly authorized write may persist the title.
@@ -155,6 +180,7 @@ def _meticulous(args) -> dict:
         "comment_changed_count": len(comment_changes),
         "comment_purpose": comment_purpose,
         "route_wires": bool(args.route_wires),
+        "islands": list(plan.islands),
         "wire_route_transaction": route_transaction,
         "audit_only": bool(args.audit),
         "audit": report,

@@ -16,7 +16,7 @@ def test_posix_installer_is_valid_shell_and_installs_the_release_wheel():
     assert "asecli install-skill --agent all" in text
     assert "py3-none-any.whl" in text
     assert "astral.sh/uv/install.sh" in text
-    assert 'TAG="v0.6.3"' in text
+    assert 'TAG="v0.6.4"' in text
 
 
 def test_windows_installer_installs_the_same_release_wheel():
@@ -26,4 +26,4 @@ def test_windows_installer_installs_the_same_release_wheel():
     assert "asecli install-skill --agent all" in text
     assert "py3-none-any.whl" in text
     assert "astral.sh/uv/install.ps1" in text
-    assert '$tag = "v0.6.3"' in text
+    assert '$tag = "v0.6.4"' in text

@@ -67,6 +67,20 @@ def test_repeated_direct_use_inside_one_group_is_allowed():
     assert report["remote_direct_wires"] == []
 
 
+def test_distinct_output_components_are_not_combined_as_one_shared_result():
+    shader = _graph(
+        [("1", "Producer"), ("2", "Consumer"), ("3", "Consumer"),
+         ("100", "AmplifyShaderEditor.TemplateMultiPassMasterNode")],
+        [("1", "0", "2", "0"), ("1", "1", "3", "0"),
+         ("2", "0", "100", "0"), ("3", "0", "100", "1")],
+    )
+    _set_positions(shader, {"2": "0,0", "3": "0,500"})
+    create_comment_group(shader.graph, ["2"], "颜色计算")
+    create_comment_group(shader.graph, ["3"], "透明度计算")
+    _, report = _audit(shader)
+    assert report["remote_direct_wires"] == []
+
+
 def test_two_consumer_groups_require_local_var_for_external_direct_wire():
     shader = _graph(
         [("1", "Producer"), ("2", "Consumer"), ("3", "Consumer"),

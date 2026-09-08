@@ -60,3 +60,4 @@ CR-0025,变更,已被 CR-0026 取代（GitHub 入口保持）,ADR-0019,MOD-CLI,T
 CR-0026,变更,已发布,ADR-0019,MOD-CLI,TASK-0058,REG-0021 REG-0052 REG-0057,2026-09-08 Publisher 从 Pending 自动转为 Active；run 34192454152 attempt 3 全成功；PyPI 双资产摘要和官方索引 `uvx` 版本/parse 通过,REL-0012,long,仓库变量启用 OIDC；不保存 API Token；PyPI 为规范包入口且 GitHub Release 保持有效
 CR-0027,变更,已发布,ADR-0021,MOD-CLI MOD-SKILL,TASK-0059 TASK-0060,REG-0058,2026-09-08 v0.6.3@a758d0f；run 34205409407；双 Python 358 passed/3 skipped；双渠道摘要与安装回滚通过,REL-0013,long,主流 Agent Skill；旧安装兼容
 BUG-0023,缺陷,已修复,ADR-0020,MOD-BRIDGE,TASK-0060,REG-0059,2026-09-08 两类真实 v2 CLI create/manifest/validate/recompile 通过；358 passed/3 skipped,REL-0013,long,方法体兼容 KeyValuePair；SphereMask Radius 重载仍为已知限制
+CR-0028,变更,自动验证完成实机待验,ADR-0021,MOD-CORE MOD-LAYOUT MOD-CLI MOD-SKILL,TASK-0061 TASK-0062 TASK-0063,REG-0060 REG-0061,端口级基线与复用计划及岛内刚性多列布局；未自动创建LocalVar；未做实机验收,REL-0014,long,保留并行创建器改动；不修改SGCLI

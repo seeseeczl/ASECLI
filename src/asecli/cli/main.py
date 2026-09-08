@@ -26,7 +26,8 @@ from .gui_support_command import cmd_gui_support
 from .commentary_command import cmd_comment_group
 from .skill_command import AGENT_CHOICES, SCOPE_CHOICES, cmd_install_skill
 from .usage_command import cmd_graph_audit, cmd_remove_node
-from .layout_command import cmd_layout
+from .layout_command import configure_layout_parser
+from .graph_review_command import cmd_graph_review
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -97,22 +98,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_fix_checksum)
 
-    s = sub.add_parser("layout", help="auto-arrange nodes using legacy or meticulous DAG layout")
+    s = sub.add_parser("graph-review", help="read-only computation baseline and Local Var reuse plan")
     s.add_argument("file")
-    s.add_argument("--mode", choices=("legacy", "meticulous"), default="legacy")
-    s.add_argument("--audit", action="store_true", help="report meticulous layout quality without writing")
-    s.add_argument(
-        "--route-wires", action="store_true",
-        help="explicitly allow meticulous mode to move or add WireNode routing anchors",
-    )
-    s.add_argument("--gap-x", type=float, default=280.0)
-    s.add_argument("--gap-y", type=float, default=120.0)
-    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument("--unity-instance", help="target Name@hash when multiple Unity/Tuanjie instances are connected")
-    s.add_argument("--allow-remote-mcp", action="store_true")
-    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
-    s.add_argument("--write", action="store_true")
-    s.set_defaults(func=cmd_layout)
+    s.add_argument("--baseline", help="original Shader backup for conservative semantic comparison")
+    s.add_argument("--reuse-policy", choices=("consumer-groups", "fanout"), default="consumer-groups")
+    s.set_defaults(func=cmd_graph_review)
+
+    configure_layout_parser(sub)
 
     s = sub.add_parser("custom-gui", help="inspect or edit CustomEditor and MZGUI-compatible property metadata")
     s.add_argument("file")

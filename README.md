@@ -106,6 +106,8 @@ uv tool uninstall asecli
 
 ### 源码开发运行
 
+工作区新增（尚未发布）：转换后的现有 Shader 可用 `asecli graph-review <file> --baseline <backup.shader>` 保守核对计算基线；`--reuse-policy fanout` 显式选择按输出端口两次消费注册的只读计划，默认仍按消费组。`layout --mode meticulous --island-columns 3` 在鱼骨后整体摆放物理独立计算岛。该流程不从旧 JSON 重建图，也不自动创建 Register/Get；详见 [转换后交付流程](skills/asecli/references/conversion-workflow.md)。
+
 ```bash
 git clone https://github.com/seeseeczl/ASECLI.git
 cd ASECLI
