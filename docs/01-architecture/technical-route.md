@@ -173,6 +173,7 @@
 - 状态：已确认（2026-09-07，CR-0022）
 - 决策：将许可证从 `LicenseRef-ASECLI-Proprietary` 改为 MIT；GitHub 仓库 `seeseeczl/ASECLI` 转为 public。
 - 2026-09-08 修订（CR-0025，已发布）：当前规范入口为公开 GitHub Release wheel，由仓库一键安装脚本解析 Latest；PyPI 因没有发布账号而延后，只有配置匹配的 Trusted Publisher 并再次明确授权后才启用。CLI-Anything Hub 仍按 ADR-0004 后置。
+- 2026-09-08 修订（CR-0026，已发布）：PyPI `asecli` 恢复为规范包安装入口；GitHub Release 与一键安装脚本继续保留。PyPI Publisher 只信任 `seeseeczl/ASECLI` 的 `publish.yml` 和 `pypi` environment，tag workflow 复用同一已校验 artifact，不使用 API Token。CLI-Anything Hub 仍按 ADR-0004 后置。
 - 回滚：恢复专有 LICENSE 与私有可见性属于单独授权，不自动执行。GitHub Release 回滚通过选择保留的历史版本 wheel 完成，不移动既有 tag。
 
 ### ADR-0020 EditorGraphSpec v3 使用版本化算法 primitive 闭包
