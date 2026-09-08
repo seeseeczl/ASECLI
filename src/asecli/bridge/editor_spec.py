@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
-from pathlib import Path
 from typing import Any
 
+from ._editor_primitives import ExpansionSpec, expansion_classes, primitive_class
 
 SUPPORTED_ASE_VERSIONS = frozenset({"1.9.6.2"})
 
@@ -49,6 +48,13 @@ class NodeSpec:
     code: str | None = None
     output_type: str | None = None
     inputs: tuple[InputSpec, ...] = ()
+    precision: str | None = None
+    default: Any | None = None
+    min: float | None = None
+    max: float | None = None
+    op: str | None = None
+    recipe: str | None = None
+    expansion: ExpansionSpec | None = None
 
     @property
     def ase_type(self) -> str:
@@ -56,6 +62,15 @@ class NodeSpec:
             return "SamplerNode"
         if self.kind == "custom_expression":
             return "CustomExpressionNode"
+        if self.kind == "primitive":
+            assert self.op is not None
+            cls = primitive_class(self.op)
+            assert cls is not None
+            return cls
+        if self.kind == "recipe":
+            # A recipe expands to multiple ASE nodes; the manifest records the
+            # authoritative expansion, not a single class name.
+            return "Recipe"
         assert self.type is not None
         return self.type
 
@@ -67,6 +82,13 @@ class NodeSpec:
         }
         if self.type is not None:
             result["type"] = self.type
+        if self.precision is not None:
+            result["precision"] = self.precision
+        if self.default is not None:
+            result["default"] = self.default
+        if self.min is not None:
+            result["min"] = self.min
+            result["max"] = self.max
         if self.property_name is not None:
             result.update(
                 property_name=self.property_name,
@@ -86,6 +108,16 @@ class NodeSpec:
                 output_type=self.output_type,
                 inputs=[item.to_dict() for item in self.inputs],
             )
+        if self.kind == "primitive":
+            result["op"] = self.op
+        if self.kind == "recipe":
+            result.update(
+                recipe=self.recipe,
+                code=self.code,
+                output_type=self.output_type,
+                inputs=[item.to_dict() for item in self.inputs],
+                expansion=self.expansion.to_dict(),
+            )
         return result
 
     def manifest_entry(self) -> dict:
@@ -96,6 +128,13 @@ class NodeSpec:
                 inspector_name=self.inspector_name,
                 parameter_type=self.parameter_type,
             )
+        if self.precision is not None:
+            result["precision"] = self.precision
+        if self.default is not None:
+            result["default"] = self.default
+        if self.min is not None:
+            result["min"] = self.min
+            result["max"] = self.max
         if self.kind == "custom_expression":
             result.update(
                 name=self.name,
@@ -103,7 +142,38 @@ class NodeSpec:
                 output_type=self.output_type,
                 inputs=[item.to_dict() for item in self.inputs],
             )
+        if self.kind == "primitive":
+            result["op"] = self.op
+        if self.kind == "recipe":
+            if self.expansion_is_native():
+                classes = expansion_classes(self.expansion.primitives)
+                assert classes is not None
+                result.update(
+                    recipe=self.recipe,
+                    output_type=self.output_type,
+                    expansion_nodes=[
+                        {"id": primitive.id, "type": cls}
+                        for primitive, cls in zip(self.expansion.primitives, classes)
+                    ],
+                )
+            else:
+                # Fallback: the executor emits a single CustomExpressionNode
+                # using the authoritative HLSL code.
+                result["type"] = "CustomExpressionNode"
+                result.update(
+                    name=self.recipe,
+                    code=self.code,
+                    output_type=self.output_type,
+                    inputs=[item.to_dict() for item in self.inputs],
+                )
         return result
+
+    def expansion_is_native(self) -> bool:
+        assert self.expansion is not None
+        if expansion_classes(self.expansion.primitives) is None:
+            return False
+        ids = {primitive.id for primitive in self.expansion.primitives}
+        return self.expansion.output in ids
 
 
 @dataclass(frozen=True)
@@ -130,6 +200,7 @@ class EditorGraphSpec:
     template: TemplateSpec
     nodes: tuple[NodeSpec, ...]
     connections: tuple[ConnectionSpec, ...]
+    primitives_version: int | None = None
 
     @classmethod
     def from_dict(cls, value: Any) -> "EditorGraphSpec":
@@ -138,12 +209,15 @@ class EditorGraphSpec:
         return parse_editor_graph_spec(value)
 
     def to_dict(self) -> dict:
-        return {
+        result: dict[str, Any] = {
             "version": self.version,
             "template": self.template.to_dict(),
             "nodes": [node.to_dict() for node in self.nodes],
             "connections": [item.to_dict() for item in self.connections],
         }
+        if self.primitives_version is not None:
+            result["primitives_version"] = self.primitives_version
+        return result
 
     def editor_payload(self, asset_path: str, temporary_asset_path: str) -> dict:
         # The fixed ASE executor protocol remains v1. Presentation-only fields
@@ -165,18 +239,12 @@ class EditorGraphSpec:
 
 
 def load_editor_graph_spec(path: str | Path) -> EditorGraphSpec:
-    try:
-        value = json.loads(Path(path).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise SpecError(f"cannot read EditorGraphSpec JSON: {exc}") from exc
-    return EditorGraphSpec.from_dict(value)
+    from ._editor_spec_io import load_editor_graph_spec as _load
+
+    return _load(path)
 
 
 def route_create_backend(requested: str, spec: EditorGraphSpec | None) -> str:
-    if requested not in {"text", "editor", "auto"}:
-        raise SpecError(f"unknown create backend: {requested}")
-    if requested == "auto":
-        return "editor" if spec is not None else "text"
-    return requested
+    from ._editor_spec_io import route_create_backend as _route
+
+    return _route(requested, spec)

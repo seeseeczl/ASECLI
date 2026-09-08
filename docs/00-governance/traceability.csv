@@ -25,7 +25,7 @@ BUG-0006,缺陷,已解决,ADR-0006,MOD-CHECK MOD-CLI,TASK-0009,REG-0004 REG-0018
 BUG-0007,缺陷,已解决,ADR-0001,MOD-CORE,TASK-0014,REG-0011,2026-09-01 1007 节点 5 轮通过,,long,性能假门禁
 BUG-0008,缺陷,已解决,ADR-0001,MOD-CLI,TASK-0016,REG-0020,2026-09-01 catalog 18 条可收集,,long,治理路径漂移
 BUG-0009,缺陷,已解决,ADR-0008,MOD-CORE MOD-CLI,TASK-0017,REG-0019,2026-09-01 自动回归通过,,long,跨模块私有导入
-CR-0006,变更,已确认,ADR-0009,MOD-CLI,TASK-0018 TASK-0019 TASK-0037 TASK-0041 TASK-0044 TASK-0045,REG-0021 REG-0043 REG-0048,2026-09-05 run 33972763464 与 v0.4.2 六项正式资产、SHA256SUMS、本机安装及 v0.4.1 回滚/恢复通过,REL-0001 REL-0002 REL-0003 REL-0004 REL-0005 REL-0006 REL-0007 REL-0008,long,CI REL 与供应链基线；公开包仓仍未发布
+CR-0006,变更,已确认,ADR-0009,MOD-CLI,TASK-0018 TASK-0019 TASK-0037 TASK-0041 TASK-0044 TASK-0045 TASK-0046 TASK-0048 TASK-0051,REG-0021 REG-0043 REG-0048,2026-09-07 run 34045894959 与 v0.6.1 六项正式资产、SHA256SUMS、本机安装及 v0.6.0 回滚/恢复通过,REL-0001 REL-0002 REL-0003 REL-0004 REL-0005 REL-0006 REL-0007 REL-0008 REL-0009 REL-0010 REL-0011,long,CI REL 与供应链基线；PyPI 尚未发布
 FR-0011,功能,已确认,ADR-0012 ADR-0015,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028 TASK-0032 TASK-0033,REG-0026 REG-0027 REG-0028 REG-0029 REG-0037 REG-0038 REG-0039 REG-0040,2026-09-03 v2 规格与 CLI 后验治理自动通过；团结 2022.3.61t9 + ASE 1.9.6.2 完成创建进程与全新重开进程对账；0 error 且无暂存残留,REL-0003,long,正式 CLI 使用 EditorGraphSpec v2 强制属性呈现；双进程兼容性阻塞已解除
 CR-0008,变更,已确认,ADR-0012,MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0023 TASK-0024 TASK-0025 TASK-0026 TASK-0027 TASK-0028,REG-0026 REG-0027 REG-0028 REG-0029,2026-09-01 自动回归与隔离团结双进程 E2E 通过,,long,离线文本与窄范围 Editor 后端按能力路由；目标画面待验
 CR-0009,变更,已确认,ADR-0009 ADR-0010 ADR-0012 ADR-0013,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BRIDGE MOD-CLI,TASK-0029,REG-0031 REG-0032 REG-0033 REG-0034 REG-0035,2026-09-01 自动与 GitHub run 33510909955 artifact 通过；真实 GUI probe 待验,,long,第二轮对抗性审计整改
@@ -53,5 +53,6 @@ CR-0018,变更,已发布,ADR-0015 ADR-0017,MOD-CUSTOM-GUI MOD-GUI-SUPPORT MOD-BR
 CR-0019,变更,已发布,ADR-0005,MOD-LAYOUT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0047 TASK-0048,REG-0050,2026-09-06 自动回归与真实图集中验收通过；v0.6.0@a54795d 经 run 34033313137 三项 job、六项正式资产摘要、本机安装和隔离回滚验证完成私有发布,REL-0010,long,脑图式 DAG 精排；缩放几何归一；休眠多 Pass Master 兼容；Comment 联动收框；asecli.graph-layout.v2；失败关闭
 CR-0020,变更,已发布,ADR-0005,MOD-LAYOUT MOD-SKILL,TASK-0049 TASK-0051,REG-0050,2026-09-07 v0.6.1@9cdc1ee 经 run 34045894959、正式资产和本机安装/回滚验证通过,REL-0011,long,Local Var 按去重消费组计数；两个及以上组必须注册；同组复用次数不限但仍须尽量零交叉
 CR-0021,变更,已发布（视觉待签收）,ADR-0018,MOD-LAYOUT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0050 TASK-0051,REG-0051,2026-09-07 定向 70 passed；全量 313 passed/3 skipped；真实 248 节点 V3 审计零硬失败；run 34045894959、正式资产和本机安装/回滚通过,REL-0011,long,递归局部鱼骨；真实端口水平；局部同层输出右对齐；Comment 保留与作用标题；显式 WireNode 路由事务；正常缩放视觉与新增/移动锚点实机待签收
-CR-0022,变更,已发布,ADR-0019,交付链,8239df8,REG-0021,2026-09-07 MIT 开源与公开 GitHub 仓库完成,,long,MIT 许可证；公开 GitHub 源码与 Release
-CR-0023,变更,进行中,ADR-0019,交付链,main,REG-0021,2026-09-07 用户明确授权 PyPI 作为规范安装入口,,long,uv tool install asecli；Trusted Publishing；v0.6.2
+CR-0022,变更,已发布,ADR-0019,MOD-CLI,8239df8,REG-0021,2026-09-07 MIT 开源与公开 GitHub 仓库完成,,long,MIT 许可证；公开 GitHub 源码与 Release
+CR-0023,变更,发布中,ADR-0019,MOD-CLI,TASK-0052 TASK-0053 TASK-0058,REG-0021 REG-0052 REG-0057,2026-09-08 用户已授权 v0.6.2 公开发布；本地双 Python全量、回归目录、可复现构建、SPDX、供应链与隔离安装 smoke 通过,REL-0012,long,当前公开入口在远端后验完成前仍为 GitHub Release v0.6.1；PyPI Trusted Publishing 由 tag workflow 执行
+CR-0024,变更,已验证（发布中）,ADR-0020,MOD-BRIDGE MOD-CLI,TASK-0054 TASK-0058,REG-0053 REG-0057,2026-09-08 v1/v2/v3 自动回归与隔离团结 2022.3.61t9 + ASE 1.9.6.2 双进程通过；已进入 v0.6.2 本地验证候选,REL-0012,long,EditorGraphSpec v3 primitive/recipe 与 precision/default/min/max；SGCLI 保持独立

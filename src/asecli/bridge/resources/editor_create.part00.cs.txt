@@ -64,13 +64,92 @@ try
         "SetRawPropertyName", publicInstance, null, new System.Type[] { typeof(string) }, null);
     var propertyInspectorProperty = typeof(AmplifyShaderEditor.PropertyNode).GetProperty(
         "PropertyInspectorName", publicInstance);
+    var precisionField = typeof(AmplifyShaderEditor.ParentNode).GetField(
+        "m_currentPrecisionType", privateInstance);
+    var rangedMinField = typeof(AmplifyShaderEditor.RangedFloatNode).GetField(
+        "m_min", privateInstance);
+    var rangedMaxField = typeof(AmplifyShaderEditor.RangedFloatNode).GetField(
+        "m_max", privateInstance);
     if (createTemplateMethod == null || createNodeMethod == null || createConnectionMethod == null ||
         saveMethod == null || loadMethod == null || expressionNameField == null ||
         expressionItemsField == null || expressionCodeField == null ||
         expressionOutputField == null || expressionFunctionField == null ||
         rawPropertyNameMethod == null || propertyInspectorProperty == null ||
-        propertyInspectorProperty.GetSetMethod() == null)
+        propertyInspectorProperty.GetSetMethod() == null || precisionField == null ||
+        rangedMinField == null || rangedMaxField == null)
         throw new System.Exception("required ASE API member is missing");
+
+    var primitiveTypes = new System.Collections.Generic.Dictionary<string, System.Type> {
+        { "add", typeof(AmplifyShaderEditor.SimpleAddOpNode) }, { "sub", typeof(AmplifyShaderEditor.SimpleSubtractOpNode) },
+        { "mul", typeof(AmplifyShaderEditor.SimpleMultiplyOpNode) }, { "div", typeof(AmplifyShaderEditor.SimpleDivideOpNode) },
+        { "min", typeof(AmplifyShaderEditor.SimpleMinOpNode) }, { "max", typeof(AmplifyShaderEditor.SimpleMaxOpNode) },
+        { "remainder", typeof(AmplifyShaderEditor.SimpleRemainderNode) }, { "saturate", typeof(AmplifyShaderEditor.SaturateNode) },
+        { "one_minus", typeof(AmplifyShaderEditor.OneMinusNode) }, { "negate", typeof(AmplifyShaderEditor.NegateNode) },
+        { "abs", typeof(AmplifyShaderEditor.AbsOpNode) }, { "floor", typeof(AmplifyShaderEditor.FloorOpNode) },
+        { "ceil", typeof(AmplifyShaderEditor.CeilOpNode) }, { "fract", typeof(AmplifyShaderEditor.FractNode) },
+        { "round", typeof(AmplifyShaderEditor.RoundOpNode) }, { "trunc", typeof(AmplifyShaderEditor.TruncOpNode) },
+        { "sign", typeof(AmplifyShaderEditor.SignOpNode) }, { "sqrt", typeof(AmplifyShaderEditor.SqrtOpNode) },
+        { "rsqrt", typeof(AmplifyShaderEditor.RSqrtOpNode) }, { "rcp", typeof(AmplifyShaderEditor.ReciprocalOpNode) },
+        { "normalize", typeof(AmplifyShaderEditor.NormalizeNode) }, { "length", typeof(AmplifyShaderEditor.LengthOpNode) },
+        { "clamp", typeof(AmplifyShaderEditor.ClampOpNode) }, { "step", typeof(AmplifyShaderEditor.StepOpNode) },
+        { "smoothstep", typeof(AmplifyShaderEditor.SmoothstepOpNode) }, { "lerp", typeof(AmplifyShaderEditor.LerpOp) },
+        { "pow", typeof(AmplifyShaderEditor.PowerNode) }, { "exp", typeof(AmplifyShaderEditor.ExpOpNode) },
+        { "exp2", typeof(AmplifyShaderEditor.Exp2OpNode) }, { "log", typeof(AmplifyShaderEditor.LogOpNode) },
+        { "log2", typeof(AmplifyShaderEditor.Log2OpNode) }, { "log10", typeof(AmplifyShaderEditor.Log10OpNode) },
+        { "sin", typeof(AmplifyShaderEditor.SinOpNode) }, { "cos", typeof(AmplifyShaderEditor.CosOpNode) },
+        { "tan", typeof(AmplifyShaderEditor.TanOpNode) }, { "asin", typeof(AmplifyShaderEditor.ASinOpNode) },
+        { "acos", typeof(AmplifyShaderEditor.ACosOpNode) }, { "atan", typeof(AmplifyShaderEditor.ATanOpNode) },
+        { "atan2", typeof(AmplifyShaderEditor.ATan2OpNode) }, { "sinh", typeof(AmplifyShaderEditor.SinhOpNode) },
+        { "cosh", typeof(AmplifyShaderEditor.CoshOpNode) }, { "tanh", typeof(AmplifyShaderEditor.TanhOpNode) },
+        { "radians", typeof(AmplifyShaderEditor.RadiansOpNode) }, { "degrees", typeof(AmplifyShaderEditor.DegreesOpNode) },
+        { "fmod", typeof(AmplifyShaderEditor.FmodOpNode) }, { "remap", typeof(AmplifyShaderEditor.TFHCRemapNode) },
+        { "dot", typeof(AmplifyShaderEditor.DotProductOpNode) }, { "cross", typeof(AmplifyShaderEditor.CrossProductOpNode) },
+        { "distance", typeof(AmplifyShaderEditor.DistanceOpNode) }, { "reflect", typeof(AmplifyShaderEditor.ReflectOpNode) },
+        { "refract", typeof(AmplifyShaderEditor.RefractOpVec) }, { "rotate_axis", typeof(AmplifyShaderEditor.RotateAboutAxisNode) },
+        { "append", typeof(AmplifyShaderEditor.DynamicAppendNode) }, { "swizzle", typeof(AmplifyShaderEditor.SwizzleNode) },
+        { "component_mask", typeof(AmplifyShaderEditor.ComponentMaskNode) }, { "split", typeof(AmplifyShaderEditor.BreakToComponentsNode) },
+        { "luminance", typeof(AmplifyShaderEditor.LuminanceNode) }, { "desaturate", typeof(AmplifyShaderEditor.DesaturateOpNode) },
+        { "contrast", typeof(AmplifyShaderEditor.SimpleContrastOpNode) }, { "posterize", typeof(AmplifyShaderEditor.PosterizeNode) },
+        { "rgb_to_hsv", typeof(AmplifyShaderEditor.RGBToHSVNode) }, { "hsv_to_rgb", typeof(AmplifyShaderEditor.HSVToRGBNode) },
+        { "gamma_to_linear", typeof(AmplifyShaderEditor.GammaToLinearNode) }, { "linear_to_gamma", typeof(AmplifyShaderEditor.LinearToGammaNode) },
+        { "not", typeof(AmplifyShaderEditor.NotNode) }, { "nand", typeof(AmplifyShaderEditor.NandNode) },
+        { "and", typeof(AmplifyShaderEditor.AllOpNode) }, { "or", typeof(AmplifyShaderEditor.AnyOpNode) },
+        { "select", typeof(AmplifyShaderEditor.StaticSwitch) }, { "texcoord", typeof(AmplifyShaderEditor.TextureCoordinatesNode) },
+        { "world_position", typeof(AmplifyShaderEditor.WorldPosInputsNode) }, { "time", typeof(AmplifyShaderEditor.SimpleTimeNode) },
+        { "vertex_color", typeof(AmplifyShaderEditor.VertexColorNode) }, { "vertex_id", typeof(AmplifyShaderEditor.VertexIdVariableNode) },
+        { "instance_id", typeof(AmplifyShaderEditor.InstanceIdNode) }, { "world_normal", typeof(AmplifyShaderEditor.WorldNormalVector) },
+    };
+    System.Func<string, System.Type> primitiveClass = delegate (string op) {
+        System.Type found = null;
+        primitiveTypes.TryGetValue(op, out found);
+        return found;
+    };
+    System.Func<string, System.Type> constClass = delegate (string value) {
+        string s = value.Trim();
+        if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$"))
+            return typeof(AmplifyShaderEditor.RangedFloatNode);
+        if (s.StartsWith("float2")) return typeof(AmplifyShaderEditor.Vector2Node);
+        if (s.StartsWith("float3")) return typeof(AmplifyShaderEditor.Vector3Node);
+        if (s.StartsWith("float4")) return typeof(AmplifyShaderEditor.Vector4Node);
+        return null;
+    };
+    System.Func<string, float[]> parseFloats = delegate (string value) {
+        int a = value.IndexOf('(');
+        int b = value.IndexOf(')');
+        if (a < 0 || b < 0 || b <= a) return new float[0];
+        string[] parts = value.Substring(a + 1, b - a - 1).Split(',');
+        float[] result = new float[parts.Length];
+        for (int i = 0; i < parts.Length; i++)
+            result[i] = float.Parse(parts[i].Trim(), System.Globalization.CultureInfo.InvariantCulture);
+        return result;
+    };
+    System.Action<AmplifyShaderEditor.ParentNode, string> writeConst = delegate (AmplifyShaderEditor.ParentNode node, string value) {
+        if (node is AmplifyShaderEditor.RangedFloatNode)
+            ((AmplifyShaderEditor.RangedFloatNode)node).Value = float.Parse(value.Trim(), System.Globalization.CultureInfo.InvariantCulture);
+        else if (node is AmplifyShaderEditor.Vector2Node) { float[] f = parseFloats(value); ((AmplifyShaderEditor.Vector2Node)node).Value = new UnityEngine.Vector2(f[0], f[1]); }
+        else if (node is AmplifyShaderEditor.Vector3Node) { float[] f = parseFloats(value); ((AmplifyShaderEditor.Vector3Node)node).Value = new UnityEngine.Vector3(f[0], f[1], f[2]); }
+        else if (node is AmplifyShaderEditor.Vector4Node) { float[] f = parseFloats(value); ((AmplifyShaderEditor.Vector4Node)node).Value = new UnityEngine.Vector4(f[0], f[1], f[2], f[3]); }
+    };
 
     string templateGuid = (string)template["guid"];
     string shaderName = (string)template["shader_name"];
@@ -89,117 +168,9 @@ try
 
     var graph = win.CurrentGraph;
     var aliasIds = new System.Collections.Generic.Dictionary<string, int>();
+    var recipePrimitiveIds = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, int>>();
+    var recipePrimitiveClasses = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>>();
+    var recipeOutputIds = new System.Collections.Generic.Dictionary<string, int>();
+    var recipeInputTargets = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<System.Tuple<int, int>>>>();
     int masterId = graph.CurrentMasterNode.UniqueId;
     foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)
-    {
-        string alias = (string)nodeSpec["alias"];
-        string kind = (string)nodeSpec["kind"];
-        var position = (Newtonsoft.Json.Linq.JArray)nodeSpec["position"];
-        System.Type nodeType = null;
-        if (kind == "sampler") nodeType = typeof(AmplifyShaderEditor.SamplerNode);
-        else if (kind == "custom_expression") nodeType = typeof(AmplifyShaderEditor.CustomExpressionNode);
-        else
-        {
-            string typeName = (string)nodeSpec["type"];
-            if (typeName == "WorldPosInputsNode") nodeType = typeof(AmplifyShaderEditor.WorldPosInputsNode);
-            else if (typeName == "TextureCoordinatesNode") nodeType = typeof(AmplifyShaderEditor.TextureCoordinatesNode);
-            else if (typeName == "BreakToComponentsNode") nodeType = typeof(AmplifyShaderEditor.BreakToComponentsNode);
-            else if (typeName == "TexturePropertyNode") nodeType = typeof(AmplifyShaderEditor.TexturePropertyNode);
-            else if (typeName == "RangedFloatNode") nodeType = typeof(AmplifyShaderEditor.RangedFloatNode);
-            else if (typeName == "Matrix4X4Node") nodeType = typeof(AmplifyShaderEditor.Matrix4X4Node);
-            else if (typeName == "Vector4Node") nodeType = typeof(AmplifyShaderEditor.Vector4Node);
-            else throw new System.Exception("node type escaped allowlist: " + typeName);
-        }
-        var created = win.CreateNode(
-            nodeType,
-            new UnityEngine.Vector2((float)position[0], (float)position[1]),
-            null,
-            false);
-        if (created == null || created.GetType() != nodeType)
-            throw new System.Exception("ASE failed to create node: " + alias);
-        aliasIds.Add(alias, created.UniqueId);
-
-        if (kind == "sampler")
-        {
-            var sampler = created as AmplifyShaderEditor.SamplerNode;
-            sampler.CurrentParameterType = (AmplifyShaderEditor.PropertyType)System.Enum.Parse(
-                typeof(AmplifyShaderEditor.PropertyType), (string)nodeSpec["parameter_type"]);
-            sampler.SetPropertyName((string)nodeSpec["property_name"]);
-            sampler.SetInspectorName((string)nodeSpec["inspector_name"]);
-            sampler.AutoRegister = true;
-            sampler.OnPropertyNameChanged();
-        }
-        else if (kind == "property")
-        {
-            var property = created as AmplifyShaderEditor.PropertyNode;
-            if (property == null) throw new System.Exception("property-node cast failed: " + alias);
-            property.CurrentParameterType = (AmplifyShaderEditor.PropertyType)System.Enum.Parse(
-                typeof(AmplifyShaderEditor.PropertyType), (string)nodeSpec["parameter_type"]);
-            property.SetRawPropertyName((string)nodeSpec["property_name"]);
-            propertyInspectorProperty.SetValue(property, (string)nodeSpec["inspector_name"], null);
-            property.AutoRegister = true;
-            property.OnPropertyNameChanged();
-        }
-        else if (kind == "custom_expression")
-        {
-            var expression = created as AmplifyShaderEditor.CustomExpressionNode;
-            string expressionCode = (string)nodeSpec["code"];
-            var inputSpecs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
-            var items = new System.Collections.Generic.List<AmplifyShaderEditor.CustomExpressionInputItem>();
-            for (int inputIndex = 0; inputIndex < inputSpecs.Count; inputIndex++)
-            {
-                var inputSpec = (Newtonsoft.Json.Linq.JObject)inputSpecs[inputIndex];
-                string inputName = (string)inputSpec["name"];
-                var inputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
-                    typeof(AmplifyShaderEditor.WirePortDataType), (string)inputSpec["type"]);
-                var item = new AmplifyShaderEditor.CustomExpressionInputItem(
-                    AmplifyShaderEditor.PrecisionType.Inherit,
-                    AmplifyShaderEditor.VariableQualifiers.In,
-                    string.Empty,
-                    false,
-                    true,
-                    string.Empty);
-                item.Type = inputType;
-                items.Add(item);
-                if (inputIndex == 0)
-                    expression.InputPorts[0].ChangeProperties(inputName, inputType, false);
-                else
-                    expression.AddInputPort(inputType, false, inputName);
-            }
-            string outputTypeName = (string)nodeSpec["output_type"];
-            var outputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
-                typeof(AmplifyShaderEditor.WirePortDataType), outputTypeName);
-            int outputTypeIndex = outputTypeName == "INT" ? 0 :
-                outputTypeName == "FLOAT" ? 1 :
-                outputTypeName == "FLOAT2" ? 2 :
-                outputTypeName == "FLOAT3" ? 3 :
-                outputTypeName == "FLOAT4" ? 4 :
-                outputTypeName == "FLOAT3x3" ? 5 : 6;
-            expression.OutputPorts[0].ChangeType(outputType, false);
-            expressionNameField.SetValue(expression, (string)nodeSpec["name"]);
-            expressionItemsField.SetValue(expression, items);
-            expressionCodeField.SetValue(expression, expressionCode);
-            expressionOutputField.SetValue(expression, outputTypeIndex);
-            expressionFunctionField.SetValue(expression, expressionCode.Contains("return"));
-        }
-    }
-
-    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
-    {
-        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
-        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
-        string sourceAlias = (string)sourceSpec["node"];
-        string destinationAlias = (string)destinationSpec["node"];
-        int sourceNodeId = aliasIds[sourceAlias];
-        int destinationNodeId = destinationAlias == "master" ? masterId : aliasIds[destinationAlias];
-        int sourcePortId = (int)sourceSpec["port"];
-        int destinationPortId = (int)destinationSpec["port"];
-        var sourceNode = graph.GetNode(sourceNodeId);
-        var destinationNode = graph.GetNode(destinationNodeId);
-        if (sourceNode == null || destinationNode == null ||
-            sourceNode.GetOutputPortByUniqueId(sourcePortId) == null ||
-            destinationNode.GetInputPortByUniqueId(destinationPortId) == null)
-            throw new System.Exception("connection endpoint not found");
-        graph.CreateConnection(destinationNodeId, destinationPortId, sourceNodeId, sourcePortId, false);
-        if (!destinationNode.GetInputPortByUniqueId(destinationPortId).IsConnectedTo(sourceNodeId, sourcePortId))
-            throw new System.Exception("ASE rejected connection");

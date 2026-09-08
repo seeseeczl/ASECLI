@@ -1,205 +1,145 @@
-    }
-
-    bool saved = win.SaveToDisk(false);
-    if (!saved) throw new System.Exception("ASE SaveToDisk returned false");
-    var loadResult = win.LoadFromDisk(temporaryAssetPath, null);
-    bool reloaded = loadResult == AmplifyShaderEditor.ShaderLoadResult.LOADED ||
-        loadResult == AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED;
-    if (!reloaded) throw new System.Exception("ASE temporary LoadFromDisk failed: " + loadResult);
-
-    graph = win.CurrentGraph;
-    var reloadedMaster = graph.CurrentMasterNode as AmplifyShaderEditor.TemplateMultiPassMasterNode;
-    var reloadedShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(temporaryAssetPath);
-    if (reloadedMaster == null || reloadedMaster.CurrentTemplate == null || reloadedShader == null ||
-        reloadedMaster.CurrentTemplate.GUID != templateGuid ||
-        reloadedMaster.ShaderName != shaderName || reloadedShader.name != shaderName)
-        throw new System.Exception("template or shader identity changed after temporary reload");
-    var manifestNodes = new Newtonsoft.Json.Linq.JArray();
-    foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)
     {
         string alias = (string)nodeSpec["alias"];
         string kind = (string)nodeSpec["kind"];
-        var actualNode = graph.GetNode(aliasIds[alias]);
-        if (actualNode == null) throw new System.Exception("node missing after reload: " + alias);
-        string expectedType = kind == "sampler" ? "SamplerNode" :
-            kind == "custom_expression" ? "CustomExpressionNode" : (string)nodeSpec["type"];
-        if (actualNode.GetType().Name != expectedType)
-            throw new System.Exception("node type changed after reload: " + alias);
-        var manifestNode = new Newtonsoft.Json.Linq.JObject();
-        manifestNode["alias"] = alias;
-        manifestNode["kind"] = kind;
-        manifestNode["type"] = actualNode.GetType().Name;
-        if (kind == "sampler" || kind == "property")
+        var position = (Newtonsoft.Json.Linq.JArray)nodeSpec["position"];
+        if (kind == "recipe")
         {
-            var property = actualNode as AmplifyShaderEditor.PropertyNode;
-            if (property.PropertyName != (string)nodeSpec["property_name"] ||
-                property.PropertyInspectorName != (string)nodeSpec["inspector_name"] ||
-                property.CurrentParameterType.ToString() != (string)nodeSpec["parameter_type"])
-                throw new System.Exception("property changed after reload: " + alias);
-            manifestNode["property_name"] = property.PropertyName;
-            manifestNode["inspector_name"] = property.PropertyInspectorName;
-            manifestNode["parameter_type"] = property.CurrentParameterType.ToString();
-        }
-        else if (kind == "custom_expression")
-        {
-            var expression = actualNode as AmplifyShaderEditor.CustomExpressionNode;
-            string actualName = (string)expressionNameField.GetValue(expression);
-            string actualCode = (string)expressionCodeField.GetValue(expression);
-            string actualOutputType = expression.OutputPorts[0].DataType.ToString();
-            if (actualName != (string)nodeSpec["name"] || actualCode != (string)nodeSpec["code"] ||
-                actualOutputType != (string)nodeSpec["output_type"])
-                throw new System.Exception("custom expression changed after reload: " + alias);
-            manifestNode["name"] = actualName;
-            manifestNode["code"] = actualCode;
-            manifestNode["output_type"] = actualOutputType;
-            var manifestInputs = new Newtonsoft.Json.Linq.JArray();
-            var expectedInputs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
-            if (expression.InputPorts.Count != expectedInputs.Count)
-                throw new System.Exception("custom expression input count changed after reload: " + alias);
-            for (int inputIndex = 0; inputIndex < expectedInputs.Count; inputIndex++)
+            var recipeName = (string)nodeSpec["recipe"];
+            var recipeCode = (string)nodeSpec["code"];
+            var recipeOutputType = (string)nodeSpec["output_type"];
+            var recipeInputs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
+            var expansion = (Newtonsoft.Json.Linq.JObject)nodeSpec["expansion"];
+            var primitiveSpecs = (Newtonsoft.Json.Linq.JArray)expansion["primitives"];
+            string expansionOutput = (string)expansion["output"];
+
+            bool native = true;
+            foreach (Newtonsoft.Json.Linq.JObject primitiveSpec in primitiveSpecs)
             {
-                var expectedInput = (Newtonsoft.Json.Linq.JObject)expectedInputs[inputIndex];
-                var actualInput = expression.InputPorts[inputIndex];
-                if (actualInput.Name != (string)expectedInput["name"] ||
-                    actualInput.DataType.ToString() != (string)expectedInput["type"])
-                    throw new System.Exception("custom expression input changed after reload: " + alias);
-                var manifestInput = new Newtonsoft.Json.Linq.JObject();
-                manifestInput["name"] = actualInput.Name;
-                manifestInput["type"] = actualInput.DataType.ToString();
-                manifestInputs.Add(manifestInput);
+                string opName = (string)primitiveSpec["op"];
+                System.Type resolved = opName == "const" ? constClass((string)primitiveSpec["value"]) : primitiveClass(opName);
+                if (resolved == null) { native = false; break; }
             }
-            manifestNode["inputs"] = manifestInputs;
-        }
-        manifestNodes.Add(manifestNode);
-    }
 
-    var manifestConnections = new Newtonsoft.Json.Linq.JArray();
-    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
-    {
-        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
-        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
-        string sourceAlias = (string)sourceSpec["node"];
-        string destinationAlias = (string)destinationSpec["node"];
-        int sourceNodeId = aliasIds[sourceAlias];
-        int destinationNodeId = destinationAlias == "master" ? masterId : aliasIds[destinationAlias];
-        int sourcePortId = (int)sourceSpec["port"];
-        int destinationPortId = (int)destinationSpec["port"];
-        var destinationPort = graph.GetNode(destinationNodeId).GetInputPortByUniqueId(destinationPortId);
-        if (destinationPort == null || !destinationPort.IsConnectedTo(sourceNodeId, sourcePortId))
-            throw new System.Exception("connection missing after reload");
-        manifestConnections.Add(connectionSpec.DeepClone());
-    }
+            if (!native)
+            {
+                var expression = win.CreateNode(typeof(AmplifyShaderEditor.CustomExpressionNode),
+                    new UnityEngine.Vector2((float)position[0], (float)position[1]), null, false) as AmplifyShaderEditor.CustomExpressionNode;
+                if (expression == null)
+                    throw new System.Exception("ASE failed to create recipe fallback expression: " + alias);
+                var inputSpecs = recipeInputs;
+                var items = new System.Collections.Generic.List<AmplifyShaderEditor.CustomExpressionInputItem>();
+                for (int inputIndex = 0; inputIndex < inputSpecs.Count; inputIndex++)
+                {
+                    var inputSpec = (Newtonsoft.Json.Linq.JObject)inputSpecs[inputIndex];
+                    string inputName = (string)inputSpec["name"];
+                    var inputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
+                        typeof(AmplifyShaderEditor.WirePortDataType), (string)inputSpec["type"]);
+                    var item = new AmplifyShaderEditor.CustomExpressionInputItem(
+                        AmplifyShaderEditor.PrecisionType.Inherit, AmplifyShaderEditor.VariableQualifiers.In,
+                        string.Empty, false, true, string.Empty);
+                    item.Type = inputType;
+                    items.Add(item);
+                    if (inputIndex == 0)
+                        expression.InputPorts[0].ChangeProperties(inputName, inputType, false);
+                    else
+                        expression.AddInputPort(inputType, false, inputName);
+                }
+                var outputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
+                    typeof(AmplifyShaderEditor.WirePortDataType), recipeOutputType);
+                int outputTypeIndex = recipeOutputType == "INT" ? 0 :
+                    recipeOutputType == "FLOAT" ? 1 :
+                    recipeOutputType == "FLOAT2" ? 2 :
+                    recipeOutputType == "FLOAT3" ? 3 :
+                    recipeOutputType == "FLOAT4" ? 4 :
+                    recipeOutputType == "FLOAT3x3" ? 5 : 6;
+                expression.OutputPorts[0].ChangeType(outputType, false);
+                expressionNameField.SetValue(expression, recipeName);
+                expressionItemsField.SetValue(expression, items);
+                expressionCodeField.SetValue(expression, recipeCode);
+                expressionOutputField.SetValue(expression, outputTypeIndex);
+                expressionFunctionField.SetValue(expression, recipeCode.Contains("return"));
+                aliasIds.Add(alias, expression.UniqueId);
+                continue;
+            }
 
-    string moveError = UnityEditor.AssetDatabase.MoveAsset(temporaryAssetPath, assetPath);
-    if (!string.IsNullOrEmpty(moveError)) throw new System.Exception("asset commit failed: " + moveError);
-    committed = true;
-    var targetShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(assetPath);
-    if (targetShader == null || targetShader.name != shaderName)
-        throw new System.Exception("shader identity changed after asset commit");
+            var inputIndexByName = new System.Collections.Generic.Dictionary<string, int>();
+            for (int i = 0; i < recipeInputs.Count; i++)
+                inputIndexByName[(string)((Newtonsoft.Json.Linq.JObject)recipeInputs[i])["name"]] = i;
+            var idToNode = new System.Collections.Generic.Dictionary<string, AmplifyShaderEditor.ParentNode>();
+            var idToClass = new System.Collections.Generic.Dictionary<string, string>();
+            foreach (Newtonsoft.Json.Linq.JObject primitiveSpec in primitiveSpecs)
+            {
+                string pid = (string)primitiveSpec["id"];
+                string opName = (string)primitiveSpec["op"];
+                System.Type resolved = opName == "const" ? constClass((string)primitiveSpec["value"]) : primitiveClass(opName);
+                var pn = win.CreateNode(resolved,
+                    new UnityEngine.Vector2((float)position[0], (float)position[1]), null, false);
+                if (pn == null || pn.GetType() != resolved)
+                    throw new System.Exception("ASE failed to create recipe primitive: " + pid);
+                if (opName == "const")
+                    writeConst(pn, (string)primitiveSpec["value"]);
+                idToNode[pid] = pn;
+                idToClass[pid] = resolved.Name;
+            }
+            var targets = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<System.Tuple<int, int>>>();
+            foreach (Newtonsoft.Json.Linq.JObject primitiveSpec in primitiveSpecs)
+            {
+                string pid = (string)primitiveSpec["id"];
+                var pn = idToNode[pid];
+                var args = (Newtonsoft.Json.Linq.JArray)primitiveSpec["args"];
+                if (args == null) continue;
+                for (int argIndex = 0; argIndex < args.Count; argIndex++)
+                {
+                    string argRef = (string)args[argIndex];
+                    if (inputIndexByName.ContainsKey(argRef))
+                    {
+                        int inputPort = inputIndexByName[argRef];
+                        if (!targets.ContainsKey(inputPort))
+                            targets[inputPort] = new System.Collections.Generic.List<System.Tuple<int, int>>();
+                        targets[inputPort].Add(System.Tuple.Create(pn.UniqueId, argIndex));
+                        continue;
+                    }
+                    int sourceNodeId = idToNode[argRef].UniqueId;
+                    graph.CreateConnection(pn.UniqueId, argIndex, sourceNodeId, 0, false);
+                    if (!pn.GetInputPortByUniqueId(argIndex).IsConnectedTo(sourceNodeId, 0))
+                        throw new System.Exception("ASE rejected recipe primitive connection");
+                }
+            }
+            recipePrimitiveIds[alias] = new System.Collections.Generic.Dictionary<string, int>();
+            recipePrimitiveClasses[alias] = idToClass;
+            foreach (System.Collections.Generic.KeyValuePair<string, AmplifyShaderEditor.ParentNode> kv in idToNode)
+                recipePrimitiveIds[alias][kv.Key] = kv.Value.UniqueId;
+            recipeOutputIds[alias] = idToNode[expansionOutput].UniqueId;
+            recipeInputTargets[alias] = targets;
+            continue;
+        }
 
-    var result = new Newtonsoft.Json.Linq.JObject();
-    result["protocol"] = "ASECLI_EDITOR_CREATE_V1";
-    result["ase_version"] = aseVersion;
-    result["asset_path"] = assetPath;
-    result["template_guid"] = reloadedMaster.CurrentTemplate.GUID;
-    result["shader_name"] = targetShader.name;
-    result["saved"] = saved;
-    result["reloaded"] = reloaded;
-    result["committed"] = committed;
-    var manifest = new Newtonsoft.Json.Linq.JObject();
-    var manifestTemplate = new Newtonsoft.Json.Linq.JObject();
-    manifestTemplate["guid"] = reloadedMaster.CurrentTemplate.GUID;
-    manifestTemplate["shader_name"] = targetShader.name;
-    manifest["template"] = manifestTemplate;
-    manifest["nodes"] = manifestNodes;
-    manifest["connections"] = manifestConnections;
-    result["manifest"] = manifest;
-
-    UnityEditor.Selection.activeObject = previousSelection;
-    AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
-    stateRestored = true;
-    if (win != null && win != previousWindow)
-    {
-        var createdWindow = win;
-        createdWindow.Close();
-        UnityEngine.Object.DestroyImmediate(createdWindow);
-        win = null;
-    }
-    success = true;
-    return "ASECLI_EDITOR_CREATE_V1:" + result.ToString(Newtonsoft.Json.Formatting.None);
-}
-catch (System.Exception ex)
-{
-    failure = ex;
-    throw;
-}
-finally
-{
-    var cleanupErrors = new System.Collections.Generic.List<string>();
-    if (win == null && AmplifyShaderEditor.UIUtils.CurrentWindow != previousWindow)
-        win = AmplifyShaderEditor.UIUtils.CurrentWindow as AmplifyShaderEditor.AmplifyShaderEditorWindow;
-    if (!success)
-    {
-        try
+        System.Type nodeType = null;
+        if (kind == "sampler") nodeType = typeof(AmplifyShaderEditor.SamplerNode);
+        else if (kind == "custom_expression") nodeType = typeof(AmplifyShaderEditor.CustomExpressionNode);
+        else if (kind == "primitive")
         {
-            if (committed && !UnityEditor.AssetDatabase.DeleteAsset(assetPath) &&
-                System.IO.File.Exists(System.IO.Path.GetFullPath(assetPath)))
-                cleanupErrors.Add("failed to roll back committed target asset");
-        }
-        catch (System.Exception cleanupEx)
-        {
-            cleanupErrors.Add("target rollback threw: " + cleanupEx.Message);
-        }
-        try
-        {
-            if (!UnityEditor.AssetDatabase.DeleteAsset(temporaryAssetPath) &&
-                System.IO.File.Exists(System.IO.Path.GetFullPath(temporaryAssetPath)))
-                cleanupErrors.Add("failed to delete temporary asset");
-        }
-        catch (System.Exception cleanupEx)
-        {
-            cleanupErrors.Add("temporary cleanup threw: " + cleanupEx.Message);
-        }
-        try { UnityEditor.AssetDatabase.Refresh(); }
-        catch (System.Exception cleanupEx) { cleanupErrors.Add("AssetDatabase.Refresh threw: " + cleanupEx.Message); }
-    }
-    if (!stateRestored)
-    {
-        try
-        {
-            UnityEditor.Selection.activeObject = previousSelection;
-            AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
-            stateRestored = true;
-        }
-        catch (System.Exception cleanupEx)
-        {
-            cleanupErrors.Add("Editor state restore threw: " + cleanupEx.Message);
-        }
-    }
-    if (win != null && win != previousWindow)
-    {
-        try
-        {
-            win.Close();
-            UnityEngine.Object.DestroyImmediate(win);
-            win = null;
-        }
-        catch (System.Exception cleanupEx)
-        {
-            cleanupErrors.Add("window cleanup threw: " + cleanupEx.Message);
-        }
-    }
-    if (cleanupErrors.Count > 0)
-    {
-        string cleanupMessage = string.Join(" | ", cleanupErrors.ToArray());
-        if (failure != null)
-        {
-            failure.Data["ASECLI cleanup failures"] = cleanupMessage;
-            UnityEngine.Debug.LogError("ASECLI Editor create cleanup failures: " + cleanupMessage);
+            nodeType = primitiveClass((string)nodeSpec["op"]);
+            if (nodeType == null) throw new System.Exception("primitive op escaped closure: " + (string)nodeSpec["op"]);
         }
         else
         {
-            throw new System.Exception("ASECLI Editor create cleanup failed: " + cleanupMessage);
+            string typeName = (string)nodeSpec["type"];
+            if (typeName == "WorldPosInputsNode") nodeType = typeof(AmplifyShaderEditor.WorldPosInputsNode);
+            else if (typeName == "TextureCoordinatesNode") nodeType = typeof(AmplifyShaderEditor.TextureCoordinatesNode);
+            else if (typeName == "BreakToComponentsNode") nodeType = typeof(AmplifyShaderEditor.BreakToComponentsNode);
+            else if (typeName == "SimpleAddOpNode") nodeType = typeof(AmplifyShaderEditor.SimpleAddOpNode);
+            else if (typeName == "SimpleSubtractOpNode") nodeType = typeof(AmplifyShaderEditor.SimpleSubtractOpNode);
+            else if (typeName == "SimpleMultiplyOpNode") nodeType = typeof(AmplifyShaderEditor.SimpleMultiplyOpNode);
+            else if (typeName == "SimpleDivideOpNode") nodeType = typeof(AmplifyShaderEditor.SimpleDivideOpNode);
+            else if (typeName == "SimpleMinOpNode") nodeType = typeof(AmplifyShaderEditor.SimpleMinOpNode);
+            else if (typeName == "SimpleMaxOpNode") nodeType = typeof(AmplifyShaderEditor.SimpleMaxOpNode);
+            else if (typeName == "SaturateNode") nodeType = typeof(AmplifyShaderEditor.SaturateNode);
+            else if (typeName == "OneMinusNode") nodeType = typeof(AmplifyShaderEditor.OneMinusNode);
+            else if (typeName == "LerpOp") nodeType = typeof(AmplifyShaderEditor.LerpOp);
+            else if (typeName == "TexturePropertyNode") nodeType = typeof(AmplifyShaderEditor.TexturePropertyNode);
+            else if (typeName == "RangedFloatNode") nodeType = typeof(AmplifyShaderEditor.RangedFloatNode);
+            else if (typeName == "Matrix4X4Node") nodeType = typeof(AmplifyShaderEditor.Matrix4X4Node);
+            else if (typeName == "Vector4Node") nodeType = typeof(AmplifyShaderEditor.Vector4Node);
+            else throw new System.Exception("node type escaped allowlist: " + typeName);
         }
-    }
-}

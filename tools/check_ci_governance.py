@@ -5,8 +5,23 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
 from pathlib import Path
+
+try:
+    from .check_document_governance import document_governance_findings
+except ImportError:  # Direct script execution from the tools directory.
+    from check_document_governance import document_governance_findings
+
+try:
+    from .check_packed_executor_loc import (
+        _loc_exemption_governance_findings,
+        _packed_executor_loc_findings,
+    )
+except ImportError:
+    from check_packed_executor_loc import (
+        _loc_exemption_governance_findings,
+        _packed_executor_loc_findings,
+    )
 
 NODE24_ACTION_REFS = {
     "actions/checkout": "93cb6efe18208431cddfb8368fd83d5badbf9bfd",
@@ -120,64 +135,16 @@ def _release_record_findings(root: Path) -> list[str]:
     return findings
 
 
-def _packed_executor_loc_findings(root: Path, source_limit: int, exemptions: dict[str, dict]) -> list[str]:
-    findings: list[str] = []
-    seen: set[str] = set()
-    for path in (root / "src/asecli").rglob("*.cs.txt"):
-        relative = path.relative_to(root).as_posix()
-        seen.add(relative)
-        loc = len(path.read_text(encoding="utf-8").splitlines())
-        exemption = exemptions.get(relative)
-        if loc > source_limit and exemption is None:
-            findings.append(
-                f"{relative} has {loc} lines (source limit {source_limit}) and is not listed in loc_exemptions"
-            )
-        elif exemption is not None:
-            findings.extend(_loc_exemption_governance_findings(relative, exemption))
-    for relative, exemption in exemptions.items():
-        target = root / relative
-        if not target.is_file():
-            findings.append(f"loc exemption missing file: {relative}")
-        elif relative not in seen:
-            findings.extend(_loc_exemption_governance_findings(relative, exemption))
-    return findings
-
-
-def _loc_exemption_governance_findings(
-    relative: str, exemption: dict, *, today: date | None = None
-) -> list[str]:
-    findings: list[str] = []
-    required_text = (
-        "id", "path", "rule", "reason", "risk", "owner", "approved_by",
-        "created_at", "expires_at", "exit_condition",
-    )
-    for field in required_text:
-        if not isinstance(exemption.get(field), str) or not exemption[field].strip():
-            findings.append(f"{relative} loc exemption is missing {field}")
-    controls = exemption.get("compensating_controls")
-    if not isinstance(controls, list) or not controls or any(
-        not isinstance(item, str) or not item.strip() for item in controls
-    ):
-        findings.append(f"{relative} loc exemption has invalid compensating_controls")
-    try:
-        created = date.fromisoformat(str(exemption.get("created_at", "")))
-        expires = date.fromisoformat(str(exemption.get("expires_at", "")))
-    except ValueError:
-        findings.append(f"{relative} loc exemption has invalid governance dates")
-        return findings
-    if expires < created or (expires - created).days > 30:
-        findings.append(f"{relative} loc exemption exceeds the 30-day maximum")
-    if expires < (today or date.today()):
-        findings.append(f"{relative} loc exemption expired on {expires.isoformat()}")
-    return findings
-
-
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     config = json.loads((root / ".project-architect.json").read_text(encoding="utf-8"))
     source_limit = config["thresholds"]["source"]["limit"]
+    source_warning = config["thresholds"]["source"]["warning"]
     findings = []
     exemptions = _loc_exemptions(config)
+    warning_baselines = config.get("packed_executor_warning_baselines", {})
+    if not isinstance(warning_baselines, dict):
+        warning_baselines = {}
 
     required = [
         "docs/00-governance/traceability.csv",
@@ -188,9 +155,14 @@ def main() -> int:
     findings.extend(f"missing {path}" for path in required if not (root / path).is_file())
 
     findings.extend(_python_loc_findings(root, config))
-    findings.extend(_packed_executor_loc_findings(root, source_limit, exemptions))
+    findings.extend(
+        _packed_executor_loc_findings(
+            root, source_warning, source_limit, exemptions, warning_baselines
+        )
+    )
     findings.extend(_audit_supplement_findings(root, config))
     findings.extend(_release_record_findings(root))
+    findings.extend(document_governance_findings(root))
 
     private_core_import = re.compile(r"from\s+\.\.core\s+import\s+[^\n]*\b_\w+")
     for path in (root / "src/asecli").rglob("*.py"):
@@ -206,6 +178,18 @@ def main() -> int:
             findings.append(f"hard-coded asecli artifact version: {path.relative_to(root)}")
         if "shasum -a 256 dist/*.whl dist/*.tar.gz" in workflow:
             findings.append(f"non-portable artifact checksum paths: {path.relative_to(root)}")
+
+    publish = (root / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+    release_markers = (
+        "tools/check_release_candidate.py", "pytest -q",
+        "tools/check_regression_catalog.py", "tools/check_ci_governance.py",
+        "tools/compare_build_artifacts.py", "tools/generate_sbom.py",
+        "tools/supply_chain_check.py", "shasum -a 256 -c SHA256SUMS",
+        "uv publish dist/*.whl dist/*.tar.gz",
+    )
+    for marker in release_markers:
+        if marker not in publish:
+            findings.append(f"publish workflow missing release gate: {marker}")
 
     print(json.dumps({"ok": not findings, "findings": findings}, ensure_ascii=False))
     return 0 if not findings else 1

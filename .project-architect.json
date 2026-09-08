@@ -8,6 +8,10 @@
     "config": {"warning": 160, "limit": 200}
   },
   "loc_exemptions": [],
+  "packed_executor_warning_baselines": {
+    "src/asecli/bridge/resources/asecli_material_gui.part00.cs.txt": 300,
+    "src/asecli/bridge/resources/asecli_material_gui.part01.cs.txt": 290
+  },
   "module_roots": ["src/asecli"],
   "module_public_patterns": [
     "__init__.py",

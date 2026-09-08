@@ -12,10 +12,37 @@ env:
   SOURCE_DATE_EPOCH: "1788220800"
 
 jobs:
-  build:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1 (Node 24)
+        with:
+          version: "0.11.14"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: false
+      - run: uv lock --check
+      - run: uv sync --frozen --python ${{ matrix.python-version }}
+      - run: >-
+          uv run --frozen --python ${{ matrix.python-version }}
+          python tools/check_release_candidate.py --tag "$GITHUB_REF_NAME"
+      - run: uv run --frozen --python ${{ matrix.python-version }} pytest -q
+      - run: >-
+          uv run --frozen --python ${{ matrix.python-version }}
+          python tools/check_regression_catalog.py
+      - run: >-
+          uv run --frozen --python ${{ matrix.python-version }}
+          python tools/check_ci_governance.py
+
+  package:
+    needs: verify
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
         with:
@@ -26,20 +53,44 @@ jobs:
           python-version: "3.12"
           enable-cache: false
       - run: uv sync --frozen --python 3.12
-      - name: Configure build paths outside the checkout
-        run: echo "ASECLI_VERSION=$(uv version --short)" >> "$GITHUB_ENV"
-      - run: uv build --no-build-isolation
+      - run: uv run --frozen python tools/check_release_candidate.py --tag "$GITHUB_REF_NAME"
+      - name: Configure immutable candidate paths
+        run: |
+          echo "ASECLI_VERSION=$(uv version --short)" >> "$GITHUB_ENV"
+          echo "ASECLI_BUILD_A=$RUNNER_TEMP/asecli-build-a" >> "$GITHUB_ENV"
+          echo "ASECLI_BUILD_B=$RUNNER_TEMP/asecli-build-b" >> "$GITHUB_ENV"
+          echo "ASECLI_REPRO_REPORT=$RUNNER_TEMP/asecli-reproducibility.json" >> "$GITHUB_ENV"
+      - run: uv build --no-build-isolation --out-dir "$ASECLI_BUILD_A"
+      - run: uv build --no-build-isolation --out-dir "$ASECLI_BUILD_B"
+      - run: >-
+          uv run --frozen python tools/compare_build_artifacts.py
+          --left "$ASECLI_BUILD_A"
+          --right "$ASECLI_BUILD_B"
+          --output "$ASECLI_REPRO_REPORT"
+      - run: mkdir dist && cp "$ASECLI_BUILD_A"/* dist/
+      - run: cd dist && shasum -a 256 *.whl *.tar.gz > SHA256SUMS
+      - run: >-
+          uv run --frozen python tools/generate_sbom.py
+          --dist dist --output "dist/asecli-$ASECLI_VERSION.spdx.json"
+      - run: uv run --frozen python tools/supply_chain_check.py --output dist/supply-chain-check.json
       - run: uv venv .artifact-venv --python 3.12
       - run: uv pip install --python .artifact-venv/bin/python "dist/asecli-${ASECLI_VERSION}-py3-none-any.whl"
       - run: .artifact-venv/bin/asecli parse tests/fixtures/step-antialiasing.function.txt
+      - run: .artifact-venv/bin/asecli install-skill --skill-root "$RUNNER_TEMP/codex-skills"
+      - name: Smoke test packaged GUI installer
+        run: |
+          test_project="$RUNNER_TEMP/asecli-gui-smoke"
+          mkdir -p "$test_project/Assets" "$test_project/ProjectSettings"
+          .artifact-venv/bin/asecli gui-support "$test_project" --write
+          test -f "$test_project/Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
-          name: dist
+          name: dist-${{ github.sha }}
           path: dist/
           if-no-files-found: error
 
   publish:
-    needs: build
+    needs: package
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -53,6 +104,7 @@ jobs:
           enable-cache: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1 (Node 24)
         with:
-          name: dist
+          name: dist-${{ github.sha }}
           path: dist/
-      - run: uv publish
+      - run: cd dist && shasum -a 256 -c SHA256SUMS
+      - run: uv publish dist/*.whl dist/*.tar.gz

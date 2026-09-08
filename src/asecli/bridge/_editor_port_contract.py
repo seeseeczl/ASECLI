@@ -1,13 +1,14 @@
-"""ASE 1.9.6.2 port contracts exposed by EditorGraphSpec v1."""
+"""ASE 1.9.6.2 port contracts exposed by EditorGraphSpec v1..v3."""
 
 from __future__ import annotations
 
+from ._editor_primitives import DYNAMIC_NUMERIC, PRIMITIVE_OPS
 from .editor_spec import ConnectionSpec, NodeSpec, SpecError, TemplateSpec
 
 
 _NUMERIC_TYPES = frozenset({"INT", "FLOAT", "FLOAT2", "FLOAT3", "FLOAT4", "COLOR"})
 _MATRIX_TYPES = frozenset({"FLOAT3x3", "FLOAT4x4"})
-_DYNAMIC_NUMERIC = "DYNAMIC_NUMERIC"
+_DYNAMIC_NUMERIC = DYNAMIC_NUMERIC
 _URP_UNLIT_GUID = "2992e84f91cbeb14eab234972e07ea9d"
 _URP_UNLIT_MASTER_INPUTS = {
     0: "FLOAT3",  # Baked Albedo
@@ -23,6 +24,15 @@ _STATIC_INPUT_PORTS = {
     "WorldPosInputsNode": {},
     "TextureCoordinatesNode": {0: "FLOAT2", 1: "FLOAT2", 2: "SAMPLER2D"},
     "BreakToComponentsNode": {0: _DYNAMIC_NUMERIC},
+    "SimpleAddOpNode": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC},
+    "SimpleSubtractOpNode": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC},
+    "SimpleMultiplyOpNode": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC},
+    "SimpleDivideOpNode": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC},
+    "SimpleMinOpNode": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC},
+    "SimpleMaxOpNode": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC},
+    "SaturateNode": {0: _DYNAMIC_NUMERIC},
+    "OneMinusNode": {0: _DYNAMIC_NUMERIC},
+    "LerpOp": {0: _DYNAMIC_NUMERIC, 1: _DYNAMIC_NUMERIC, 2: _DYNAMIC_NUMERIC},
     "TexturePropertyNode": {},
     "RangedFloatNode": {},
     "Matrix4X4Node": {},
@@ -36,6 +46,15 @@ _STATIC_OUTPUT_PORTS = {
     "WorldPosInputsNode": {0: "FLOAT3", 1: "FLOAT", 2: "FLOAT", 3: "FLOAT"},
     "TextureCoordinatesNode": {0: "FLOAT2", 1: "FLOAT", 2: "FLOAT", 3: "FLOAT", 4: "FLOAT"},
     "BreakToComponentsNode": {port: "FLOAT" for port in range(16)},
+    "SimpleAddOpNode": {0: _DYNAMIC_NUMERIC},
+    "SimpleSubtractOpNode": {0: _DYNAMIC_NUMERIC},
+    "SimpleMultiplyOpNode": {0: _DYNAMIC_NUMERIC},
+    "SimpleDivideOpNode": {0: _DYNAMIC_NUMERIC},
+    "SimpleMinOpNode": {0: _DYNAMIC_NUMERIC},
+    "SimpleMaxOpNode": {0: _DYNAMIC_NUMERIC},
+    "SaturateNode": {0: _DYNAMIC_NUMERIC},
+    "OneMinusNode": {0: _DYNAMIC_NUMERIC},
+    "LerpOp": {0: _DYNAMIC_NUMERIC},
     "TexturePropertyNode": {0: "SAMPLER2D", 1: "SAMPLERSTATE"},
     "RangedFloatNode": {0: "FLOAT"},
     "Matrix4X4Node": {0: "FLOAT4x4"},
@@ -83,6 +102,10 @@ def validate_connections(
 def _input_ports(node: NodeSpec) -> dict[int, str]:
     if node.kind == "custom_expression":
         return {index: item.type for index, item in enumerate(node.inputs)}
+    if node.kind == "primitive":
+        return PRIMITIVE_OPS[node.op][1]
+    if node.kind == "recipe":
+        return {index: item.type for index, item in enumerate(node.inputs)}
     return _STATIC_INPUT_PORTS[node.ase_type]
 
 
@@ -90,10 +113,17 @@ def _output_ports(node: NodeSpec) -> dict[int, str]:
     if node.kind == "custom_expression":
         assert node.output_type is not None
         return {0: node.output_type}
+    if node.kind == "primitive":
+        return PRIMITIVE_OPS[node.op][2]
+    if node.kind == "recipe":
+        assert node.output_type is not None
+        return {0: node.output_type}
     return _STATIC_OUTPUT_PORTS[node.ase_type]
 
 
 def _compatible_port_types(source: str, destination: str) -> bool:
+    if source == _DYNAMIC_NUMERIC:
+        return destination == _DYNAMIC_NUMERIC or destination in _NUMERIC_TYPES or destination in _MATRIX_TYPES
     if destination == _DYNAMIC_NUMERIC:
         return source in _NUMERIC_TYPES or source in _MATRIX_TYPES
     if source in _NUMERIC_TYPES and destination in _NUMERIC_TYPES:

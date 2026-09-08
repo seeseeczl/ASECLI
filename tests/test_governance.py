@@ -10,6 +10,7 @@ from tools.check_ci_governance import (
     _action_runtime_findings,
     _audit_supplement_findings,
     _loc_exemption_governance_findings,
+    _packed_executor_loc_findings,
     _python_loc_findings,
     _release_record_findings,
 )
@@ -19,6 +20,8 @@ from tools.check_regression_catalog import (
     catalog_command_spans,
     catalog_commands,
 )
+from tools.check_release_candidate import candidate_findings, project_version
+from tools.check_document_governance import _markdown_cells
 
 
 def test_regression_catalog_parser_covers_every_pytest_span():
@@ -72,6 +75,46 @@ def test_audit_supplement_has_stable_complete_module_set():
         (root / config["audit"]["supplement"]).read_text(encoding="utf-8")
     )
     assert len({item["id"] for item in supplement["functional_modules"]}) == 14
+
+
+def test_release_candidate_tag_must_match_project_version(tmp_path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text('[project]\nversion = "0.6.2"\n', encoding="utf-8")
+
+    assert project_version(pyproject) == "0.6.2"
+    assert candidate_findings("v0.6.2", "0.6.2") == []
+    assert candidate_findings("v0.6.1", "0.6.2") == [
+        "release tag 'v0.6.1' does not match project version '0.6.2'"
+    ]
+    assert candidate_findings("release-0.6.2", "0.6.2") == [
+        "release tag must match vX.Y.Z, got 'release-0.6.2'"
+    ]
+
+
+def test_publish_workflow_keeps_all_gates_before_oidc_publish():
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+
+    required = (
+        "tools/check_release_candidate.py",
+        "pytest -q",
+        "tools/check_regression_catalog.py",
+        "tools/check_ci_governance.py",
+        "tools/compare_build_artifacts.py",
+        "tools/generate_sbom.py",
+        "tools/supply_chain_check.py",
+        "shasum -a 256 -c SHA256SUMS",
+        "uv publish dist/*.whl dist/*.tar.gz",
+    )
+    for marker in required:
+        assert marker in workflow
+    assert workflow.index("needs: package") < workflow.index("id-token: write")
+
+
+def test_governance_markdown_cells_preserve_escaped_pipes():
+    assert _markdown_cells("| TASK-1 | CR-1 | `legacy\\|meticulous` | REG-1 |") == [
+        "TASK-1", "CR-1", "`legacy|meticulous`", "REG-1",
+    ]
 
 
 def test_released_records_have_no_pending_evidence():
@@ -144,6 +187,28 @@ def test_loc_exemption_requires_complete_unexpired_governance():
     assert "resource.cs.txt loc exemption expired on 2026-07-31" in _loc_exemption_governance_findings(
         "resource.cs.txt", expired, today=date(2026, 9, 3)
     )
+
+
+def test_packed_executor_warning_baseline_blocks_growth_and_new_large_parts(tmp_path):
+    resources = tmp_path / "src/asecli/bridge/resources"
+    resources.mkdir(parents=True)
+    tracked = resources / "tracked.cs.txt"
+    tracked.write_text("line\n" * 4, encoding="utf-8")
+    new_large = resources / "new-large.cs.txt"
+    new_large.write_text("line\n" * 3, encoding="utf-8")
+
+    findings = _packed_executor_loc_findings(
+        tmp_path,
+        source_warning=2,
+        source_limit=5,
+        exemptions={},
+        warning_baselines={"src/asecli/bridge/resources/tracked.cs.txt": 3},
+    )
+
+    assert findings == [
+        "src/asecli/bridge/resources/new-large.cs.txt has 3 lines (source warning 2) and has no valid growth baseline",
+        "src/asecli/bridge/resources/tracked.cs.txt grew from warning baseline 3 to 4 lines",
+    ]
 
 
 def test_ci_actions_use_approved_node24_commits():

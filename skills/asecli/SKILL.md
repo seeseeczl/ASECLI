@@ -98,7 +98,7 @@ asecli recompile <file>
 若返回 `provider=native_mzgui`，使用工程已有 MZGUI；`gui-support --write` 只安装 authoring/条件 Drawer，不创建第二个 provider。若安装了 `asecli_compat`，则使用 fallback。等待 Unity 编译后打开 `Window > Amplify Shader Editor > MZGUI Attributes (ASECLI)`；在 ASE 中选择一个 Property 节点，用 Foldout/Tooltip/HelpBox/条件启用控件编辑，点击“应用并保存 Shader”。不要让用户手写 Custom Attribute 字符串。
 
 - `--group` 写 `FoldoutMzgui`，`--tooltip` 写 `TooltipMzgui`。把 group 加在组内第一个 PropertyNode；后续属性归入该组，直到下一个非空分组标题。
-- Property 的公开显示名强制包含中文；创建新节点时使用 EditorGraphSpec v2 的 `inspector_name`，已有节点通过 `custom-gui --spec` 的 `display_name` 原子修改图字段与编译区标签。
+- Property 的公开显示名强制包含中文；创建新节点时使用 EditorGraphSpec v2/v3 的 `inspector_name`，已有节点通过 `custom-gui --spec` 的 `display_name` 原子修改图字段与编译区标签。
 - 选中的 ShaderGUI（原生 MZGUI 或 ASECLI fallback）会自动在 Tooltip 末尾追加变量名与默认基线，并从默认 `Material(shader)` 读取真实 Shader 默认值；Tooltip 正文写用途、调节方向、通道、单位或限制，不手工抄写技术信息。
 - HelpBox 是用户可选内容：工具默认不创建，也不把存在 HelpBox 视为违规。用户可用 `--help-box`、`--clear-help-box` 或批量 spec 的可选 `help` 字段增删；它不能替代必填 Tooltip。
 - 条件置灰用 `enabled_if` / `--enabled-if` 写为 `EnableIfMzgui(source,operator,value)`。支持 `Less`、`LessEqual`、`Equal`、`NotEqual`、`GreaterEqual`、`Greater`；控制属性缺失或多选材质并非全部满足时置灰。它只控制 Editor 可编辑状态，不清空值，不代替 Shader Keyword、Static Switch 或运行时分支。
@@ -238,7 +238,7 @@ ASECLI_MCP_INSTANCE_TOKEN='<由安全渠道注入>' asecli recompile Assets/Exp/
 Editor 创建规则：
 
 - 只用于尚不存在、位于当前 Unity/Tuanjie 工程 `Assets/` 下的 `.shader`；禁止 `--force`，不得拿它覆盖或迁移生产 Shader。
-- 正式 CLI 创建使用 `EditorGraphSpec v2`，每个 Property/Sampler 必填中文 `inspector_name` 与中文 `tooltip`；旧 `help` 输入只迁移为 Tooltip，底层 v1 仅保留桥接兼容。URP Unlit 模板 GUID `2992e84f91cbeb14eab234972e07ea9d` 的端口、方向、基本类型和 `property_name` 唯一性均在 MCP 前校验。
+- 正式 CLI 创建使用 `EditorGraphSpec v2/v3`，每个 Property/Sampler 必填中文 `inspector_name` 与中文 `tooltip`；旧 `help` 输入只迁移为 Tooltip，底层 v1 仅保留桥接兼容。v3 必填 `primitives_version: 1`，只接受版本化 primitive 闭包和无前向引用的 recipe；支持的 Property 可携带 `precision/default/min/max`。未知版本、primitive、模板、端口、字段或类型均在 MCP 前失败关闭。
 - 固定执行器调用 ASE 的 `CreateNewTemplateShader`、`CreateNode`、`ParentGraph.CreateConnection`、`SaveToDisk`、`LoadFromDisk`；不要生成或要求用户提供一次性 C#，也不要手工拼 ShaderLab/HLSL/ASEBEGIN 冒充 Editor 结果。
 - 成功结果必须对账 `template_guid`、`shader_name`、节点/属性/Custom Expression 输入输出和连接 manifest。创建调用只重载并核对暂存图：JSON 的 `reloaded`/`staging_reloaded=true` 不等于目标图已重开，`target_graph_reloaded` 为 `false`。提交后由独立 `recompile` 重载目标，避免 MCP 插件重连吞掉成功回执；最终发布前仍要用新 Editor 进程重开目标。结构通过不等于目标材质和渲染画面通过。
 - MCP 3.4.7 的模式扫描会拦截固定回滚代码中的 `DeleteAsset`；CLI 只对包内固定、nonce 隔离的创建执行器设置该次 `safety_checks=false`，规格不能传入任意 C#。

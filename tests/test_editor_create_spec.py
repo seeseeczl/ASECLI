@@ -288,3 +288,110 @@ def test_v2_accepts_conditional_enable_but_keeps_it_out_of_editor_payload_v1():
     raw["nodes"][0]["enabled_if"]["operator"] = "Between"
     with pytest.raises(SpecError, match="enabled_if.operator"):
         EditorGraphSpec.from_dict(raw)
+
+
+MATH_NODE_TYPES = [
+    "SimpleAddOpNode",
+    "SimpleSubtractOpNode",
+    "SimpleMultiplyOpNode",
+    "SimpleDivideOpNode",
+    "SimpleMinOpNode",
+    "SimpleMaxOpNode",
+    "SaturateNode",
+    "OneMinusNode",
+    "LerpOp",
+]
+
+
+@pytest.mark.parametrize("node_type", MATH_NODE_TYPES)
+def test_v2_math_nodes_are_in_the_generic_allowlist(node_type):
+    raw = {
+        "version": 2,
+        "template": {"guid": TEMPLATE_GUID, "shader_name": "Tests/Math"},
+        "nodes": [
+            {"alias": "a", "kind": "node", "type": node_type, "position": [-400, 0]},
+        ],
+        "connections": [],
+    }
+
+    spec = EditorGraphSpec.from_dict(raw)
+
+    assert spec.nodes[0].type == node_type
+    assert spec.nodes[0].ase_type == node_type
+    assert spec.expected_manifest()["nodes"][0] == {
+        "alias": "a",
+        "kind": "node",
+        "type": node_type,
+    }
+
+
+def test_v2_math_node_dynamic_ports_accept_concrete_sources_and_chain():
+    raw = {
+        "version": 2,
+        "template": {"guid": TEMPLATE_GUID, "shader_name": "Tests/MathChain"},
+        "nodes": [
+            {"alias": "world", "kind": "node", "type": "WorldPosInputsNode", "position": [-800, -80]},
+            {"alias": "add", "kind": "node", "type": "SimpleAddOpNode", "position": [-600, -80]},
+            {"alias": "mul", "kind": "node", "type": "SimpleMultiplyOpNode", "position": [-400, -80]},
+            {"alias": "lerp", "kind": "node", "type": "LerpOp", "position": [-200, -80]},
+            {"alias": "sat", "kind": "node", "type": "SaturateNode", "position": [0, -80]},
+        ],
+        "connections": [
+            # concrete FLOAT3 -> dynamic Add input 0
+            {"from": {"node": "world", "port": 0}, "to": {"node": "add", "port": 0}},
+            # dynamic Add output -> dynamic Multiply input 0
+            {"from": {"node": "add", "port": 0}, "to": {"node": "mul", "port": 0}},
+            # dynamic Multiply output -> dynamic Lerp input 0
+            {"from": {"node": "mul", "port": 0}, "to": {"node": "lerp", "port": 0}},
+            # dynamic Lerp output -> dynamic Saturate input 0
+            {"from": {"node": "lerp", "port": 0}, "to": {"node": "sat", "port": 0}},
+            # dynamic Saturate output -> concrete master FLOAT3 (port 2)
+            {"from": {"node": "sat", "port": 0}, "to": {"node": "master", "port": 2}},
+        ],
+    }
+
+    spec = EditorGraphSpec.from_dict(raw)
+
+    assert len(spec.connections) == 5
+
+
+def test_v2_math_node_dynamic_source_to_concrete_destination_roundtrips_manifest():
+    raw = {
+        "version": 2,
+        "template": {"guid": TEMPLATE_GUID, "shader_name": "Tests/MathManifest"},
+        "nodes": [
+            {"alias": "one", "kind": "node", "type": "OneMinusNode", "position": [-400, 0]},
+            {"alias": "max", "kind": "node", "type": "SimpleMaxOpNode", "position": [-200, 0]},
+        ],
+        "connections": [
+            {"from": {"node": "one", "port": 0}, "to": {"node": "max", "port": 0}},
+        ],
+    }
+
+    spec = EditorGraphSpec.from_dict(raw)
+
+    manifest = spec.expected_manifest()
+    assert manifest["nodes"] == [
+        {"alias": "one", "kind": "node", "type": "OneMinusNode"},
+        {"alias": "max", "kind": "node", "type": "SimpleMaxOpNode"},
+    ]
+    assert spec.to_dict()["nodes"][0]["type"] == "OneMinusNode"
+    assert spec.to_dict()["nodes"][1]["type"] == "SimpleMaxOpNode"
+
+
+def test_v2_math_node_rejects_nonexistent_ports():
+    raw = {
+        "version": 2,
+        "template": {"guid": TEMPLATE_GUID, "shader_name": "Tests/MathPorts"},
+        "nodes": [
+            {"alias": "saturate", "kind": "node", "type": "SaturateNode", "position": [-400, 0]},
+            {"alias": "add", "kind": "node", "type": "SimpleAddOpNode", "position": [-200, 0]},
+        ],
+        "connections": [
+            # Saturate has only input 0; input 1 does not exist.
+            {"from": {"node": "add", "port": 0}, "to": {"node": "saturate", "port": 1}},
+        ],
+    }
+
+    with pytest.raises(SpecError, match="destination port"):
+        EditorGraphSpec.from_dict(raw)

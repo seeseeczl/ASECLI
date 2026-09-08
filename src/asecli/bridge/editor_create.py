@@ -16,6 +16,9 @@ from .resource_text import compose_resource_text
 EDITOR_CREATE_RESOURCE_PARTS = (
     "editor_create.part00.cs.txt",
     "editor_create.part01.cs.txt",
+    "editor_create.part02.cs.txt",
+    "editor_create.part03.cs.txt",
+    "editor_create.part04.cs.txt",
 )
 EDITOR_CREATE_SNIPPET = compose_resource_text(
     "asecli.bridge", "resources", EDITOR_CREATE_RESOURCE_PARTS

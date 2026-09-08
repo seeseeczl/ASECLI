@@ -1,0 +1,139 @@
+        var created = win.CreateNode(
+            nodeType,
+            new UnityEngine.Vector2((float)position[0], (float)position[1]),
+            null,
+            false);
+        if (created == null || created.GetType() != nodeType)
+            throw new System.Exception("ASE failed to create node: " + alias);
+        aliasIds.Add(alias, created.UniqueId);
+
+        if (kind == "sampler")
+        {
+            var sampler = created as AmplifyShaderEditor.SamplerNode;
+            sampler.CurrentParameterType = (AmplifyShaderEditor.PropertyType)System.Enum.Parse(
+                typeof(AmplifyShaderEditor.PropertyType), (string)nodeSpec["parameter_type"]);
+            sampler.SetPropertyName((string)nodeSpec["property_name"]);
+            sampler.SetInspectorName((string)nodeSpec["inspector_name"]);
+            sampler.AutoRegister = true;
+            sampler.OnPropertyNameChanged();
+        }
+        else if (kind == "property")
+        {
+            var property = created as AmplifyShaderEditor.PropertyNode;
+            if (property == null) throw new System.Exception("property-node cast failed: " + alias);
+            property.CurrentParameterType = (AmplifyShaderEditor.PropertyType)System.Enum.Parse(
+                typeof(AmplifyShaderEditor.PropertyType), (string)nodeSpec["parameter_type"]);
+            property.SetRawPropertyName((string)nodeSpec["property_name"]);
+            propertyInspectorProperty.SetValue(property, (string)nodeSpec["inspector_name"], null);
+            property.AutoRegister = true;
+            property.OnPropertyNameChanged();
+            if (property is AmplifyShaderEditor.RangedFloatNode && nodeSpec["default"] != null)
+            {
+                var ranged = (AmplifyShaderEditor.RangedFloatNode)property;
+                ranged.Value = (float)nodeSpec["default"];
+                if (nodeSpec["min"] != null)
+                {
+                    rangedMinField.SetValue(ranged, (float)nodeSpec["min"]);
+                    rangedMaxField.SetValue(ranged, (float)nodeSpec["max"]);
+                    ranged.SetFloatMode(false);
+                }
+            }
+            else if (property is AmplifyShaderEditor.Vector4Node && nodeSpec["default"] != null)
+            {
+                var vector = (AmplifyShaderEditor.Vector4Node)property;
+                var values = (Newtonsoft.Json.Linq.JArray)nodeSpec["default"];
+                vector.Value = new UnityEngine.Vector4((float)values[0], (float)values[1], (float)values[2], (float)values[3]);
+            }
+        }
+        else if (kind == "custom_expression")
+        {
+            var expression = created as AmplifyShaderEditor.CustomExpressionNode;
+            string expressionCode = (string)nodeSpec["code"];
+            var inputSpecs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
+            var items = new System.Collections.Generic.List<AmplifyShaderEditor.CustomExpressionInputItem>();
+            for (int inputIndex = 0; inputIndex < inputSpecs.Count; inputIndex++)
+            {
+                var inputSpec = (Newtonsoft.Json.Linq.JObject)inputSpecs[inputIndex];
+                string inputName = (string)inputSpec["name"];
+                var inputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
+                    typeof(AmplifyShaderEditor.WirePortDataType), (string)inputSpec["type"]);
+                var item = new AmplifyShaderEditor.CustomExpressionInputItem(
+                    AmplifyShaderEditor.PrecisionType.Inherit,
+                    AmplifyShaderEditor.VariableQualifiers.In,
+                    string.Empty,
+                    false,
+                    true,
+                    string.Empty);
+                item.Type = inputType;
+                items.Add(item);
+                if (inputIndex == 0)
+                    expression.InputPorts[0].ChangeProperties(inputName, inputType, false);
+                else
+                    expression.AddInputPort(inputType, false, inputName);
+            }
+            string outputTypeName = (string)nodeSpec["output_type"];
+            var outputType = (AmplifyShaderEditor.WirePortDataType)System.Enum.Parse(
+                typeof(AmplifyShaderEditor.WirePortDataType), outputTypeName);
+            int outputTypeIndex = outputTypeName == "INT" ? 0 :
+                outputTypeName == "FLOAT" ? 1 :
+                outputTypeName == "FLOAT2" ? 2 :
+                outputTypeName == "FLOAT3" ? 3 :
+                outputTypeName == "FLOAT4" ? 4 :
+                outputTypeName == "FLOAT3x3" ? 5 : 6;
+            expression.OutputPorts[0].ChangeType(outputType, false);
+            expressionNameField.SetValue(expression, (string)nodeSpec["name"]);
+            expressionItemsField.SetValue(expression, items);
+            expressionCodeField.SetValue(expression, expressionCode);
+            expressionOutputField.SetValue(expression, outputTypeIndex);
+            expressionFunctionField.SetValue(expression, expressionCode.Contains("return"));
+        }
+        if (nodeSpec["precision"] != null)
+            precisionField.SetValue(created,
+                (AmplifyShaderEditor.PrecisionType)System.Enum.Parse(
+                    typeof(AmplifyShaderEditor.PrecisionType), (string)nodeSpec["precision"]));
+    }
+
+    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
+    {
+        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
+        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
+        string sourceAlias = (string)sourceSpec["node"];
+        string destinationAlias = (string)destinationSpec["node"];
+        int sourcePortId = (int)sourceSpec["port"];
+        int destinationPortId = (int)destinationSpec["port"];
+        int sourceNodeId = recipeOutputIds.ContainsKey(sourceAlias) ? recipeOutputIds[sourceAlias] : aliasIds[sourceAlias];
+        int sourceOutPort = recipeOutputIds.ContainsKey(sourceAlias) ? 0 : sourcePortId;
+        var sourceNode = graph.GetNode(sourceNodeId);
+        if (sourceNode == null || sourceNode.GetOutputPortByUniqueId(sourceOutPort) == null)
+            throw new System.Exception("connection source endpoint not found");
+
+        if (destinationAlias == "master")
+        {
+            graph.CreateConnection(masterId, destinationPortId, sourceNodeId, sourceOutPort, false);
+            if (!graph.CurrentMasterNode.GetInputPortByUniqueId(destinationPortId).IsConnectedTo(sourceNodeId, sourceOutPort))
+                throw new System.Exception("ASE rejected connection");
+        }
+        else if (recipeInputTargets.ContainsKey(destinationAlias))
+        {
+            var targets = recipeInputTargets[destinationAlias];
+            if (!targets.ContainsKey(destinationPortId) || targets[destinationPortId].Count == 0)
+                throw new System.Exception("recipe input port has no consumer");
+            foreach (System.Tuple<int, int> target in targets[destinationPortId])
+            {
+                graph.CreateConnection(target.Item1, target.Item2, sourceNodeId, sourceOutPort, false);
+                if (!graph.GetNode(target.Item1).GetInputPortByUniqueId(target.Item2).IsConnectedTo(sourceNodeId, sourceOutPort))
+                    throw new System.Exception("ASE rejected recipe input connection");
+            }
+        }
+        else
+        {
+            int destinationNodeId = aliasIds[destinationAlias];
+            var destinationNode = graph.GetNode(destinationNodeId);
+            if (destinationNode == null ||
+                destinationNode.GetInputPortByUniqueId(destinationPortId) == null)
+                throw new System.Exception("connection destination endpoint not found");
+            graph.CreateConnection(destinationNodeId, destinationPortId, sourceNodeId, sourceOutPort, false);
+            if (!destinationNode.GetInputPortByUniqueId(destinationPortId).IsConnectedTo(sourceNodeId, sourceOutPort))
+                throw new System.Exception("ASE rejected connection");
+        }
+    }

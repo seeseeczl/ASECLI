@@ -104,10 +104,10 @@ def _cmd_create_text(args, spec) -> dict:
 def _cmd_create_editor(args, spec) -> dict:
     if spec is None:
         raise CliError("USAGE_ERROR", "--spec is required for the editor create backend")
-    if spec.version != 2:
+    if spec.version not in {2, 3}:
         raise CliError(
             "USAGE_ERROR",
-            "CLI Editor creation requires EditorGraphSpec v2 with Chinese inspector_name and help for every property",
+            "CLI Editor creation requires EditorGraphSpec v2 or v3 with Chinese inspector_name and help for every property",
         )
     if args.from_template or args.graph_from or args.name:
         raise CliError("USAGE_ERROR", "--from, --graph-from and --name are text-backend options")

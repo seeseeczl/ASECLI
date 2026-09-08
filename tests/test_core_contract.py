@@ -19,3 +19,12 @@ def test_parse_node_line_rejects_malformed_input():
 
     with pytest.raises(ValueError, match="malformed Node line"):
         parse_node_line("Node;too-short")
+
+
+def test_layout_cli_dependencies_are_public_core_contracts():
+    from asecli.core import AseFile, COMMENTARY_TYPE, WIRE_NODE_TYPE, logical_wire_manifest
+
+    assert AseFile.__name__ == "AseFile"
+    assert COMMENTARY_TYPE == "AmplifyShaderEditor.CommentaryNode"
+    assert WIRE_NODE_TYPE == "AmplifyShaderEditor.WireNode"
+    assert callable(logical_wire_manifest)

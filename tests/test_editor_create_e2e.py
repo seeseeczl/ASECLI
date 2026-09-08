@@ -16,6 +16,7 @@ from asecli.bridge.editor_spec import EditorGraphSpec
 from asecli.checks import validate_file
 from asecli.cli.create_command import _finalize_editor_property_presentation
 from asecli.core import AseFile, require_property_presentation
+from tests.editor_create_v3_fixture import algorithm_reload_method, algorithm_spec
 
 
 TEMPLATE_GUID = "2992e84f91cbeb14eab234972e07ea9d"
@@ -23,7 +24,7 @@ PROJECT_ENV = "ASECLI_EDITOR_CREATE_PROJECT"
 EDITOR_ENV = "ASECLI_TUANJIE_PATH"
 
 
-def _specs() -> tuple[EditorGraphSpec, EditorGraphSpec]:
+def _specs() -> tuple[EditorGraphSpec, EditorGraphSpec, EditorGraphSpec]:
     caster = {
         "version": 2,
         "template": {"guid": TEMPLATE_GUID, "shader_name": "ASECLI/E2E/Caster"},
@@ -73,7 +74,12 @@ def _specs() -> tuple[EditorGraphSpec, EditorGraphSpec]:
             {"from": {"node": "expr", "port": 0}, "to": {"node": "master", "port": 2}},
         ],
     }
-    return EditorGraphSpec.from_dict(caster), EditorGraphSpec.from_dict(receiver)
+    algorithm = algorithm_spec(TEMPLATE_GUID)
+    return (
+        EditorGraphSpec.from_dict(caster),
+        EditorGraphSpec.from_dict(receiver),
+        EditorGraphSpec.from_dict(algorithm),
+    )
 
 
 @pytest.mark.bridge
@@ -91,7 +97,7 @@ def test_real_editor_create_then_new_process_reload():
     if not editor.is_file():
         pytest.fail(f"Tuanjie executable not found: {editor}")
 
-    caster, receiver = _specs()
+    caster, receiver, algorithm = _specs()
     generated = project / "Assets" / "ASECLIE2E" / "Generated"
     editor_dir = project / "Assets" / "ASECLIE2E" / "Editor"
     generated.mkdir(parents=True, exist_ok=True)
@@ -101,17 +107,21 @@ def test_real_editor_create_then_new_process_reload():
     editor_dir.mkdir(parents=True, exist_ok=True)
     caster_path = "Assets/ASECLIE2E/Generated/Caster.shader"
     receiver_path = "Assets/ASECLIE2E/Generated/Receiver.shader"
+    algorithm_path = "Assets/ASECLIE2E/Generated/AlgorithmV3.shader"
     close_failure_path = "Assets/ASECLIE2E/Generated/CloseFailure.shader"
-    for relative in (caster_path, receiver_path, close_failure_path):
+    for relative in (caster_path, receiver_path, algorithm_path, close_failure_path):
         target = project / relative
         assert not target.exists(), f"isolated E2E target already exists: {target}"
 
     caster_payload = caster.editor_payload(caster_path, "Assets/ASECLIE2E/Generated/ASECLI-Temp-e2e-caster.shader")
     receiver_payload = receiver.editor_payload(receiver_path, "Assets/ASECLIE2E/Generated/ASECLI-Temp-e2e-receiver.shader")
+    algorithm_payload = algorithm.editor_payload(
+        algorithm_path, "Assets/ASECLIE2E/Generated/ASECLI-Temp-e2e-algorithm-v3.shader"
+    )
     close_failure_payload = caster.editor_payload(
         close_failure_path, "Assets/ASECLIE2E/Generated/ASECLI-Temp-e2e-close-failure.shader"
     )
-    source = _harness_source(caster_payload, receiver_payload, close_failure_payload)
+    source = _harness_source(caster_payload, receiver_payload, algorithm_payload, close_failure_payload)
     harness = editor_dir / "ASECLIEditorCreateE2E.cs"
     harness.write_text(source, encoding="utf-8")
 
@@ -123,14 +133,17 @@ def test_real_editor_create_then_new_process_reload():
     assert result["close_failure_rolled_back"] is True, result
     caster_result = json.loads(result["caster"].split("ASECLI_EDITOR_CREATE_V1:", 1)[1])
     receiver_result = json.loads(result["receiver"].split("ASECLI_EDITOR_CREATE_V1:", 1)[1])
+    algorithm_result = json.loads(result["algorithm"].split("ASECLI_EDITOR_CREATE_V1:", 1)[1])
     assert caster_result["manifest"] == caster.expected_manifest()
     assert receiver_result["manifest"] == receiver.expected_manifest()
+    assert algorithm_result["manifest"] == algorithm.expected_manifest()
     assert caster_result["template_guid"] == TEMPLATE_GUID
     assert receiver_result["template_guid"] == TEMPLATE_GUID
     assert caster_result["shader_name"] == "ASECLI/E2E/Caster"
     assert receiver_result["shader_name"] == "ASECLI/E2E/Receiver"
+    assert algorithm_result["shader_name"] == "ASECLI/E2E/AlgorithmV3"
 
-    for spec, relative in ((caster, caster_path), (receiver, receiver_path)):
+    for spec, relative in ((caster, caster_path), (receiver, receiver_path), (algorithm, algorithm_path)):
         target = project / relative
         created = AseFile.from_path(target)
         output, presentation = _finalize_editor_property_presentation(created, spec)
@@ -140,7 +153,7 @@ def test_real_editor_create_then_new_process_reload():
     reload_log = project / "asecli-editor-reload.log"
     _run_editor(editor, project, "ASECLIEditorCreateE2E.VerifyReload", reload_log)
     reload_result = json.loads((project / "asecli-editor-reload-result.json").read_text(encoding="utf-8"))
-    assert reload_result == {"ok": True, "caster": True, "receiver": True}
+    assert reload_result == {"ok": True, "caster": True, "receiver": True, "algorithm": True}
     for log in (create_log, reload_log):
         text = log.read_text(encoding="utf-8", errors="replace")
         assert not any(marker in text for marker in ("Shader error", "failed to compile", "error CS", "Exception:"))
@@ -150,8 +163,9 @@ def test_real_editor_create_then_new_process_reload():
 
     assert _shader_name(project / caster_path) == "ASECLI/E2E/Caster"
     assert _shader_name(project / receiver_path) == "ASECLI/E2E/Receiver"
+    assert _shader_name(project / algorithm_path) == "ASECLI/E2E/AlgorithmV3"
 
-    for relative in (caster_path, receiver_path):
+    for relative in (caster_path, receiver_path, algorithm_path):
         ase_file = AseFile.from_path(project / relative)
         errors = [issue for issue in validate_file(ase_file) if issue["severity"] == "error"]
         assert not errors
@@ -194,7 +208,12 @@ def _method_body(payload: dict, *, inject_close_failure: bool = False) -> str:
     return textwrap.indent(snippet, "        ")
 
 
-def _harness_source(caster_payload: dict, receiver_payload: dict, close_failure_payload: dict) -> str:
+def _harness_source(
+    caster_payload: dict,
+    receiver_payload: dict,
+    algorithm_payload: dict,
+    close_failure_payload: dict,
+) -> str:
     return f'''using UnityEditor;
 using UnityEngine;
 
@@ -207,6 +226,7 @@ public static class ASECLIEditorCreateE2E
         {{
             result["caster"] = CreateCaster();
             result["receiver"] = CreateReceiver();
+            result["algorithm"] = CreateAlgorithm();
             result["close_failure_rolled_back"] = VerifyCloseFailureRollback();
             result["ok"] = true;
             System.IO.File.WriteAllText("asecli-editor-create-result.json", result.ToString(Newtonsoft.Json.Formatting.None));
@@ -230,6 +250,11 @@ public static class ASECLIEditorCreateE2E
     private static string CreateReceiver()
     {{
 {_method_body(receiver_payload)}
+    }}
+
+    private static string CreateAlgorithm()
+    {{
+{_method_body(algorithm_payload)}
     }}
 
     private static string CreateCloseFailure()
@@ -268,6 +293,7 @@ public static class ASECLIEditorCreateE2E
                 "Assets/ASECLIE2E/Generated/Caster.shader", "ASECLI/E2E/Caster", true);
             result["receiver"] = VerifyOne(
                 "Assets/ASECLIE2E/Generated/Receiver.shader", "ASECLI/E2E/Receiver", false);
+            result["algorithm"] = VerifyAlgorithm();
             result["ok"] = true;
             System.IO.File.WriteAllText("asecli-editor-reload-result.json", result.ToString(Newtonsoft.Json.Formatting.None));
             EditorApplication.Exit(0);
@@ -342,5 +368,7 @@ public static class ASECLIEditorCreateE2E
             if (win != null) {{ win.Close(); Object.DestroyImmediate(win); }}
         }}
     }}
+
+{algorithm_reload_method(TEMPLATE_GUID)}
 }}
 '''

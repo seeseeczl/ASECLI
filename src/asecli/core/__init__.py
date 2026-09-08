@@ -48,6 +48,7 @@ from .local_vars import (
     parse_get_local_var,
     parse_register_local_var,
 )
+from .wire_router import WIRE_NODE_TYPE, logical_wire_manifest
 from .material_gui_spec import apply_material_gui_spec, material_property_nodes, resolve_property_node
 from .material_gui_condition import (
     ENABLE_IF_ATTRIBUTE,
@@ -79,4 +80,5 @@ __all__ = [
     "inspect_comment_groups", "parse_commentary_node", "refit_comment_groups",
     "GET_LOCAL_VAR_TYPE", "REGISTER_LOCAL_VAR_TYPE", "local_var_edges",
     "parse_get_local_var", "parse_register_local_var",
+    "WIRE_NODE_TYPE", "logical_wire_manifest",
 ]

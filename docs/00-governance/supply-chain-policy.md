@@ -14,7 +14,7 @@ evidence: [uv.lock, LICENSE, SECURITY.md, tools/supply_chain_check.py, tools/gen
 
 ## 分发与许可
 
-- AseCLI 以 MIT 许可证开源，标识为 `MIT`。用户安装入口为 PyPI 项目 `asecli`；源码与 GitHub Release 仍公开。CLI Hub 仍须单独 CR。
+- AseCLI 以 MIT 许可证开源，标识为 `MIT`。当前用户安装入口为仓库一键安装脚本及其解析的最新 GitHub Release wheel；PyPI 项目 `asecli` 是 CR-0023 已批准但尚未发布的目标入口。源码与 GitHub Release 公开，CLI Hub 仍须单独 CR。
 - 当前生产运行时依赖为 0；开发依赖由 `uv.lock` 固定来源、版本和 SHA-256。第三方依赖继续遵守其自身许可证。
 - 新增生产依赖、修改许可或改变分发渠道属于单独 CR，必须先完成许可证与漏洞评估。
 
@@ -24,7 +24,7 @@ evidence: [uv.lock, LICENSE, SECURITY.md, tools/supply_chain_check.py, tools/gen
 - `tools/supply_chain_check.py`：检查 lock hash、固定 Action SHA、常见高置信 secret 形态与内部许可证。
 - `tools/generate_sbom.py`：生成 SPDX 2.3 JSON，包含项目、锁定包和构建 artifact SHA-256。
 - CI 使用经官方 tag 核对、固定 commit 且原生声明 Node 24 的 GitHub Actions；`tools/check_ci_governance.py` 固定 allowlist，阻止 SHA/runtime 回退。`ci.yml` 必须包含 checkout、setup-uv 与 upload-artifact；`publish.yml` 额外固定 download-artifact。artifact 同时上传 wheel、sdist、SHA256SUMS、SBOM 和供应链检查结果。
-- 推送 `vX.Y.Z` tag 后，`publish.yml` 以 Trusted Publishing 上传 PyPI，不在仓库中保存 PyPI token。
+- CR-0023 完成发布准备且获得单独发布授权后，推送与 `pyproject.toml` 完全一致的 `vX.Y.Z` tag，`publish.yml` 才可通过 Trusted Publishing 上传 PyPI；在此之前不得把 PyPI 写成已交付入口，也不在仓库中保存 PyPI token。
 
 ## 漏洞、密钥与例外
 

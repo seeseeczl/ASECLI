@@ -1,0 +1,114 @@
+
+    string moveError = UnityEditor.AssetDatabase.MoveAsset(temporaryAssetPath, assetPath);
+    if (!string.IsNullOrEmpty(moveError)) throw new System.Exception("asset commit failed: " + moveError);
+    committed = true;
+    var targetShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(assetPath);
+    if (targetShader == null || targetShader.name != shaderName)
+        throw new System.Exception("shader identity changed after asset commit");
+
+    var result = new Newtonsoft.Json.Linq.JObject();
+    result["protocol"] = "ASECLI_EDITOR_CREATE_V1";
+    result["ase_version"] = aseVersion;
+    result["asset_path"] = assetPath;
+    result["template_guid"] = reloadedMaster.CurrentTemplate.GUID;
+    result["shader_name"] = targetShader.name;
+    result["saved"] = saved;
+    result["reloaded"] = reloaded;
+    result["committed"] = committed;
+    var manifest = new Newtonsoft.Json.Linq.JObject();
+    var manifestTemplate = new Newtonsoft.Json.Linq.JObject();
+    manifestTemplate["guid"] = reloadedMaster.CurrentTemplate.GUID;
+    manifestTemplate["shader_name"] = targetShader.name;
+    manifest["template"] = manifestTemplate;
+    manifest["nodes"] = manifestNodes;
+    manifest["connections"] = manifestConnections;
+    result["manifest"] = manifest;
+
+    UnityEditor.Selection.activeObject = previousSelection;
+    AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+    stateRestored = true;
+    if (win != null && win != previousWindow)
+    {
+        var createdWindow = win;
+        createdWindow.Close();
+        UnityEngine.Object.DestroyImmediate(createdWindow);
+        win = null;
+    }
+    success = true;
+    return "ASECLI_EDITOR_CREATE_V1:" + result.ToString(Newtonsoft.Json.Formatting.None);
+}
+catch (System.Exception ex)
+{
+    failure = ex;
+    throw;
+}
+finally
+{
+    var cleanupErrors = new System.Collections.Generic.List<string>();
+    if (win == null && AmplifyShaderEditor.UIUtils.CurrentWindow != previousWindow)
+        win = AmplifyShaderEditor.UIUtils.CurrentWindow as AmplifyShaderEditor.AmplifyShaderEditorWindow;
+    if (!success)
+    {
+        try
+        {
+            if (committed && !UnityEditor.AssetDatabase.DeleteAsset(assetPath) &&
+                System.IO.File.Exists(System.IO.Path.GetFullPath(assetPath)))
+                cleanupErrors.Add("failed to roll back committed target asset");
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("target rollback threw: " + cleanupEx.Message);
+        }
+        try
+        {
+            if (!UnityEditor.AssetDatabase.DeleteAsset(temporaryAssetPath) &&
+                System.IO.File.Exists(System.IO.Path.GetFullPath(temporaryAssetPath)))
+                cleanupErrors.Add("failed to delete temporary asset");
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("temporary cleanup threw: " + cleanupEx.Message);
+        }
+        try { UnityEditor.AssetDatabase.Refresh(); }
+        catch (System.Exception cleanupEx) { cleanupErrors.Add("AssetDatabase.Refresh threw: " + cleanupEx.Message); }
+    }
+    if (!stateRestored)
+    {
+        try
+        {
+            UnityEditor.Selection.activeObject = previousSelection;
+            AmplifyShaderEditor.UIUtils.CurrentWindow = previousWindow;
+            stateRestored = true;
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("Editor state restore threw: " + cleanupEx.Message);
+        }
+    }
+    if (win != null && win != previousWindow)
+    {
+        try
+        {
+            win.Close();
+            UnityEngine.Object.DestroyImmediate(win);
+            win = null;
+        }
+        catch (System.Exception cleanupEx)
+        {
+            cleanupErrors.Add("window cleanup threw: " + cleanupEx.Message);
+        }
+    }
+    if (cleanupErrors.Count > 0)
+    {
+        string cleanupMessage = string.Join(" | ", cleanupErrors.ToArray());
+        if (failure != null)
+        {
+            failure.Data["ASECLI cleanup failures"] = cleanupMessage;
+            UnityEngine.Debug.LogError("ASECLI Editor create cleanup failures: " + cleanupMessage);
+        }
+        else
+        {
+            throw new System.Exception("ASECLI Editor create cleanup failed: " + cleanupMessage);
+        }
+    }
+}

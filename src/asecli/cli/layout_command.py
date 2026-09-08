@@ -9,18 +9,18 @@ import os
 from ..bridge import McpError, apply_wire_routes_via_mcp, inspect_graph_geometry_via_mcp
 from ..checks import fix_checksum, validate_file
 from ..core import (
+    AseFile,
+    COMMENTARY_TYPE,
+    WIRE_NODE_TYPE,
     apply_meticulous_layout,
     audit_meticulous_layout,
     govern_comment_purposes,
     meticulous_layout_positions,
+    logical_wire_manifest,
     refit_comments_for_layout,
     require_managed_property_presentation,
     tidy,
 )
-from ..core.commentary import COMMENTARY_TYPE
-from ..core.meticulous_layout import WIRE_NODE_TYPE
-from ..core.model import AseFile
-from ..core.wire_router import logical_wire_manifest
 from .commands import CliError, _commit_text, _load, _save
 from .io import restore_from_backup
 

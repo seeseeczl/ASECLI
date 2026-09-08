@@ -1,0 +1,161 @@
+    bool saved = win.SaveToDisk(false);
+    if (!saved) throw new System.Exception("ASE SaveToDisk returned false");
+    var loadResult = win.LoadFromDisk(temporaryAssetPath, null);
+    bool reloaded = loadResult == AmplifyShaderEditor.ShaderLoadResult.LOADED ||
+        loadResult == AmplifyShaderEditor.ShaderLoadResult.TEMPLATE_LOADED;
+    if (!reloaded) throw new System.Exception("ASE temporary LoadFromDisk failed: " + loadResult);
+
+    graph = win.CurrentGraph;
+    var reloadedMaster = graph.CurrentMasterNode as AmplifyShaderEditor.TemplateMultiPassMasterNode;
+    var reloadedShader = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Shader>(temporaryAssetPath);
+    if (reloadedMaster == null || reloadedMaster.CurrentTemplate == null || reloadedShader == null ||
+        reloadedMaster.CurrentTemplate.GUID != templateGuid ||
+        reloadedMaster.ShaderName != shaderName || reloadedShader.name != shaderName)
+        throw new System.Exception("template or shader identity changed after temporary reload");
+    var manifestNodes = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject nodeSpec in nodes)
+    {
+        string alias = (string)nodeSpec["alias"];
+        string kind = (string)nodeSpec["kind"];
+        var manifestNode = new Newtonsoft.Json.Linq.JObject();
+        manifestNode["alias"] = alias;
+        manifestNode["kind"] = kind;
+
+        if (kind == "recipe" && recipePrimitiveIds.ContainsKey(alias))
+        {
+            manifestNode["type"] = "Recipe";
+            manifestNode["recipe"] = (string)nodeSpec["recipe"];
+            manifestNode["output_type"] = (string)nodeSpec["output_type"];
+            var manifestExpansion = new Newtonsoft.Json.Linq.JArray();
+            var expectedPrimitives = (Newtonsoft.Json.Linq.JArray)((Newtonsoft.Json.Linq.JObject)nodeSpec["expansion"])["primitives"];
+            foreach (Newtonsoft.Json.Linq.JObject primitiveSpec in expectedPrimitives)
+            {
+                string pid = (string)primitiveSpec["id"];
+                var pn = graph.GetNode(recipePrimitiveIds[alias][pid]);
+                if (pn == null)
+                    throw new System.Exception("recipe primitive missing after reload: " + pid);
+                if (pn.GetType().Name != recipePrimitiveClasses[alias][pid])
+                    throw new System.Exception("recipe primitive type changed after reload: " + pid);
+                var manifestPrimitive = new Newtonsoft.Json.Linq.JObject();
+                manifestPrimitive["id"] = pid;
+                manifestPrimitive["type"] = pn.GetType().Name;
+                manifestExpansion.Add(manifestPrimitive);
+            }
+            manifestNode["expansion_nodes"] = manifestExpansion;
+            manifestNodes.Add(manifestNode);
+            continue;
+        }
+
+        var actualNode = graph.GetNode(aliasIds[alias]);
+        if (actualNode == null) throw new System.Exception("node missing after reload: " + alias);
+        string expectedType = kind == "sampler" ? "SamplerNode" :
+            kind == "custom_expression" ? "CustomExpressionNode" :
+            kind == "primitive" ? primitiveClass((string)nodeSpec["op"]).Name :
+            kind == "recipe" ? "CustomExpressionNode" :
+            (string)nodeSpec["type"];
+        if (actualNode.GetType().Name != expectedType)
+            throw new System.Exception("node type changed after reload: " + alias);
+        manifestNode["type"] = actualNode.GetType().Name;
+        if (kind == "sampler" || kind == "property")
+        {
+            var property = actualNode as AmplifyShaderEditor.PropertyNode;
+            if (property.PropertyName != (string)nodeSpec["property_name"] ||
+                property.PropertyInspectorName != (string)nodeSpec["inspector_name"] ||
+                property.CurrentParameterType.ToString() != (string)nodeSpec["parameter_type"])
+                throw new System.Exception("property changed after reload: " + alias);
+            manifestNode["property_name"] = property.PropertyName;
+            manifestNode["inspector_name"] = property.PropertyInspectorName;
+            manifestNode["parameter_type"] = property.CurrentParameterType.ToString();
+        }
+        else if (kind == "custom_expression" || kind == "recipe")
+        {
+            var expression = actualNode as AmplifyShaderEditor.CustomExpressionNode;
+            string actualName = (string)expressionNameField.GetValue(expression);
+            string actualCode = (string)expressionCodeField.GetValue(expression);
+            string actualOutputType = expression.OutputPorts[0].DataType.ToString();
+            if (actualName != (string)nodeSpec[(kind == "recipe") ? "recipe" : "name"] ||
+                actualCode != (string)nodeSpec["code"] || actualOutputType != (string)nodeSpec["output_type"])
+                throw new System.Exception("custom expression changed after reload: " + alias);
+            manifestNode["name"] = actualName;
+            manifestNode["code"] = actualCode;
+            manifestNode["output_type"] = actualOutputType;
+            var manifestInputs = new Newtonsoft.Json.Linq.JArray();
+            var expectedInputs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
+            if (expression.InputPorts.Count != expectedInputs.Count)
+                throw new System.Exception("custom expression input count changed after reload: " + alias);
+            for (int inputIndex = 0; inputIndex < expectedInputs.Count; inputIndex++)
+            {
+                var expectedInput = (Newtonsoft.Json.Linq.JObject)expectedInputs[inputIndex];
+                var actualInput = expression.InputPorts[inputIndex];
+                if (actualInput.Name != (string)expectedInput["name"] ||
+                    actualInput.DataType.ToString() != (string)expectedInput["type"])
+                    throw new System.Exception("custom expression input changed after reload: " + alias);
+                var manifestInput = new Newtonsoft.Json.Linq.JObject();
+                manifestInput["name"] = actualInput.Name;
+                manifestInput["type"] = actualInput.DataType.ToString();
+                manifestInputs.Add(manifestInput);
+            }
+            manifestNode["inputs"] = manifestInputs;
+        }
+        else if (kind == "primitive")
+        {
+            manifestNode["op"] = (string)nodeSpec["op"];
+        }
+        if (nodeSpec["precision"] != null)
+            manifestNode["precision"] = ((AmplifyShaderEditor.PrecisionType)
+                precisionField.GetValue(actualNode)).ToString();
+        if (nodeSpec["default"] != null)
+        {
+            if (actualNode is AmplifyShaderEditor.RangedFloatNode)
+                manifestNode["default"] = ((AmplifyShaderEditor.RangedFloatNode)actualNode).Value;
+            else if (actualNode is AmplifyShaderEditor.Vector4Node)
+            {
+                var vector = ((AmplifyShaderEditor.Vector4Node)actualNode).Value;
+                manifestNode["default"] = new Newtonsoft.Json.Linq.JArray(vector.x, vector.y, vector.z, vector.w);
+            }
+        }
+        if (nodeSpec["min"] != null)
+        {
+            manifestNode["min"] = (float)rangedMinField.GetValue(actualNode);
+            manifestNode["max"] = (float)rangedMaxField.GetValue(actualNode);
+        }
+        manifestNodes.Add(manifestNode);
+    }
+
+    var manifestConnections = new Newtonsoft.Json.Linq.JArray();
+    foreach (Newtonsoft.Json.Linq.JObject connectionSpec in connections)
+    {
+        var sourceSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["from"];
+        var destinationSpec = (Newtonsoft.Json.Linq.JObject)connectionSpec["to"];
+        string sourceAlias = (string)sourceSpec["node"];
+        string destinationAlias = (string)destinationSpec["node"];
+        int sourcePortId = (int)sourceSpec["port"];
+        int destinationPortId = (int)destinationSpec["port"];
+        int sourceNodeId = recipeOutputIds.ContainsKey(sourceAlias) ? recipeOutputIds[sourceAlias] : aliasIds[sourceAlias];
+        int sourceOutPort = recipeOutputIds.ContainsKey(sourceAlias) ? 0 : sourcePortId;
+
+        if (destinationAlias == "master")
+        {
+            if (!graph.CurrentMasterNode.GetInputPortByUniqueId(destinationPortId).IsConnectedTo(sourceNodeId, sourceOutPort))
+                throw new System.Exception("connection missing after reload");
+        }
+        else if (recipeInputTargets.ContainsKey(destinationAlias))
+        {
+            var targets = recipeInputTargets[destinationAlias];
+            if (!targets.ContainsKey(destinationPortId) || targets[destinationPortId].Count == 0)
+                throw new System.Exception("recipe input port has no consumer after reload");
+            foreach (System.Tuple<int, int> target in targets[destinationPortId])
+            {
+                if (!graph.GetNode(target.Item1).GetInputPortByUniqueId(target.Item2).IsConnectedTo(sourceNodeId, sourceOutPort))
+                    throw new System.Exception("recipe input connection missing after reload");
+            }
+        }
+        else
+        {
+            int destinationNodeId = aliasIds[destinationAlias];
+            var destinationPort = graph.GetNode(destinationNodeId).GetInputPortByUniqueId(destinationPortId);
+            if (destinationPort == null || !destinationPort.IsConnectedTo(sourceNodeId, sourceOutPort))
+                throw new System.Exception("connection missing after reload");
+        }
+        manifestConnections.Add(connectionSpec.DeepClone());
+    }

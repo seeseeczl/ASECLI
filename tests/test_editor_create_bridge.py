@@ -84,6 +84,9 @@ def test_executor_is_fixed_version_gated_transactional_and_closes_windows():
         'GetField("m_code"',
         'GetField("m_outputTypeIdx"',
         'GetField("m_functionMode"',
+        '"m_currentPrecisionType"',
+        '"m_min"',
+        '"m_max"',
         "CreateNewTemplateShader",
         "CreateNode",
         "CreateConnection",
@@ -105,6 +108,7 @@ def test_executor_is_fixed_version_gated_transactional_and_closes_windows():
     assert EDITOR_CREATE_SNIPPET.index("createdWindow.Close()") < EDITOR_CREATE_SNIPPET.index("success = true")
     assert EDITOR_CREATE_SNIPPET.index("stateRestored = true") < EDITOR_CREATE_SNIPPET.index("success = true")
     assert 'failure.Data["ASECLI cleanup failures"]' in EDITOR_CREATE_SNIPPET
+    assert "precisionField.GetValue(actualNode)).ToString()" in EDITOR_CREATE_SNIPPET
     post_commit = EDITOR_CREATE_SNIPPET.split("AssetDatabase.MoveAsset", 1)[1].split("catch (System.Exception ex)", 1)[0]
     assert "AssetDatabase.Refresh" not in post_commit
     assert "LoadFromDisk(assetPath" not in post_commit
@@ -114,10 +118,10 @@ def test_editor_executor_fragments_preserve_one_byte_stable_transaction_payload(
     resources = ROOT / "src/asecli/bridge/resources"
     parts = [resources / name for name in EDITOR_CREATE_RESOURCE_PARTS]
     assert all(path.is_file() for path in parts)
-    assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 205 for path in parts)
+    assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 400 for path in parts)
     assert "".join(path.read_text(encoding="utf-8") for path in parts) == EDITOR_CREATE_SNIPPET
     assert hashlib.sha256(EDITOR_CREATE_SNIPPET.encode("utf-8")).hexdigest() == (
-        "52fce4c5596ac0cb0bdaae388c2bc2e68d8e2ad4d0d39e00b196856c4b216cc4"
+        "483906ca6f42938ede927299b3761926abc1821762fcc0f30ee7c345cbfc1c26"
     )
     assert EDITOR_CREATE_SNIPPET.count("{payload_base64}") == 1
     assert EDITOR_CREATE_SNIPPET.count("catch (System.Exception ex)") == 1

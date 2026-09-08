@@ -17,7 +17,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 | 图编辑 | 设置已知字段、schema 驱动或原始行加节点、连线/断线、受保护删节点、最小差异写回 | 否 |
 | 图整理 | 分层网格布局、原生 Comment 框创建/嵌套、真实节点边界检查与自动收框、Local Var 治理规则 | 创建/检查真实边界时需要 |
 | 材质 Inspector | 原生 MZGUI 优先；缺失时才注入 ASECLI ShaderGUI fallback。两者兼容 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 和条件置灰 `EnableIfMzgui`；默认只生成 Tooltip，HelpBox 由用户按需添加 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
-| Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
+| Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2/v3` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
 | 编译桥接 | 通过 MCP for Unity 请求 ASE 重新生成 HLSL，并验证工具结果/保存语义 | 是 |
 | Agent 集成 | 全部子命令单行 JSON 输出；稳定错误码与退出码，适合 Agent 子进程编排 | 否 |
 | 工程交付 | 双 Python CI、锁文件、回归目录、可复现 wheel/sdist、SBOM、供应链与许可证检查 | 否 |
@@ -184,7 +184,7 @@ asecli create Assets/NewEditorShader.shader --backend editor --spec graph.json
 | `install-skill [--skill-root DIR]` | 安装 wheel 内置的 ASECLI Agent Skill。 | 相同内容幂等；目标已有不同内容时拒绝覆盖，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
 | `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
 | `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
-| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。仅含旧 `help` 的规格会迁移为 Tooltip。 |
+| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2/v3` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。v3 另支持版本化 primitive/recipe 与属性精度、默认值和范围。 |
 | `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，并报告 `changed`。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。 |
 
 ### 推荐使用流程
@@ -342,7 +342,8 @@ Editor 后端当前只支持 ASE `1.9.6.2` 的已验证白名单和模板端口�
 }
 ```
 
-- CLI 创建要求 `EditorGraphSpec v2`。每个 Property/Sampler 必须提供含中文的 `inspector_name` 和 `tooltip`；用户可另加可选 `help` 生成 HelpBox。旧 v2 只有 `help`、没有 `tooltip` 时按 Tooltip 迁移读取且不生成 HelpBox；v1 仅保留底层桥接兼容。
+- CLI 创建接受 `EditorGraphSpec v2/v3`。每个 Property/Sampler 必须提供含中文的 `inspector_name` 和 `tooltip`；用户可另加可选 `help` 生成 HelpBox。v3 必填 `primitives_version: 1`，增加受控 `primitive`、可原生展开或降级为单节点 Custom Expression 的 `recipe`，并为已支持节点增加 `precision/default/min/max`。未知版本、primitive 或字段在 MCP 前失败关闭；v1 仅保留底层桥接兼容。
+- v3 的 primitive 闭包绑定 ASE `1.9.6.2`；recipe 只按声明顺序引用输入或此前 primitive，禁止前向引用/循环。原生闭包不完整时才使用规格内已校验的逐节点 HLSL fallback，不会把整张图收成单一黑盒。
 - 首期绑定 ASE `1.9.6.2`；Master 端口契约只开放已实测的 URP Unlit 模板 GUID。未知版本、模板 Master 端口、节点、字段、端口或类型在写入前失败。
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
 - 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图。成功 JSON 中 `reloaded` 与 `staging_reloaded` 表示暂存图已 LoadFromDisk；`target_graph_reloaded` 恒为 `false`。CLI 属性收尾后必须使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
@@ -373,7 +374,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 ### 自定义 GUI 分组规则
 
 - `asecli.property-presentation.v2` 是硬门禁：每个导出 Property 必须使用中文 `display_name` 和一条中文 `TooltipMzgui`。HelpBox 可有可无，不参与门禁。GUI 自动在 Tooltip 末尾追加英文变量名与 Shader 默认值。
-- 新 Property 通过 EditorGraphSpec v2 的 `inspector_name`/`tooltip` 写入；已有属性使用 `custom-gui --spec` 的 `display_name`/`tooltip` 原子治理。只有用户显式提供 `help` 时才新增或更新 HelpBox，省略不会清理既有内容。
+- 新 Property 通过 EditorGraphSpec v2/v3 的 `inspector_name`/`tooltip` 写入；v3 可同时声明精度、默认值和 Range 范围。已有属性使用 `custom-gui --spec` 的 `display_name`/`tooltip` 原子治理。只有用户显式提供 `help` 时才新增或更新 HelpBox，省略不会清理既有内容。
 - `--group` 写 `FoldoutMzgui`，`--tooltip` 写 `TooltipMzgui`。目标属性成为分组首项，后续属性一直归入该组，直到下一个带非空分组标题的属性。
 - `--property _PaintColor` 可替代节点 ID；批量整理使用 `--spec`。`reorder=true` 按 `properties` 数组重写 PropertyNode 的 `m_orderIndex`，未列属性保持原相对顺序并追加。
 - ASECLI GUI 会在中文 Tooltip 后自动追加准确变量名与默认基线，并通过默认 `Material(shader)` 读取真实 Shader 默认值，不使用当前材质实例值；不要手工复制这些技术信息。
@@ -526,11 +527,11 @@ uv run --frozen --python 3.12 python tools/check_regression_catalog.py
 2. Python 3.12 package：在 checkout 外双次构建 wheel/sdist，逐项比较可复现性。
 3. 产物：生成 `SHA256SUMS`、SPDX 2.3 SBOM、供应链检查结果；从生成 wheel 建立隔离虚拟环境并执行 `asecli parse` 冒烟验证。
 
-CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。普通 push 不会发版。推送 `vX.Y.Z` 版本 tag 后，`publish.yml` 通过 PyPI Trusted Publishing 上传 wheel/sdist；CLI Hub 仍不自动提交。
+CI 通过只证明远端自动门禁通过。进入“已交付”还需要真实的 push run 链接、可下载 artifact 与 hash 核对、以及需要时的回滚观察。普通 push 不会发版。当前一键安装脚本使用最新 GitHub Release；PyPI Trusted Publishing 仍处于 CR-0023 的发布准备阶段，在完整 tag 门禁和首次公开发布验证完成前不作为当前可用入口。CLI Hub 仍不自动提交。
 
 ### 供应链、许可证与密钥
 
-- 当前许可证为 MIT；源码公开，正式安装入口为 PyPI 上的 `asecli`。CLI Hub 仍须单独书面授权。
+- 当前许可证为 MIT；源码公开，当前正式安装入口是上文的一键脚本及其使用的 GitHub Release wheel。PyPI 项目 `asecli` 是 CR-0023 已批准但尚未发布的目标入口；CLI Hub 仍须单独书面授权。
 - 当前生产运行时依赖为 0；新增运行时依赖、改许可证或改分发方式均是单独 CR，必须完成许可证与漏洞评估。
 - `uv.lock` 固定开发依赖的来源、版本和 SHA-256；CI 中所有 GitHub Actions 必须固定为 40 位 commit SHA。
 - `tools/supply_chain_check.py` 会检查 lock、Action pin、常见高置信密钥模式与许可证；`tools/generate_sbom.py` 生成 artifact 清单。离线检查不等同于真实漏洞数据库或 Dependabot 状态。
