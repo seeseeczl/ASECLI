@@ -100,13 +100,13 @@ curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/insta
 uv tool uninstall asecli
 ```
 
-当前正式版本为 `0.6.3`（跨 Agent Skill 安装与 MCP 方法体编译兼容修复），可从 [PyPI](https://pypi.org/project/asecli/0.6.3/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.3) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.6.2` 保留为回滚点。
+当前正式版本为 `0.6.4`（转换图计算基线与计算岛布局），可从 [PyPI](https://pypi.org/project/asecli/0.6.4/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.4) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.6.3` 保留为回滚点。
 
 已知限制：真实 MCP 下，属性+纹理 v2 和 Reciprocal 降级 v2 的 create、manifest、validate、独立 recompile 已通过；SGCLI SphereMask v3 spec 在重载时仍可能返回 `node missing after reload: Radius` 并回滚。本次不承诺该 recipe 端到端可用，也不改变 SGCLI v2 默认值契约。
 
 ### 源码开发运行
 
-工作区新增（尚未发布）：转换后的现有 Shader 可用 `asecli graph-review <file> --baseline <backup.shader>` 保守核对计算基线；`--reuse-policy fanout` 显式选择按输出端口两次消费注册的只读计划，默认仍按消费组。`layout --mode meticulous --island-columns 3` 在鱼骨后整体摆放物理独立计算岛。该流程不从旧 JSON 重建图，也不自动创建 Register/Get；详见 [转换后交付流程](skills/asecli/references/conversion-workflow.md)。
+v0.6.4 新增：转换后的现有 Shader 可用 `asecli graph-review <file> --baseline <backup.shader>` 保守核对计算基线；`--reuse-policy fanout` 显式选择按输出端口两次消费注册的只读计划，默认仍按消费组。`layout --mode meticulous --island-columns 3` 在鱼骨后整体摆放物理独立计算岛。该流程不从旧 JSON 重建图，也不自动创建 Register/Get；详见 [转换后交付流程](skills/asecli/references/conversion-workflow.md)。
 
 ```bash
 git clone https://github.com/seeseeczl/ASECLI.git
