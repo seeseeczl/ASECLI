@@ -100,7 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/insta
 uv tool uninstall asecli
 ```
 
-本次发布版本为 `0.6.3`（跨 Agent Skill 安装与 MCP 方法体编译兼容修复）；发布完成后可从 [PyPI](https://pypi.org/project/asecli/0.6.3/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.3) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.6.2` 保留为回滚点。
+当前正式版本为 `0.6.3`（跨 Agent Skill 安装与 MCP 方法体编译兼容修复），可从 [PyPI](https://pypi.org/project/asecli/0.6.3/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.6.3) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.6.2` 保留为回滚点。
 
 已知限制：真实 MCP 下，属性+纹理 v2 和 Reciprocal 降级 v2 的 create、manifest、validate、独立 recompile 已通过；SGCLI SphereMask v3 spec 在重载时仍可能返回 `node missing after reload: Radius` 并回滚。本次不承诺该 recipe 端到端可用，也不改变 SGCLI v2 默认值契约。
 

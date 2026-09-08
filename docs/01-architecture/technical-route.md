@@ -187,7 +187,7 @@
 
 ### ADR-0021 使用开放 Agent Skills 目录加 Claude 原生目录覆盖主流 Agent
 
-- 状态：已实现，自动与治理验证通过，尚未发布（2026-09-08，CR-0027）
+- 状态：已发布，自动与治理验证通过（2026-09-08，CR-0027，REL-0013）
 - 背景：CR-0015 的 Skill 内容本身是标准 Markdown，但安装命令和帮助只默认 Codex 路径，不能让 Claude Code、Cursor、Gemini CLI 与 GitHub Copilot 用户直接选择其原生用户级或项目级目录。
 - 决策：新增 `--agent agents|codex|claude|cursor|gemini|copilot|all`、`--scope user|project` 和 `--project-root`。`.agents/skills` 是 Codex、Cursor、Gemini CLI 与 GitHub Copilot 共同识别的开放目录；Claude Code 另用 `.claude/skills`。因此 `all` 只安装这两个根，避免向每个兼容别名重复复制同名 Skill。单一 Agent 仍可选择其原生目录。
 - 兼容与安全：无参数继续解析 `$CODEX_HOME/skills` 或 `~/.codex/skills`，`--skill-root` 保持显式覆盖。所有目标沿用完整树 digest、幂等、符号链接保护与不同内容拒绝覆盖；`all` 在创建任一目标前预检全部已有 Skill 内容冲突。
