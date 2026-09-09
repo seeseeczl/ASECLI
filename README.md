@@ -19,7 +19,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 | --- | --- | --- |
 | 图读取与安全检查 | 解析节点/连线、结构校验、CHKSM 校验与修复、无效节点审计 | 否 |
 | 图编辑 | 设置已知字段、schema 驱动或原始行加节点、连线/断线、受保护删节点、最小差异写回 | 否 |
-| 图整理 | 离线初排、真实几何递归鱼骨、独立计算岛多列摆放、原生 Comment 与边界检查 | 精排、真实边界检查需要 |
+| 图整理 | 离线初排、真实几何递归鱼骨、独立计算岛摆放（默认单列，可选多列）、原生 Comment 与边界检查 | 精排、真实边界检查需要 |
 | 转换后核对 | `graph-review` 保守比较计算基线，按输出端口生成 Local Var 复用计划 | 只读计划不需要；不会自动创建 Register/Get |
 | 材质 Inspector | 原生 MZGUI 优先；缺失时才注入 ASECLI ShaderGUI fallback。两者兼容 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 和条件置灰 `EnableIfMzgui`；默认只生成 Tooltip，HelpBox 由用户按需添加 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
 | Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2/v3` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
@@ -30,7 +30,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 核心实现特性：
 
 - **纯文本读写引擎**：真实样本逐字节 roundtrip 一致；普通布局保留计算连接，精排还可联动 Comment，显式路由需另外授权与核对。
-- **节点 schema 库**：295 种节点类型的参数结构来自 ASE 运行时序列化提取；未知或版本不兼容的结构拒绝猜写。
+- **节点 schema 库**：299 种节点类型的参数结构来自 ASE 运行时序列化提取；未知或版本不兼容的结构拒绝猜写。
 - **安全写入**：写前比对 SHA-256 快照、加独占锁、拒绝符号链接和陈旧快照；既有文件写入前生成相邻 `.bak` 备份。
 - **受控 Editor 创建**：固定 C# 执行器 + 白名单 JSON 规格，拒绝任意 C#、任意反射字段和不支持版本的降级写入。
 - **属性呈现契约**：所有由 `create` 生成的 ASE Shader 必须满足 `asecli.property-presentation.v2`；公开属性使用中文显示名和中文 Tooltip，GUI 自动追加英文变量名与 Shader 默认值。HelpBox 是用户可选内容，不参与合规门禁。
@@ -224,19 +224,19 @@ asecli recompile Assets/Example.shader
 | `graph-review <file> [--baseline FILE] [--reuse-policy consumer-groups\\|fanout]` | 保守核对计算基线并列出复用计划。 | 只读；基线不一致返回 `SEMANTIC_MISMATCH` / 2，不自动创建 Local Var。 |
 | `graph-audit <file>` | 从 Master 反向分析未参与输出的节点，区分 `unused_candidates` 与外部消费者。 | 只读；Property 的源码/HLSL/GUI 引用不会被误报为可删。 |
 | `set-field <file> --node N --field I --value V [--write]` | 修改一个已知节点的绝对序列化字段。 | 默认预演；`--write` 后写入。不要用它猜写 Master 或未知版本尾部。 |
-| `add-node <file> --type T [--id N] [--pos X,Y] [--write]` | 按 schema 创建可写节点与默认参数。 | 默认预演；未知、opaque 或版本不兼容节点会拒绝。`--line` 是复用真实序列化行的专家入口。 |
+| `add-node <file> --type T [--id N] [--pos X,Y] [--write]` | 按 schema 创建可写节点与默认参数。 | 默认预演；未知、opaque 或版本不兼容节点会拒绝。`--line` 是复用真实序列化行的专家入口；若新行含 schema 占位符的 32 位 hex 标识，会返回 `warnings` 提示在 Unity 中核对唯一性。 |
 | `connect <file> --from A:P --to B:P [--write]` | 将来源节点输出端接到目标节点输入端。 | 默认预演；`--from` 是数据源，`--to` 是消费者。 |
 | `disconnect <file> --from A:P --to B:P [--write]` | 删除一条精确连线。 | 默认预演；找不到该连线会失败。 |
 | `remove-node <file> --node N [--force-external] [--write]` | 删除节点及附属连线。 | 默认预演；外部源码仍引用的 Property 默认拒删。`--force-external` 只用于已迁移消费者的明确操作。 |
 | `fix-checksum <file> [--write]` | 重算 `//CHKSM`，并报告旧值、实际值和是否已有效。 | 默认预演；`--write` 后写入并备份原文件。 |
-| `layout <file> [--mode legacy\|meticulous] [--audit] [--write]` | `legacy` 保留原分层布局；`meticulous` 以 Output 为根递归展开上游子树，按输入端口顺序居中分布，并联动收紧 Comment。 | 默认仍为 `legacy` 且只预演。`meticulous` 单次连接 Editor 获取真实节点、标题栏和端口几何；硬门禁失败或几何缺失时不写盘。 |
+| `layout <file> [--mode legacy\|meticulous] [--island-columns N] [--route-wires] [--gap-x X --gap-y Y] [--audit] [--unity-instance NAME] [--write]` | `legacy` 保留原分层布局；`meticulous` 以 Output 为根递归展开上游子树，按输入端口顺序居中分布，并联动收紧 Comment。 | 默认 `legacy` 且只预演。`meticulous` 单次连接 Editor 获取真实节点、标题栏和端口几何；硬门禁失败或几何缺失时不写盘。`--island-columns`（1-8，默认单列）多列摆放计算岛；`--route-wires` 移动/新增 WireNode 需单独授权；`--gap-x/--gap-y` 仅 `legacy`；多实例用 `--unity-instance` 选 `Name@hash`。 |
 | `gui-support <project> [--runtime-probe] [--handoff-native] [--write]` | 优先检测并选用原生 MZGUI；原生环境只安装 authoring/条件置灰扩展，缺失时安装 fallback；原生后来加入时可恢复交接。 | 不创建第二个原生 provider；V2 枚举全部 provider；handoff 默认预演，只处理已知哈希并保留 authoring-only bridge，复验失败可恢复。 |
-| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；设置或清除 Foldout、Tooltip、用户 HelpBox 和由另一数值属性控制的置灰条件。 | 条件写为 `EnableIfMzgui(source,operator,value)`；不满足时只禁用控件，不清空材质值。`--clear-enabled-if` 可清除。 |
-| `install-skill [--agent A] [--scope user\|project] [--project-root DIR] [--skill-root DIR]` | 将 wheel 内置的通用 ASECLI Agent Skill 安装到开放 `.agents` 目录或 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 原生目录。 | 无参数保持旧 Codex 目录；`all` 以两个非重复目标覆盖五类 Agent；相同内容幂等，任一冲突先整体拒绝，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
-| `comment-group <file> [--nodes IDS --title T] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor。 |
+| `custom-gui <file> [--node N \| --property P] … [--write]` | 查询/同步 CustomEditor；设置或清除 Foldout、Tooltip、用户 HelpBox 和由另一数值属性控制的置灰条件。 | 条件写为 `EnableIfMzgui(source,operator,value)`；不满足时只禁用控件，不清空材质值。`--clear-enabled-if` 可清除。expert 参数 `--add-attribute`/`--remove-attribute` 直接增删 MZGUI 兼容元数据。 |
+| `install-skill [--agent A] [--scope user\|project] [--project-root DIR] [--skill-root DIR]` | 将 wheel 内置的通用 ASECLI Agent Skill 安装到开放 `.agents` 目录或 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 原生目录。 | 无参数保持旧 Codex 目录；省略 `--agent` 但给 `--scope`/`--project-root` 时默认 `agents`；`all` 以两个非重复目标覆盖五类 Agent；相同内容幂等，任一冲突先整体拒绝，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
+| `comment-group <file> [--nodes IDS --title T] [--note NOTE --padding P --id N] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor；`--note` 写 Comment 头小字（默认 "Comment"），`--padding` 默认 50，`--id` 指定 Comment 节点 ID。 |
 | `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
 | `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2/v3` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。v3 另支持版本化 primitive/recipe 与属性精度、默认值和范围。 |
-| `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，并报告 `changed`。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。 |
+| `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，报告 `changed`；并自动快照→恢复材质 GUI 元数据、重算 CHKSM、强制 `AssetDatabase.ImportAsset` 二次导入。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。返回 `changed`，元数据被恢复时另返回 `metadata_restored` 与 `asset_import`。 |
 
 ### 详细操作入口
 
@@ -296,7 +296,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 {"ok": false, "error": {"code": "NOT_FOUND", "message": "..."}}
 ```
 
-常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`EXTERNAL_REFERENCE`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
+常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
 退出码：`0` 成功 · `2` 用法/校验/解析错误 · `3` 桥接错误
 
 ## 安全与验收边界
@@ -386,7 +386,7 @@ CI 通过只证明远端自动门禁通过。进入“已交付”还需要真�
 ```
 src/asecli/
 ├── core/      解析器/序列化器/图模型/布局引擎
-├── schema/    节点 schema 库（data/schemas.json）
+├── schema/    节点 schema 库（data/schemas.json）与 Master 观测样本（data/observed.json）
 ├── checks/    结构校验与 checksum
 ├── bridge/    MCP for Unity 客户端、重编译触发与材质 GUI 支持安装器
 └── cli/       命令入口与 JSON 契约
