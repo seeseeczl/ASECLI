@@ -14,7 +14,7 @@ from .gui_support import (
 )
 from .gui_handoff import handoff_gui_support
 from .gui_runtime_probe import probe_native_mzgui_via_mcp
-from .recompile import recompile_via_mcp
+from .recompile import import_shader_via_mcp, recompile_via_mcp
 from .wire_route import apply_wire_routes_via_mcp
 
 __all__ = [
@@ -35,6 +35,7 @@ __all__ = [
     "EditorNodeGeometry",
     "inspect_graph_geometry_via_mcp",
     "recompile_via_mcp",
+    "import_shader_via_mcp",
     "route_create_backend",
     "apply_wire_routes_via_mcp",
 ]

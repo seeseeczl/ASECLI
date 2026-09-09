@@ -5,8 +5,7 @@ from __future__ import annotations
 import os
 
 from ..bridge import McpError
-from ..bridge import recompile_via_mcp
-from ..bridge.recompile import import_shader_via_mcp
+from ..bridge import import_shader_via_mcp, recompile_via_mcp
 from ..checks import (
     ChecksumFormatError,
     fix_checksum,

@@ -29,7 +29,13 @@
       "id": "FM-F03DFA9A41",
       "name": "layout",
       "path": "src/asecli/core/layout.py",
-      "evidence_paths": ["src/asecli/core/layout.py", "tests/test_layout.py"]
+      "evidence_paths": [
+        "src/asecli/core/layout.py",
+        "src/asecli/core/island_layout.py",
+        "src/asecli/core/reuse_plan.py",
+        "tests/test_layout.py",
+        "tests/test_island_layout.py"
+      ]
     },
     {
       "id": "FM-3537DE9938",
@@ -47,7 +53,13 @@
       "id": "FM-1DB3E4EA8B",
       "name": "cli-contract",
       "path": "src/asecli/cli/main.py",
-      "evidence_paths": ["src/asecli/cli/main.py", "tests/test_cli_contract.py"]
+      "evidence_paths": [
+        "src/asecli/cli/main.py",
+        "src/asecli/cli/graph_review_command.py",
+        "src/asecli/core/graph_review.py",
+        "tests/test_cli_contract.py",
+        "tests/test_graph_review.py"
+      ]
     },
     {
       "id": "FM-25E63BD4F6",

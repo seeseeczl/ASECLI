@@ -246,6 +246,14 @@ def test_unconfirmed_saved_result_is_bridge_failure(tmp_path, monkeypatch):
         recompile_via_mcp(str(shader))
 
 
+def test_import_shader_via_mcp_is_exported_from_bridge_public_surface():
+    import asecli.bridge as bridge
+    from asecli.bridge.recompile import import_shader_via_mcp
+
+    assert "import_shader_via_mcp" in bridge.__all__
+    assert bridge.import_shader_via_mcp is import_shader_via_mcp
+
+
 def test_metadata_import_is_targeted_synchronous_and_requires_receipt(tmp_path, monkeypatch):
     from asecli.bridge.recompile import import_shader_via_mcp
     shader = _shader_project(tmp_path)
