@@ -1,0 +1,1 @@
+{"ok": true, "data": {"transport": "mcp", "server": "http://127.0.0.1:9080/mcp", "asset_path": "Assets/ASECLIProbe/SGCLI_asecli_fix_defaults_degradation_20260908_161756_0e3bb9.shader", "saved": true, "changed": true, "tool_result": "recompiled, saved=True", "metadata_restored": 1}}

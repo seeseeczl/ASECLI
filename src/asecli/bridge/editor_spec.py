@@ -8,21 +8,17 @@ from typing import Any
 from ._editor_primitives import ExpansionSpec, expansion_classes, primitive_class
 
 SUPPORTED_ASE_VERSIONS = frozenset({"1.9.6.2"})
-
-
 class SpecError(ValueError):
     """EditorGraphSpec is outside the explicitly supported v1 grammar."""
-
-
 @dataclass(frozen=True)
 class TemplateSpec:
     guid: str
     shader_name: str
+    settings: dict | None = None
 
     def to_dict(self) -> dict:
-        return {"guid": self.guid, "shader_name": self.shader_name}
-
-
+        return ({"guid": self.guid, "shader_name": self.shader_name} if self.settings is None
+                else {"guid": self.guid, "shader_name": self.shader_name, "settings": dict(self.settings)})
 @dataclass(frozen=True)
 class InputSpec:
     name: str
@@ -30,8 +26,6 @@ class InputSpec:
 
     def to_dict(self) -> dict:
         return {"name": self.name, "type": self.type}
-
-
 @dataclass(frozen=True)
 class NodeSpec:
     alias: str
@@ -55,6 +49,9 @@ class NodeSpec:
     op: str | None = None
     recipe: str | None = None
     expansion: ExpansionSpec | None = None
+    hdr: bool | None = None
+    texture_guid: str | None = None
+    hidden: bool | None = None
 
     @property
     def ase_type(self) -> str:
@@ -68,8 +65,6 @@ class NodeSpec:
             assert cls is not None
             return cls
         if self.kind == "recipe":
-            # A recipe expands to multiple ASE nodes; the manifest records the
-            # authoritative expansion, not a single class name.
             return "Recipe"
         assert self.type is not None
         return self.type
@@ -82,6 +77,12 @@ class NodeSpec:
         }
         if self.type is not None:
             result["type"] = self.type
+        if self.hdr is not None:
+            result["hdr"] = self.hdr
+        if self.hidden is not None:
+            result["hidden"] = self.hidden
+        if self.texture_guid is not None:
+            result["texture_guid"] = self.texture_guid
         if self.precision is not None:
             result["precision"] = self.precision
         if self.default is not None:
@@ -128,6 +129,12 @@ class NodeSpec:
                 inspector_name=self.inspector_name,
                 parameter_type=self.parameter_type,
             )
+        if self.hdr is not None:
+            result["hdr"] = self.hdr
+        if self.hidden is not None:
+            result["hidden"] = self.hidden
+        if self.texture_guid is not None:
+            result["texture_guid"] = self.texture_guid
         if self.precision is not None:
             result["precision"] = self.precision
         if self.default is not None:
@@ -174,8 +181,6 @@ class NodeSpec:
             return False
         ids = {primitive.id for primitive in self.expansion.primitives}
         return self.expansion.output in ids
-
-
 @dataclass(frozen=True)
 class EndpointSpec:
     node: str
@@ -183,8 +188,6 @@ class EndpointSpec:
 
     def to_dict(self) -> dict:
         return {"node": self.node, "port": self.port}
-
-
 @dataclass(frozen=True)
 class ConnectionSpec:
     source: EndpointSpec
@@ -192,8 +195,6 @@ class ConnectionSpec:
 
     def to_dict(self) -> dict:
         return {"from": self.source.to_dict(), "to": self.destination.to_dict()}
-
-
 @dataclass(frozen=True)
 class EditorGraphSpec:
     version: int
@@ -220,8 +221,6 @@ class EditorGraphSpec:
         return result
 
     def editor_payload(self, asset_path: str, temporary_asset_path: str) -> dict:
-        # The fixed ASE executor protocol remains v1. Presentation-only fields
-        # are finalized and verified by the CLI after ASE commits the graph.
         payload = self.to_dict()
         payload["version"] = 1
         for node in payload["nodes"]:
@@ -236,8 +235,6 @@ class EditorGraphSpec:
             "nodes": [node.manifest_entry() for node in self.nodes],
             "connections": [item.to_dict() for item in self.connections],
         }
-
-
 def load_editor_graph_spec(path: str | Path) -> EditorGraphSpec:
     from ._editor_spec_io import load_editor_graph_spec as _load
 

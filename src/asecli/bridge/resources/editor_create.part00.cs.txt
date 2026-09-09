@@ -166,7 +166,36 @@ try
     repaintEvent.type = UnityEngine.EventType.Repaint;
     win.SendEvent(repaintEvent);
 
+    System.Func<AmplifyShaderEditor.TemplateMultiPassMasterNode, bool, Newtonsoft.Json.Linq.JObject> renderSettings = delegate(AmplifyShaderEditor.TemplateMultiPassMasterNode master, bool apply) {
+        var requested = template["settings"] as Newtonsoft.Json.Linq.JObject;
+        var actual = new Newtonsoft.Json.Linq.JObject();
+        if (requested == null) return actual;
+        var labels = new System.Collections.Generic.Dictionary<string, string> {
+            {"surface", "Surface"}, {"blend", "  Blend"}, {"two_sided", "Two Sided"},
+            {"cast_shadows", "Cast Shadows"}, {"receive_shadows", "Receive Shadows"},
+            {"fog", "Built-in Fog"}, {"lod_crossfade", "LOD CrossFade"}, {"vertex_position", "Vertex Position"}
+        };
+        foreach (var key in new string[] {"surface", "blend", "two_sided", "cast_shadows", "receive_shadows", "fog", "lod_crossfade", "vertex_position"}) {
+            if (requested[key] == null) continue;
+            AmplifyShaderEditor.TemplateOptionUIItem found = null;
+            foreach (var item in master.SubShaderOptions.PassCustomOptionsUI)
+                if (item.Options.Name == labels[key]) {
+                    if (found != null) throw new System.Exception("ambiguous template option: " + key);
+                    found = item;
+                }
+            if (found == null) throw new System.Exception("missing template option: " + key);
+            string wanted = requested[key].Type == Newtonsoft.Json.Linq.JTokenType.Boolean ? ((bool)requested[key] ? "true" : "false") : (string)requested[key];
+            int index = System.Array.IndexOf(found.Options.Options, wanted);
+            if (index < 0) throw new System.Exception("unsupported template option value: " + key);
+            if (apply) { found.CurrentOption = index; found.Update(false); }
+            string current = found.Options.Options[found.CurrentOption];
+            if (current != wanted) throw new System.Exception("template option did not survive reload: " + key);
+            actual[key] = requested[key].Type == Newtonsoft.Json.Linq.JTokenType.Boolean ? (Newtonsoft.Json.Linq.JToken)(current == "true") : (Newtonsoft.Json.Linq.JToken)current;
+        }
+        return actual;
+    };
     var graph = win.CurrentGraph;
+    if (template["settings"] != null) renderSettings((AmplifyShaderEditor.TemplateMultiPassMasterNode)graph.CurrentMasterNode, true);
     var aliasIds = new System.Collections.Generic.Dictionary<string, int>();
     var recipePrimitiveIds = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, int>>();
     var recipePrimitiveClasses = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>>();

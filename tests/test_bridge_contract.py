@@ -244,3 +244,26 @@ def test_unconfirmed_saved_result_is_bridge_failure(tmp_path, monkeypatch):
     monkeypatch.setattr("asecli.bridge.recompile.McpClient", UnknownClient)
     with pytest.raises(McpError, match="saved"):
         recompile_via_mcp(str(shader))
+
+
+def test_metadata_import_is_targeted_synchronous_and_requires_receipt(tmp_path, monkeypatch):
+    from asecli.bridge.recompile import import_shader_via_mcp
+    shader = _shader_project(tmp_path)
+    calls = []
+    class Client:
+        response = 'asecli_target_import_complete'
+        def __init__(self, *args, **kwargs):
+            pass
+        def connect(self):
+            pass
+        def call_tool(self, name, args):
+            calls.append(args['code'])
+            return {'content': [{'type': 'text', 'text': self.response}]}
+    monkeypatch.setattr('asecli.bridge.recompile.McpClient', Client)
+    assert import_shader_via_mcp(str(shader), mcp_url='http://127.0.0.1:9080/mcp')['synchronized']
+    assert '"Assets/test.shader"' in calls[-1]
+    assert 'ForceSynchronousImport' in calls[-1]
+    assert 'AssetDatabase.Refresh' not in calls[-1]
+    Client.response = 'unconfirmed'
+    with pytest.raises(McpError, match='did not confirm'):
+        import_shader_via_mcp(str(shader), mcp_url='http://127.0.0.1:9080/mcp')

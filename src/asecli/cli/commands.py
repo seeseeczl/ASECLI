@@ -6,6 +6,7 @@ import os
 
 from ..bridge import McpError
 from ..bridge import recompile_via_mcp
+from ..bridge.recompile import import_shader_via_mcp
 from ..checks import (
     ChecksumFormatError,
     fix_checksum,
@@ -228,6 +229,10 @@ def cmd_recompile(args) -> dict:
             output = fix_checksum(ase_file.serialize())
             _commit_text(args.file, output, ase_file.source_digest)
             result["metadata_restored"] = restored
+            result["asset_import"] = import_shader_via_mcp(
+                args.file, mcp_url=args.mcp_url, instance_token=instance_token,
+                allow_remote_mcp=args.allow_remote_mcp,
+            )
         return result
     except McpError as e:
         raise CliError("BRIDGE_ERROR", str(e), e.data)

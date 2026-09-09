@@ -11,7 +11,7 @@ from .editor_spec import InputSpec, NodeSpec, SpecError
 
 
 GENERIC_NODE_TYPES = frozenset({"WorldPosInputsNode", "TextureCoordinatesNode", "BreakToComponentsNode", "SimpleAddOpNode", "SimpleSubtractOpNode", "SimpleMultiplyOpNode", "SimpleDivideOpNode", "SimpleMinOpNode", "SimpleMaxOpNode", "SaturateNode", "OneMinusNode", "LerpOp"})
-PROPERTY_NODE_TYPES = frozenset({"TexturePropertyNode", "RangedFloatNode", "Matrix4X4Node", "Vector4Node"})
+PROPERTY_NODE_TYPES = frozenset({"TexturePropertyNode", "RangedFloatNode", "Matrix4X4Node", "Vector4Node", "ColorNode"})
 PROPERTY_TYPES = frozenset({"Constant", "Property", "InstancedProperty", "Global"})
 SUPPORTED_PRIMITIVES_VERSIONS = frozenset({1})
 PRECISION_TYPES = frozenset({"Float", "Half", "Inherit"})
@@ -23,7 +23,7 @@ INPUT_TYPES = frozenset(
 )
 OUTPUT_TYPES = frozenset({"INT", "FLOAT", "FLOAT2", "FLOAT3", "FLOAT4", "FLOAT3x3", "FLOAT4x4"})
 _ROOT_KEYS = frozenset({"version", "template", "nodes", "connections", "primitives_version"})
-_TEMPLATE_KEYS = frozenset({"guid", "shader_name"})
+_TEMPLATE_KEYS = frozenset({"guid", "shader_name", "settings"})
 _COMMON_NODE_KEYS = frozenset({"alias", "kind", "position"})
 _NODE_KEYS_V1 = {
     "node": _COMMON_NODE_KEYS | {"type"},
@@ -34,8 +34,9 @@ _NODE_KEYS_V1 = {
 _NODE_KEYS_V2 = {
     **_NODE_KEYS_V1,
     "node": _NODE_KEYS_V1["node"] | {"precision"},
-    "property": _NODE_KEYS_V1["property"] | {"help", "tooltip", "enabled_if", "precision", "default", "min", "max"},
-    "sampler": _NODE_KEYS_V1["sampler"] | {"help", "tooltip", "enabled_if", "precision"},
+    "custom_expression": _NODE_KEYS_V1["custom_expression"] | {"precision"},
+    "property": _NODE_KEYS_V1["property"] | {"help", "tooltip", "enabled_if", "precision", "default", "min", "max", "hdr"},
+    "sampler": _NODE_KEYS_V1["sampler"] | {"help", "tooltip", "enabled_if", "precision", "texture_guid", "hidden"},
 }
 _NODE_KEYS_V3 = {
     **_NODE_KEYS_V2,
@@ -171,7 +172,7 @@ def parse_property_semantics(
             if minimum > maximum:
                 raise SpecError(f"{label} min must not exceed max")
         return default, minimum, maximum
-    if node_type == "Vector4Node":
+    if node_type in {"Vector4Node", "ColorNode"}:
         if default is not None:
             if not isinstance(default, list) or len(default) != 4 or any(
                 isinstance(item, bool) or not isinstance(item, (int, float)) for item in default

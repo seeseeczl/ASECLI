@@ -16,6 +16,22 @@
             sampler.SetInspectorName((string)nodeSpec["inspector_name"]);
             sampler.AutoRegister = true;
             sampler.OnPropertyNameChanged();
+            if (nodeSpec["hidden"] != null)
+            {
+                var field = typeof(AmplifyShaderEditor.PropertyNode).GetField("m_selectedAttribs", privateInstance);
+                var attributes = field.GetValue(sampler) as System.Collections.Generic.List<int>;
+                if (attributes == null) throw new System.Exception("Sampler attribute API unavailable");
+                attributes.Remove(0);
+                if ((bool)nodeSpec["hidden"]) attributes.Add(0);
+                sampler.RefreshExternalReferences();
+            }
+            if (nodeSpec["texture_guid"] != null)
+            {
+                string texturePath = UnityEditor.AssetDatabase.GUIDToAssetPath((string)nodeSpec["texture_guid"]);
+                var boundTexture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(texturePath);
+                if (boundTexture == null) throw new System.Exception("texture GUID could not resolve to Texture2D");
+                sampler.DefaultValue = boundTexture;
+            }
         }
         else if (kind == "property")
         {
@@ -38,6 +54,20 @@
                     ranged.SetFloatMode(false);
                 }
             }
+            else if (property is AmplifyShaderEditor.ColorNode && nodeSpec["default"] != null)
+            {
+                var values = (Newtonsoft.Json.Linq.JArray)nodeSpec["default"];
+                ((AmplifyShaderEditor.ColorNode)property).Value = new UnityEngine.Color((float)values[0], (float)values[1], (float)values[2], (float)values[3]);
+            }
+            if (property is AmplifyShaderEditor.ColorNode && nodeSpec["hdr"] != null)
+            {
+                var selectedField = typeof(AmplifyShaderEditor.PropertyNode).GetField("m_selectedAttribs", privateInstance);
+                var attributes = selectedField.GetValue(property) as System.Collections.Generic.List<int>;
+                if (attributes == null) throw new System.Exception("Color attribute API unavailable");
+                attributes.Remove(1);
+                if ((bool)nodeSpec["hdr"]) attributes.Add(1);
+                property.RefreshExternalReferences();
+            }
             else if (property is AmplifyShaderEditor.Vector4Node && nodeSpec["default"] != null)
             {
                 var vector = (AmplifyShaderEditor.Vector4Node)property;
@@ -51,6 +81,7 @@
             string expressionCode = (string)nodeSpec["code"];
             var inputSpecs = (Newtonsoft.Json.Linq.JArray)nodeSpec["inputs"];
             var items = new System.Collections.Generic.List<AmplifyShaderEditor.CustomExpressionInputItem>();
+            if (inputSpecs.Count == 0) expression.DeleteInputPortByArrayIdx(0);
             for (int inputIndex = 0; inputIndex < inputSpecs.Count; inputIndex++)
             {
                 var inputSpec = (Newtonsoft.Json.Linq.JObject)inputSpecs[inputIndex];

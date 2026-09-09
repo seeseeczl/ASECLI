@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import gzip
+import math
 import json
 from pathlib import Path
 import secrets
@@ -45,10 +47,7 @@ def create_shader_via_mcp(
     transaction_nonce = secrets.token_hex(16)
     temporary_asset_path = _temporary_asset_path(asset_path, transaction_nonce)
     payload = spec.editor_payload(asset_path, temporary_asset_path)
-    encoded = base64.b64encode(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    ).decode("ascii")
-    code = EDITOR_CREATE_SNIPPET.replace("{payload_base64}", encoded)
+    code = build_executor_code(payload)
     client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
     client.connect()
     result = client.call_tool(
@@ -89,6 +88,27 @@ def create_shader_via_mcp(
         "shader_sha256": _sha256(target),
         "meta_sha256": _sha256(meta_file) if meta_file.is_file() else None,
     }
+
+
+def build_executor_code(payload: dict) -> str:
+    """压缩大图的 JSON，固定执行器仍完整留在受控代码内。"""
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    # 固定资源仅含单行字符串；去掉行首缩进不改动任何字符串内容。
+    snippet = "\n".join(line.strip() for line in EDITOR_CREATE_SNIPPET.splitlines()
+                        if line.strip() and not line.lstrip().startswith("//"))
+    encoded = base64.b64encode(raw).decode("ascii")
+    code = snippet.replace("{payload_base64}", encoded)
+    if len(code) > 50000:
+        encoded = base64.b64encode(gzip.compress(raw, mtime=0)).decode("ascii")
+        first_line = snippet.split("\n", 1)[0]
+        unpack = ('string payloadJson;\n'
+                  'using (var compressed = new System.IO.MemoryStream(System.Convert.FromBase64String("{payload_base64}")))\n'
+                  'using (var gzip = new System.IO.Compression.GZipStream(compressed, System.IO.Compression.CompressionMode.Decompress))\n'
+                  'using (var reader = new System.IO.StreamReader(gzip, System.Text.Encoding.UTF8)) payloadJson = reader.ReadToEnd();')
+        code = snippet.replace(first_line, unpack, 1).replace("{payload_base64}", encoded)
+    if len(code) > 50000:
+        raise ValueError("compressed Editor create request exceeds MCP's 50000-character limit")
+    return code
 
 
 def _project_asset_path(target: Path) -> tuple[Path, str]:
@@ -145,7 +165,8 @@ def _execute_code_result_text(result: dict, instance_token: str | None) -> str:
     if envelope.get("success") is False:
         detail = envelope.get("message")
         if not isinstance(detail, str) or not detail.strip():
-            detail = "no error details"
+            details = envelope.get("data")
+            detail = str(details.get("reason", "no error details")) if isinstance(details, dict) else "no error details"
         raise McpError(f"MCP execute_code reported failure: {redact(detail[:300], instance_token)}")
     data = envelope.get("data")
     if isinstance(data, dict) and isinstance(data.get("result"), str):
@@ -169,5 +190,20 @@ def _validate_result(response: dict, asset_path: str, expected_manifest: dict) -
     for field in ("saved", "reloaded", "committed"):
         if response.get(field) is not True:
             raise McpError(f"Editor create did not confirm {field}=True")
-    if response.get("manifest") != expected_manifest:
-        raise McpError("Editor create Save/Load manifest does not match the requested graph")
+    if not manifests_match(response.get("manifest"), expected_manifest):
+        raise McpError("Editor create Save/Load manifest does not match the requested graph",
+                       data={"actual_manifest": response.get("manifest"), "expected_manifest": expected_manifest})
+
+
+def manifests_match(actual, expected, numeric=False):
+    """仅容忍 ASE 单精度数值序列化的舍入；类型、端口与代码仍精确比较。"""
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
+            manifests_match(actual[k], v, numeric or k in {"default", "min", "max"})
+            for k, v in expected.items())
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) == len(expected) and all(
+            manifests_match(a, b, numeric) for a, b in zip(actual, expected))
+    if numeric and type(actual) in (int, float) and type(expected) in (int, float):
+        return math.isclose(actual, expected, rel_tol=5e-7, abs_tol=1e-12)
+    return type(actual) == type(expected) and actual == expected

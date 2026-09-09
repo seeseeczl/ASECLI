@@ -20,6 +20,14 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 
 执行下文命令时，使用当前 Agent 自带的 shell/terminal 能力即可；不要假定存在某一家 Agent 的专属调用 API。若当前运行环境不允许写文件、连接 Editor 或访问目标工程，应明确报告该层未执行，不得把静态检查冒充实际写入或 Editor 验收。
 
+## 先确认能力，再执行
+
+- 确认实际调用的 CLI 路径、安装版本和相关命令 `--help`；不要将仓库未发布改动当成本机已安装能力。Skill 更新的是执行规则，不代表 CLI 自动获得新功能。
+- 只读检查用 `parse`、`validate`、`graph-audit`；转换图的计算基线与复用计划用 `graph-review`。后者不执行 Local Var 创建，也不能证明 SG 与 ASE 渲染等价。
+- 离线 `legacy` 只做初排；真实几何精排、动态节点创建和重编译复用已运行的 Editor。无法获得真实几何就报告精排未验收，不用固定尺寸替代。
+- 按任务读取详细规则：转换图读 [转换流程](references/conversion-workflow.md)，布局读 [精排规范](references/layout-standard.md)，属性 GUI 读 [属性规范](references/material-property-standard.md)，Master 设置读 [输出规范](references/master-output-settings-standard.md)。不因文档更新启动 Editor 或执行发布流程。
+- 结束时分别报告结构检查、Editor 编译/重载、画布/GUI 交互与效果对照。未运行项明确标注；保留原始 SG 默认值等已知限制，不把计划或静态检查写成完成。
+
 ## 核心事实（必读）
 
 1. ASE 节点图以纯文本嵌在 `.shader` 文件的 `/*ASEBEGIN ... ASEEND*/` 块中，行式格式。
@@ -30,7 +38,7 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 6. 自定义材质面板分两层：ASE 图只序列化主 Master 的 `CustomEditor` 与 PropertyNode 尾部属性，Unity `ShaderGUI` 负责实际显示。先用 `gui-support` 选择唯一 provider：原生 MZGUI 存在则使用它并只补 authoring/条件 Drawer，确认缺失才安装 ASECLI fallback；两者统一使用 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui`、`EnableIfMzgui`。工具默认只生成 Tooltip 说明，HelpBox 仅由用户显式添加。未知 ASE 尾部不得猜写。
 7. PropertyNode 绝对字段 9 是 `m_orderIndex`，决定材质 Inspector 顺序；ASE `CommentaryNode` 保存框尺寸、说明、成员 ID、标题和颜色，必须用语义命令维护可变长字段。
 
-## 三条链路
+## 按任务选择流程
 
 ### 链路 A：查看图（无 Unity）
 
@@ -39,7 +47,7 @@ asecli parse <file>          # 节点/连线摘要
 asecli validate <file>       # 结构校验（悬空线/重复ID/CHKSM）
 ```
 
-### 链路 B：修改图（无 Unity，毫秒级）
+### 链路 B：修改图（结构编辑可离线，精排需要 Editor）
 
 ```bash
 # 改属性值（field 为绝对下标：0=Node, 1=类型, 2=Id, 3=坐标, 4+=参数）
@@ -262,7 +270,7 @@ Editor 创建规则：
 - stdout 恒为 `{"ok": true, "data": {...}}` 或 `{"ok": false, "error": {"code", "message"}}`。
 - 错误码：`PARSE_ERROR` / `NOT_FOUND` / `USAGE_ERROR` / `SCHEMA_UNAVAILABLE` / `GUI_SUPPORT_ERROR` / `CUSTOM_GUI_ERROR` / `PROPERTY_PRESENTATION_ERROR` / `COMMENT_GROUP_ERROR` / `EXTERNAL_REFERENCE` / `VALIDATION_ERROR` / `CHECKSUM_FORMAT_ERROR` / `WRITE_CONFLICT` / `UNSAFE_PATH` / `WRITE_ERROR` / `BRIDGE_ERROR` / `INTERNAL`。
 - 退出码：0 成功；2 用法/校验/解析错误；3 桥接错误。
-- 不加 `--write` 时命令只做 dry-run（`data.written=false`）。
+- 多数修改命令不加 `--write` 时只做 dry-run（`data.written=false`）；`create`、`recompile` 会立即创建资产或请求 Editor 写回，`install-skill` 会写入 Skill 目录，不能套用此规则。
 - Editor `create` 成功 data 保留 `reloaded` 作为暂存重载兼容别名，并含 `staging_reloaded=true` 与 `target_graph_reloaded=false`；目标图重载必须走随后的独立 `recompile`。
 
 ## 桥接前提

@@ -37,6 +37,7 @@ _STATIC_INPUT_PORTS = {
     "RangedFloatNode": {},
     "Matrix4X4Node": {},
     "Vector4Node": {},
+    "ColorNode": {},
     "SamplerNode": {
         0: "SAMPLER2D", 1: "FLOAT2", 2: "FLOAT", 3: "FLOAT2",
         4: "FLOAT2", 5: "FLOAT", 6: "FLOAT", 7: "SAMPLERSTATE",
@@ -59,6 +60,7 @@ _STATIC_OUTPUT_PORTS = {
     "RangedFloatNode": {0: "FLOAT"},
     "Matrix4X4Node": {0: "FLOAT4x4"},
     "Vector4Node": {0: "FLOAT4", 1: "FLOAT", 2: "FLOAT", 3: "FLOAT", 4: "FLOAT"},
+    "ColorNode": {0: "COLOR", 1: "FLOAT", 2: "FLOAT", 3: "FLOAT", 4: "FLOAT"},
     "SamplerNode": {
         0: "COLOR", 1: "FLOAT", 2: "FLOAT", 3: "FLOAT", 4: "FLOAT", 5: "FLOAT3",
     },

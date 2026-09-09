@@ -191,7 +191,7 @@ def _finalize_editor_property_presentation(
                 "enabled_if": node.enabled_if,
             }
             for node in spec.nodes
-            if node.property_name is not None
+            if node.property_name is not None and node.parameter_type != "Constant"
         ],
     }
     apply_material_gui_spec(created, presentation_spec)

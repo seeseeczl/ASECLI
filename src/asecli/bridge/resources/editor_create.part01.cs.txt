@@ -140,6 +140,7 @@
             else if (typeName == "TexturePropertyNode") nodeType = typeof(AmplifyShaderEditor.TexturePropertyNode);
             else if (typeName == "RangedFloatNode") nodeType = typeof(AmplifyShaderEditor.RangedFloatNode);
             else if (typeName == "Matrix4X4Node") nodeType = typeof(AmplifyShaderEditor.Matrix4X4Node);
+            else if (typeName == "ColorNode") nodeType = typeof(AmplifyShaderEditor.ColorNode);
             else if (typeName == "Vector4Node") nodeType = typeof(AmplifyShaderEditor.Vector4Node);
             else throw new System.Exception("node type escaped allowlist: " + typeName);
         }

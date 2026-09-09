@@ -65,8 +65,9 @@ def parse_editor_graph_spec(value: Any) -> EditorGraphSpec:
     raw_nodes = root.get("nodes")
     if not isinstance(raw_nodes, list):
         raise SpecError("spec nodes must be an array")
-    if len(raw_nodes) > 128:
-        raise SpecError("spec nodes exceeds the v1 limit of 128")
+    node_limit = 512 if version == 3 else 128
+    if len(raw_nodes) > node_limit:
+        raise SpecError(f"spec nodes exceeds the limit of {node_limit}")
     nodes = tuple(_parse_node(item, index, version) for index, item in enumerate(raw_nodes))
     aliases = {node.alias for node in nodes}
     if len(aliases) != len(nodes):
@@ -98,7 +99,11 @@ def _parse_template(value: Any) -> TemplateSpec:
     shader_name = safe_text(obj.get("shader_name"), "template shader_name", 255, False)
     if any(char in shader_name for char in ('"', "'", ";", "\\")):
         raise SpecError("template shader_name contains a forbidden quote, separator, or escape")
-    return TemplateSpec(guid=guid.lower(), shader_name=shader_name)
+    settings = obj.get("settings")
+    if settings is not None:
+        from .render_settings import validate_settings
+        settings = validate_settings(settings, guid.lower())
+    return TemplateSpec(guid=guid.lower(), shader_name=shader_name, settings=settings)
 
 
 def _parse_node(value: Any, index: int, version: int) -> NodeSpec:
@@ -140,12 +145,12 @@ def _parse_node(value: Any, index: int, version: int) -> NodeSpec:
     if output_type not in OUTPUT_TYPES:
         raise SpecError(f"{label} output_type must be one of {sorted(OUTPUT_TYPES)}")
     raw_inputs = obj.get("inputs")
-    if not isinstance(raw_inputs, list) or not raw_inputs or len(raw_inputs) > 32:
-        raise SpecError(f"{label} inputs must contain 1 through 32 entries")
+    if not isinstance(raw_inputs, list) or len(raw_inputs) > 32:
+        raise SpecError(f"{label} inputs must contain 0 through 32 entries")
     inputs = tuple(parse_input(item, label, i) for i, item in enumerate(raw_inputs))
     if len({item.name for item in inputs}) != len(inputs):
         raise SpecError(f"{label} input name must be unique")
-    return NodeSpec(alias, kind, node_position, name=name, code=code, output_type=output_type, inputs=inputs)
+    return NodeSpec(alias, kind, node_position, name=name, code=code, output_type=output_type, inputs=inputs, precision=precision)
 
 
 def _parse_property_node(
@@ -187,12 +192,21 @@ def _parse_property_node(
     parameter_type = obj.get("parameter_type")
     if parameter_type not in PROPERTY_TYPES:
         raise SpecError(f"{label} parameter_type must be one of {sorted(PROPERTY_TYPES)}")
+    hdr = obj.get("hdr")
+    if "hdr" in obj and (node_type != "ColorNode" or not isinstance(hdr, bool)):
+        raise SpecError(f"{label} hdr requires a ColorNode and boolean value")
+    hidden = obj.get("hidden")
+    if "hidden" in obj and (kind != "sampler" or not isinstance(hidden, bool)):
+        raise SpecError(f"{label} hidden requires a sampler and boolean value")
+    texture_guid = obj.get("texture_guid")
+    if "texture_guid" in obj and (kind != "sampler" or not isinstance(texture_guid, str) or not _GUID.fullmatch(texture_guid)):
+        raise SpecError(f"{label} texture_guid requires a sampler and asset GUID")
     default, minimum, maximum = parse_property_semantics(obj, label, kind, node_type)
     return NodeSpec(alias, kind, node_position, type=None if kind == "sampler" else node_type,
                     property_name=property_name, inspector_name=inspector_name,
                     tooltip=tooltip_text, help=help_text, enabled_if=enabled_if,
                     parameter_type=parameter_type, precision=precision,
-                    default=default, min=minimum, max=maximum)
+                    default=default, min=minimum, max=maximum, hdr=hdr, texture_guid=texture_guid, hidden=hidden)
 
 
 def _parse_connection(value: Any, index: int, aliases: set[str]) -> ConnectionSpec:

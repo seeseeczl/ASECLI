@@ -105,3 +105,26 @@ def _detect_project_root(shader_path: Path) -> Path:
             return cur
         cur = cur.parent
     raise ValueError(f"cannot locate Unity project root for {shader_path}")
+
+
+def import_shader_via_mcp(shader_path: str, *, mcp_url: str,
+                          instance_token: str | None = None,
+                          allow_remote_mcp: bool = False) -> dict:
+    """Synchronize the target after restoring metadata outside the Editor."""
+    path = Path(shader_path).resolve()
+    if not path.is_file():
+        raise FileNotFoundError(shader_path)
+    root = _detect_project_root(path)
+    asset_path = path.relative_to(root).as_posix()
+    code = (
+        'UnityEditor.AssetDatabase.ImportAsset(' + json.dumps(asset_path)
+        + ', UnityEditor.ImportAssetOptions.ForceUpdate | '
+        'UnityEditor.ImportAssetOptions.ForceSynchronousImport); '
+        'return "asecli_target_import_complete";'
+    )
+    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
+    client.connect()
+    result = client.call_tool('execute_code', {'action': 'execute', 'code': code})
+    if 'asecli_target_import_complete' not in tool_text(result, instance_token):
+        raise McpError('MCP tool did not confirm target asset import')
+    return {'asset_path': asset_path, 'synchronized': True}

@@ -121,7 +121,7 @@ def test_editor_executor_fragments_preserve_one_byte_stable_transaction_payload(
     assert all(len(path.read_text(encoding="utf-8").splitlines()) <= 400 for path in parts)
     assert "".join(path.read_text(encoding="utf-8") for path in parts) == EDITOR_CREATE_SNIPPET
     assert hashlib.sha256(EDITOR_CREATE_SNIPPET.encode("utf-8")).hexdigest() == (
-        "dd1467b22b506d8fbcca2f6d5387521a7b32e7bf61d5ea5ec8a5c43b4d03c7f6"
+        "06a830967cfe50373529a9146d85f157caa94db584f66975eaa3d8f36b2ba6da"
     )
     assert EDITOR_CREATE_SNIPPET.count("{payload_base64}") == 1
     assert "public struct InputTarget" not in EDITOR_CREATE_SNIPPET

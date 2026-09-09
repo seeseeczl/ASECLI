@@ -1,0 +1,23 @@
+[
+  {
+    "category": "defaults_degradation",
+    "target": "/Users/long/Tuanjie3D/FlymeAuto3Test/Assets/ASECLIProbe/SGCLI_asecli_fix_defaults_degradation_20260908_161756_0e3bb9.shader",
+    "create": {
+      "exit_code": 0,
+      "ok": true
+    },
+    "manifest_matches": true,
+    "validate": {
+      "exit_code": 0,
+      "ok": true
+    },
+    "recompile": {
+      "exit_code": 0,
+      "ok": true
+    },
+    "validate_after_reload": {
+      "exit_code": 0,
+      "ok": true
+    }
+  }
+]

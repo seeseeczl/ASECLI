@@ -19,6 +19,7 @@
     var manifestTemplate = new Newtonsoft.Json.Linq.JObject();
     manifestTemplate["guid"] = reloadedMaster.CurrentTemplate.GUID;
     manifestTemplate["shader_name"] = targetShader.name;
+    if (template["settings"] != null) manifestTemplate["settings"] = renderSettings(reloadedMaster, false);
     manifest["template"] = manifestTemplate;
     manifest["nodes"] = manifestNodes;
     manifest["connections"] = manifestConnections;

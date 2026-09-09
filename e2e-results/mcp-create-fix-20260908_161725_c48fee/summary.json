@@ -1,0 +1,33 @@
+[
+  {
+    "category": "property_texture",
+    "target": "/Users/long/Tuanjie3D/FlymeAuto3Test/Assets/ASECLIProbe/SGCLI_asecli_fix_property_texture_20260908_161725_c48fee.shader",
+    "create": {
+      "exit_code": 0,
+      "ok": true
+    },
+    "manifest_matches": true,
+    "validate": {
+      "exit_code": 0,
+      "ok": true
+    },
+    "recompile": {
+      "exit_code": 0,
+      "ok": true
+    },
+    "validate_after_reload": {
+      "exit_code": 0,
+      "ok": true
+    }
+  },
+  {
+    "category": "sphere_mask",
+    "target": "/Users/long/Tuanjie3D/FlymeAuto3Test/Assets/ASECLIProbe/SGCLI_asecli_fix_sphere_mask_20260908_161725_c48fee.shader",
+    "create": {
+      "exit_code": 3,
+      "ok": false
+    },
+    "target_exists": false,
+    "staging_assets": []
+  }
+]

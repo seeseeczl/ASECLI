@@ -368,10 +368,19 @@ def test_recompile_cli_restores_metadata_discarded_by_editor_save(tmp_path, monk
         path.write_text(fix_checksum(compiled), encoding="utf-8")
         return {"saved": True, "changed": True}
 
+    imported = []
+    def fake_import(file, **kwargs):
+        # Import must see restored metadata, not the temporary Editor output.
+        assert "TooltipMzgui" in path.read_text()
+        imported.append(file)
+        return {"synchronized": True}
+    monkeypatch.setattr("asecli.cli.commands.import_shader_via_mcp", fake_import)
     monkeypatch.setattr("asecli.cli.commands.recompile_via_mcp", fake_recompile)
     assert app(["recompile", str(path)]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["data"]["metadata_restored"] == 4
+    assert imported == [str(path)]
+    assert payload["data"]["asset_import"]["synchronized"] is True
     restored = AseFile.from_path(path)
     attrs = {
         item["type"]: item

@@ -101,6 +101,12 @@
         {
             manifestNode["op"] = (string)nodeSpec["op"];
         }
+        if (nodeSpec["hidden"] != null)
+            manifestNode["hidden"] = ((AmplifyShaderEditor.PropertyNode)actualNode).PropertyAttributes.Contains("[HideInInspector]");
+        if (nodeSpec["hdr"] != null)
+            manifestNode["hdr"] = ((AmplifyShaderEditor.PropertyNode)actualNode).PropertyAttributes.Contains("[HDR]");
+        if (nodeSpec["texture_guid"] != null)
+            manifestNode["texture_guid"] = UnityEditor.AssetDatabase.AssetPathToGUID(UnityEditor.AssetDatabase.GetAssetPath(((AmplifyShaderEditor.SamplerNode)actualNode).DefaultValue));
         if (nodeSpec["precision"] != null)
             manifestNode["precision"] = ((AmplifyShaderEditor.PrecisionType)
                 precisionField.GetValue(actualNode)).ToString();
@@ -108,6 +114,11 @@
         {
             if (actualNode is AmplifyShaderEditor.RangedFloatNode)
                 manifestNode["default"] = ((AmplifyShaderEditor.RangedFloatNode)actualNode).Value;
+            else if (actualNode is AmplifyShaderEditor.ColorNode)
+            {
+                var color = ((AmplifyShaderEditor.ColorNode)actualNode).Value;
+                manifestNode["default"] = new Newtonsoft.Json.Linq.JArray(color.r, color.g, color.b, color.a);
+            }
             else if (actualNode is AmplifyShaderEditor.Vector4Node)
             {
                 var vector = ((AmplifyShaderEditor.Vector4Node)actualNode).Value;

@@ -1,0 +1,1 @@
+{"ok": true, "data": {"transport": "mcp", "server": "http://127.0.0.1:9080/mcp", "asset_path": "Assets/ASECLIProbe/SGCLI_asecli_fix_property_texture_20260908_161725_c48fee.shader", "saved": true, "changed": true, "tool_result": "recompiled, saved=True", "metadata_restored": 2}}
