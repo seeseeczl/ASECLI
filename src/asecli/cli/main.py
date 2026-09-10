@@ -28,7 +28,6 @@ from .skill_command import AGENT_CHOICES, SCOPE_CHOICES, cmd_install_skill
 from .usage_command import cmd_graph_audit, cmd_remove_node
 from .layout_command import configure_layout_parser
 from .graph_review_command import cmd_graph_review
-from .export_sg_command import configure_export_sg_parser
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -47,8 +46,6 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("parse", help="parse ASE file and print graph summary")
     s.add_argument("file")
     s.set_defaults(func=cmd_parse)
-
-    configure_export_sg_parser(sub)
 
     s = sub.add_parser("set-field", help="set one serialized field of a node")
     s.add_argument("file")

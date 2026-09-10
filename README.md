@@ -20,7 +20,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 | 图读取与安全检查 | 解析节点/连线、结构校验、CHKSM 校验与修复、无效节点审计 | 否 |
 | 图编辑 | 设置已知字段、schema 驱动或原始行加节点、连线/断线、受保护删节点、最小差异写回 | 否 |
 | 图整理 | 离线初排、真实几何递归鱼骨、独立计算岛摆放（默认单列，可选多列）、原生 Comment 与边界检查 | 精排、真实边界检查需要 |
-| 转换与核对 | `export-sg` 将已认证范围内的 ASE 图导出为 `sgcli.native.v2`；`graph-review` 保守比较计算基线 | 导出需要目标 SG Editor 做动态端口绑定；核对计划不需要 |
+| 转换后核对 | `graph-review` 保守比较计算基线，按输出端口生成 Local Var 复用计划 | 只读计划不需要；不会自动创建 Register/Get |
 | 材质 Inspector | 原生 MZGUI 优先；缺失时才注入 ASECLI ShaderGUI fallback。两者兼容 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 和条件置灰 `EnableIfMzgui`；默认只生成 Tooltip，HelpBox 由用户按需添加 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
 | Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2/v3` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
 | 编译桥接 | 通过 MCP for Unity 请求 ASE 重新生成 HLSL，并验证工具结果/保存语义 | 是 |
@@ -35,23 +35,6 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 - **受控 Editor 创建**：固定 C# 执行器 + 白名单 JSON 规格，拒绝任意 C#、任意反射字段和不支持版本的降级写入。
 - **属性呈现契约**：所有由 `create` 生成的 ASE Shader 必须满足 `asecli.property-presentation.v2`；公开属性使用中文显示名和中文 Tooltip，GUI 自动追加英文变量名与 Shader 默认值。HelpBox 是用户可选内容，不参与合规门禁。
 - **证据分层**：文本/自动化通过不等于真实 Editor、目标 Inspector 或最终渲染画面通过；README 会明确标注这些边界。
-
-## 导出到 Shader Graph
-
-`export-sg` 读取已有 ASE Shader，调用 SGCLI 的 `doctor`、运行时目录、配置后端口查询和创建预览，成功后在输出目录写入两个文件：`graph.sg.json` 是可直接传给 SGCLI 的裸 `sgcli.native.v2` 规格，`report.json` 是独立转换账单：
-
-```bash
-uv tool install 'asecli[export-sg]'
-asecli export-sg Assets/Shaders/Source.shader \
-  --target-project /path/to/UnityProject \
-  --out-dir /path/to/export \
-  --mcp-url http://127.0.0.1:9080/mcp \
-  --write
-```
-
-首期认证范围为 ASE 1.9.1.09/1.9.6.2 的标准 URP Unlit、Float/Vector/Color 属性与常量、基础数学、默认 Texture UV、Texture2D 采样、Wire/Local Var 折叠和 Comment 平面分组。Lit、自定义模板、Custom Expression、ASE Function、关键词及未认证动态配置会失败并在报告中指出源节点和影响。导出前会阻断源图结构错误、未映射 ShaderLab 属性和未认证 Master 设置；非空纹理还会核对源、目标 TextureImporter 的类型、色彩空间、采样与压缩设置。已有输出文件不会被覆盖；失败时只写 `report.json`。Schema 默认使用随包的 SGCLI 正式契约快照，也可用 `--sg-schema` 指定文件。
-
-导出成功只证明 Schema、目标节点/端口和 SGCLI 创建预览通过。实际创建、保存重载、编译、画布和材质效果必须另外验收，报告会保持为 `not_run`。
 
 ## 环境要求
 
@@ -313,7 +296,7 @@ stdout 恒为单行 JSON，agent 可直接解析：
 {"ok": false, "error": {"code": "NOT_FOUND", "message": "..."}}
 ```
 
-常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`WRITE_PARTIAL`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。`WRITE_PARTIAL` 的 `data.committed_files` 会列出已提交文件及摘要，调用方应先对账再重试。
+常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
 退出码：`0` 成功 · `2` 用法/校验/解析错误 · `3` 桥接错误
 
 ## 安全与验收边界
@@ -376,7 +359,7 @@ CI 通过只证明远端自动门禁通过。进入“已交付”还需要真�
 ### 供应链、许可证与密钥
 
 - 当前许可证为 MIT；源码公开，正式安装入口为 PyPI `uv tool install asecli`，GitHub Release 一键脚本保留为安装 CLI 与 Skill 的完整入口。CLI Hub 不是当前分发入口，后续启用需要新的明确授权。
-- 核心命令生产运行时依赖为 0；`export-sg` 的可选 extra 使用 `jsonschema` 执行 Draft 2020-12 正式契约校验。
+- 当前生产运行时依赖为 0；新增运行时依赖、改许可证或改分发方式均是单独 CR，必须完成许可证与漏洞评估。
 - `uv.lock` 固定开发依赖的来源、版本和 SHA-256；CI 中所有 GitHub Actions 必须固定为 40 位 commit SHA。
 - `tools/supply_chain_check.py` 会检查 lock、Action pin、常见高置信密钥模式与许可证；`tools/generate_sbom.py` 生成 artifact 清单。离线检查不等同于真实漏洞数据库或 Dependabot 状态。
 - MCP 实例 token 只能由 `ASECLI_MCP_INSTANCE_TOKEN` 环境变量提供，严禁放进 argv、仓库、文档示例、日志、截图或 artifact；远端 MCP 必须显式 `--allow-remote-mcp`。

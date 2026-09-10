@@ -47,21 +47,6 @@ asecli parse <file>          # 节点/连线摘要
 asecli validate <file>       # 结构校验（悬空线/重复ID/CHKSM）
 ```
 
-### 链路 A2：导出为 SGCLI 原生创建规格
-
-```bash
-asecli export-sg <source.shader> --target-project <UnityProject> \
-  --out-dir <export-dir> --mcp-url http://127.0.0.1:9080/mcp --write
-```
-
-- `graph.sg.json` 是可直接交给 `sgcli sg create --spec` 的裸 `sgcli.native.v2` 对象；`report.json` 独立记录来源、映射、依赖、诊断和验证状态。
-- 导出必须经过 SGCLI doctor、运行时 catalog、配置后的真实端口绑定和 create 预览。目标 Editor 不可用时不得声称规格可创建。
-- 首期只认证标准 URP Unlit 与命令帮助列出的基础节点。Lit、自定义模板、Custom Expression、ASE Function、关键词及不透明配置失败关闭，不删除节点或补默认值。
-- 默认不写文件；`--write` 也不覆盖已有导出。失败时不留下部分图规格，`--write` 时只写 `report.json`。
-- 导出前必须通过 ASE 结构校验并对账 ShaderLab 属性；非空纹理必须核对源、目标 TextureImporter 的类型、色彩空间、采样和压缩设置。任何不明项失败关闭。
-- Schema 校验需要安装 `asecli[export-sg]`，默认使用随包的 SGCLI 正式契约快照；需要对账其他版本时用 `--sg-schema` 明确指定。
-- 创建预览不等于实际资产创建、重载、编译、画布或效果验收；这些状态必须分别记录。
-
 ### 链路 B：修改图（结构编辑可离线，精排需要 Editor）
 
 ```bash
