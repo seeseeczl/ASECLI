@@ -61,4 +61,4 @@ CR-0026,变更,已发布,ADR-0019,MOD-CLI,TASK-0058,REG-0021 REG-0052 REG-0057,2
 CR-0027,变更,已发布,ADR-0021,MOD-CLI MOD-SKILL,TASK-0059 TASK-0060,REG-0058,2026-09-08 v0.6.3@a758d0f；run 34205409407；双 Python 358 passed/3 skipped；双渠道摘要与安装回滚通过,REL-0013,long,主流 Agent Skill；旧安装兼容
 BUG-0023,缺陷,已修复,ADR-0020,MOD-BRIDGE,TASK-0060,REG-0059,2026-09-08 两类真实 v2 CLI create/manifest/validate/recompile 通过；358 passed/3 skipped,REL-0013,long,方法体兼容 KeyValuePair；SphereMask Radius 重载仍为已知限制
 CR-0028,变更,已发布（视觉与自动LocalVar仍待验）,ADR-0021,MOD-CORE MOD-LAYOUT MOD-CLI MOD-SKILL,TASK-0061 TASK-0062 TASK-0063,REG-0060 REG-0061,端口级基线与复用计划及岛内刚性多列布局；未自动创建LocalVar；未做实机验收,REL-0014,long,保留并行创建器改动；不修改SGCLI
-CR-0029,变更,已验证,ADR-0001 ADR-0009,MOD-CORE MOD-LAYOUT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0064,REG-0062,2026-09-10 对抗审计 5 项关闭；76 passed；全量 388 passed/3 skipped；wheel 与 ASCII/中文路径 smoke 通过,REL-0015,long,严格原子 JSON；非有限数拒绝；version JSON；22 错误码；17 子命令动态覆盖
+CR-0029,变更,已发布,ADR-0001 ADR-0009,MOD-CORE MOD-LAYOUT MOD-BRIDGE MOD-CLI MOD-SKILL,TASK-0064,REG-0062,2026-09-10 v0.7.0@029fea4；run 34475832000 全成功；GitHub/PyPI 摘要一致；本机 CLI/Skill 安装幂等,REL-0015,long,严格原子 JSON；非有限数拒绝；version JSON；22 错误码；17 子命令动态覆盖
