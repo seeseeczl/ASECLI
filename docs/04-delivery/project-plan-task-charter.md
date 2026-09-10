@@ -104,6 +104,7 @@ kickoff_completion: complete
 | TASK-0061 | CR-0028 | 核对转换图计算基线及端口级复用计划 | 用户缺口补齐授权 | graph_review.py/reuse_plan.py/core 公共导出/layout_audit.py 与相关测试 | SGCLI、生成 HLSL、猜写 Local Var | long/2026-09-08 | REG-0060；错误端口和常量变化必须失败，默认策略保持 | 折叠丢分量或误吞默认值即停止 | 定向 94 passed；自动环节已验证；只读，不宣称自动创建接口 | 自动验证完成，实机待验 |
 | TASK-0062 | CR-0028 | 独立计算岛刚性多列摆放 | TASK-0061；已有鱼骨与真实几何契约 | island_layout.py/meticulous_layout.py 与测试 | 拆改岛内连接、自动 WireNode 路由、虚构几何 | long/2026-09-08 | REG-0061；相对位置、依赖与二次幂等 | 几何缺失/布局硬失败时零写入 | 定向 94 passed；自动环节已验证；实机待验 | 自动验证完成，实机待验 |
 | TASK-0063 | CR-0028 | 将转换后交付流程接入 CLI 与 Skill | TASK-0061 TASK-0062；用户完整过程 | graph_review_command.py/main.py/layout_command.py；Skill/README/治理 | 发布、覆盖用户 Skill、改并行创建器、生产 Shader | long/2026-09-08 | REG-0060 REG-0061；CLI JSON/只读/失败码、Skill validator | 计划冒充创建或结构冒充视觉时停止 | 定向 94 passed；自动环节已验证；未接入自动 Local Var Editor 创建 | 自动验证完成，实机待验 |
+| TASK-0064 | CR-0029 | 关闭 JSON 输出对抗审计并发布安装 `v0.7.0` | AA-OPT-001～005；用户推送、发布、安装授权 | contract/main；Commentary/layout/Editor 几何；README/Skill；版本与 REL-0015 | CLI Hub；修改用户 Shader；覆盖未知 Skill；绕过发布门禁 | long/2026-09-10 | REG-0062；双 Python、完整治理、可复现构建、远程 publish/OIDC、双渠道摘要、本机 CLI/Skill | CI、OIDC、摘要、安装或 Skill 冲突任一失败即停止，保留 `v0.6.4` | 本地 76 passed；全量 388 passed/3 skipped；远程与安装证据回写 REL-0015 | 本地候选已验证 |
 
 ## 验证、风险与回滚
 
@@ -115,6 +116,6 @@ kickoff_completion: complete
 ## 启动完成确认
 
 - [x] 上游架构文档已确认且本计划仅从其派生
-- [x] 63 张原子任务卡已定义；本次新增 CR/REG 双向链接完整（实机项保持待验）
+- [x] 64 张原子任务卡已定义；本次新增 CR/REG 双向链接完整（实机项保持待验）
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立

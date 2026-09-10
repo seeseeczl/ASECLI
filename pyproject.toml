@@ -1,6 +1,6 @@
 [project]
 name = "asecli"
-version = "0.6.4"
+version = "0.7.0"
 description = "Agent-native CLI for reading, modifying, validating and compiling Amplify Shader Editor assets"
 readme = "README.md"
 requires-python = ">=3.10"
