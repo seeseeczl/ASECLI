@@ -81,6 +81,7 @@ def test_usage_error_invalid_integer_is_single_json_line():
     "command",
     [
         "parse",
+        "export-sg",
         "set-field",
         "add-node",
         "connect",
