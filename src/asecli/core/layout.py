@@ -7,6 +7,7 @@ is untouched, and the wire set is preserved by construction.
 from __future__ import annotations
 
 from collections import defaultdict
+import math
 
 from .commentary import COMMENTARY_TYPE, inspect_comment_groups
 from .local_vars import local_var_edges
@@ -161,9 +162,12 @@ def _commentary_composite_nodes(graph: AseGraph) -> set[str]:
 def _position(node: NodeLine) -> tuple[float, float]:
     try:
         x, y = node.raw_fields[3].split(",")
-        return float(x), float(y)
+        position = float(x), float(y)
     except (IndexError, ValueError) as exc:
         raise ValueError(f"node {node.node_id} has invalid x,y position") from exc
+    if not all(math.isfinite(value) for value in position):
+        raise ValueError(f"node {node.node_id} has non-finite x,y position")
+    return position
 
 
 def _node_right_edge(node: NodeLine, graph: AseGraph) -> float:

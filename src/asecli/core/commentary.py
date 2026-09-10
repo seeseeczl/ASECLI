@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from .graph_ops import next_free_node_id
 from .model import AseGraph, NodeLine
 
@@ -31,7 +33,7 @@ def parse_commentary_node(node: NodeLine) -> dict:
     if len(set(members)) != len(members):
         raise ValueError(f"CommentaryNode {node.node_id} contains duplicate member ids")
     x, y = _position(node)
-    if width <= 0 or height <= 0:
+    if not all(math.isfinite(value) for value in (width, height)) or width <= 0 or height <= 0:
         raise ValueError(f"CommentaryNode {node.node_id} must have positive width and height")
     return {
         "node_id": node.node_id,
@@ -138,7 +140,7 @@ def _node_bounds(
 ) -> NodeBounds:
     if measured is not None and node.node_id in measured and node.type_name != COMMENTARY_TYPE:
         x, y, width, height = measured[node.node_id]
-        if width < 0 or height < 0:
+        if not all(math.isfinite(value) for value in (x, y, width, height)) or width < 0 or height < 0:
             raise ValueError(f"node {node.node_id} has invalid measured bounds")
         return x, y, x + width, y + height
     x, y = _position(node)
@@ -196,9 +198,12 @@ def _validate_new_group_overlap(graph: AseGraph, candidate: NodeLine, member_ids
 def _position(node: NodeLine) -> tuple[float, float]:
     try:
         x_raw, y_raw = node.raw_fields[3].split(",")
-        return float(x_raw), float(y_raw)
+        position = float(x_raw), float(y_raw)
     except (IndexError, ValueError) as exc:
         raise ValueError(f"node {node.node_id} has invalid x,y position") from exc
+    if not all(math.isfinite(value) for value in position):
+        raise ValueError(f"node {node.node_id} has non-finite x,y position")
+    return position
 
 
 def _validate_text(value: str, label: str, *, allow_empty: bool) -> None:

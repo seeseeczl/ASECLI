@@ -1,15 +1,22 @@
-"""asecli CLI entry point (TASK-0010): every command emits JSON on stdout."""
+"""asecli CLI entry point: every non-help invocation emits JSON on stdout."""
 
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import sys
 
 from .. import __version__
 from ..core import ENABLE_IF_OPERATORS
 from .commands import EXIT_BRIDGE, EXIT_ERROR, EXIT_OK, CliError
+from .contract import (
+    JsonArgumentParser,
+    JsonVersionAction,
+    JsonVersionRequested,
+    command_hint,
+    emit_json,
+    envelope,
+    redact,
+)
 from .commands import (
     cmd_add_node,
     cmd_connect,
@@ -30,17 +37,9 @@ from .layout_command import configure_layout_parser
 from .graph_review_command import cmd_graph_review
 
 
-class JsonArgumentParser(argparse.ArgumentParser):
-    """Keep argparse diagnostics on stderr while routing failures through JSON."""
-
-    def error(self, message: str) -> None:
-        self.print_usage(sys.stderr)
-        raise CliError("USAGE_ERROR", message)
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = JsonArgumentParser(prog="asecli", description="Agent-native CLI for Amplify Shader Editor assets")
-    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    p.add_argument("--version", nargs=0, action=JsonVersionAction, help="show version as JSON and exit")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("parse", help="parse ASE file and print graph summary")
@@ -210,31 +209,36 @@ def build_parser() -> argparse.ArgumentParser:
 
 def app(argv: list[str] | None = None) -> int:
     parser = build_parser()
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    command = command_hint(parser, raw_args)
     try:
-        args = parser.parse_args(argv)
+        args = parser.parse_args(raw_args)
+        command = args.command
         data = args.func(args)
+    except JsonVersionRequested:
+        command = "version"
+        payload = envelope(cli_version=__version__, command=command, data={"version": __version__})
+        return EXIT_OK if emit_json(payload, cli_version=__version__, command=command) else EXIT_ERROR
     except CliError as e:
-        message = str(e)
-        token = os.environ.get("ASECLI_MCP_INSTANCE_TOKEN")
-        if token:
-            message = message.replace(token, "<redacted>")
-        payload = {"ok": False, "error": {"code": e.code, "message": message}}
+        payload = envelope(
+            cli_version=__version__,
+            command=command,
+            error={"code": e.code, "message": redact(str(e))},
+        )
         if e.data is not None:
             payload["data"] = e.data
-        json.dump(payload, sys.stdout, ensure_ascii=False)
-        sys.stdout.write("\n")
-        return EXIT_BRIDGE if e.code == "BRIDGE_ERROR" else EXIT_ERROR
+        exit_code = EXIT_BRIDGE if e.code == "BRIDGE_ERROR" else EXIT_ERROR
+        return exit_code if emit_json(payload, cli_version=__version__, command=command) else EXIT_ERROR
     except Exception as e:  # noqa: BLE001
-        message = f"{type(e).__name__}: {e}"
-        token = os.environ.get("ASECLI_MCP_INSTANCE_TOKEN")
-        if token:
-            message = message.replace(token, "<redacted>")
-        json.dump({"ok": False, "error": {"code": "INTERNAL", "message": message}}, sys.stdout, ensure_ascii=False)
-        sys.stdout.write("\n")
+        payload = envelope(
+            cli_version=__version__,
+            command=command,
+            error={"code": "INTERNAL", "message": redact(f"{type(e).__name__}: {e}")},
+        )
+        emit_json(payload, cli_version=__version__, command=command)
         return EXIT_ERROR
-    json.dump({"ok": True, "data": data}, sys.stdout, ensure_ascii=False)
-    sys.stdout.write("\n")
-    return EXIT_OK
+    payload = envelope(cli_version=__version__, command=command, data=data)
+    return EXIT_OK if emit_json(payload, cli_version=__version__, command=command) else EXIT_ERROR
 
 
 if __name__ == "__main__":

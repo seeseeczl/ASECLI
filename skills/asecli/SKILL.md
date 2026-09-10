@@ -267,8 +267,8 @@ Editor 创建规则：
 
 ## JSON 契约
 
-- stdout 恒为 `{"ok": true, "data": {...}}` 或 `{"ok": false, "error": {"code", "message"}}`。
-- 错误码：`PARSE_ERROR` / `NOT_FOUND` / `USAGE_ERROR` / `SCHEMA_UNAVAILABLE` / `GUI_SUPPORT_ERROR` / `CUSTOM_GUI_ERROR` / `PROPERTY_PRESENTATION_ERROR` / `COMMENT_GROUP_ERROR` / `EXTERNAL_REFERENCE` / `VALIDATION_ERROR` / `CHECKSUM_FORMAT_ERROR` / `WRITE_CONFLICT` / `UNSAFE_PATH` / `WRITE_ERROR` / `BRIDGE_ERROR` / `INTERNAL`。
+- 除显式 `--help` 保留人类可读文本外，stdout 恒为单行严格 JSON：`{"contract_version": 1, "cli_version": "...", "command": "...", "ok": true, "data": {...}}` 或对应的 `ok=false/error`；`--version` 也返回 JSON。
+- 错误码：`BRIDGE_ERROR` / `CHECKSUM_FORMAT_ERROR` / `COMMENT_GROUP_ERROR` / `CUSTOM_GUI_ERROR` / `EXTERNAL_REFERENCE` / `GRAPH_REVIEW_ERROR` / `GUI_SUPPORT_ERROR` / `INTERNAL` / `LAYOUT_ERROR` / `NOT_FOUND` / `PARSE_ERROR` / `PROPERTY_PRESENTATION_ERROR` / `SCHEMA_UNAVAILABLE` / `SCHEMA_VERSION_MISMATCH` / `SEMANTIC_MISMATCH` / `SKILL_INSTALL_CONFLICT` / `SKILL_INSTALL_ERROR` / `UNSAFE_PATH` / `USAGE_ERROR` / `VALIDATION_ERROR` / `WRITE_CONFLICT` / `WRITE_ERROR`。
 - 退出码：0 成功；2 用法/校验/解析错误；3 桥接错误。
 - 多数修改命令不加 `--write` 时只做 dry-run（`data.written=false`）；`create`、`recompile` 会立即创建资产或请求 Editor 写回，`install-skill` 会写入 Skill 目录，不能套用此规则。
 - Editor `create` 成功 data 保留 `reloaded` 作为暂存重载兼容别名，并含 `staging_reloaded=true` 与 `target_graph_reloaded=false`；目标图重载必须走随后的独立 `recompile`。

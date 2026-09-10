@@ -80,6 +80,32 @@ Node;AmplifyShaderEditor.CommentaryNode;1069;-5680.915,4572.911;Inherit;False;67
     assert group["title"] == "明度越高，强度越小"
 
 
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        "Node;AmplifyShaderEditor.CommentaryNode;1069;nan,0;Inherit;False;300;200;;1;1;坏坐标;1,1,1,1;0;0",
+        "Node;AmplifyShaderEditor.CommentaryNode;1069;0,0;Inherit;False;nan;200;;1;1;坏宽度;1,1,1,1;0;0",
+        "Node;AmplifyShaderEditor.CommentaryNode;1069;0,0;Inherit;False;300;inf;;1;1;坏高度;1,1,1,1;0;0",
+    ],
+)
+def test_rejects_non_finite_commentary_geometry(replacement):
+    graph = parse_graph_text(f"Version=19602\n{replacement}\n")
+    with pytest.raises(ValueError, match="non-finite|positive width"):
+        inspect_comment_groups(graph)
+
+
+def test_cli_rejects_non_finite_commentary_without_emitting_nan(tmp_path):
+    path = tmp_path / "non-finite.shader"
+    path.write_text(sample_shader().replace(
+        "ASEEND*/",
+        "Node;AmplifyShaderEditor.CommentaryNode;4;0,0;Inherit;False;nan;200;Comment;1;1;坏;1,1,1,1;0;0\nASEEND*/",
+    ), encoding="utf-8")
+    code, payload = run_cli("comment-group", str(path))
+    assert code == 2
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "COMMENT_GROUP_ERROR"
+
+
 def test_nested_comment_group_contains_inner_frame_not_its_children():
     shader = AseFile.from_text(sample_shader())
     inner = create_comment_group(shader.graph, ["1", "2"], "明度越高，强度越小", note="")

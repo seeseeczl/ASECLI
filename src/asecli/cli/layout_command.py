@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import argparse
 import json
+import math
 import os
 
 from ..bridge import McpError, apply_wire_routes_via_mcp, inspect_graph_geometry_via_mcp
@@ -46,6 +47,8 @@ def configure_layout_parser(sub):
 
 
 def cmd_layout(args) -> dict:
+    if not math.isfinite(args.gap_x) or not math.isfinite(args.gap_y):
+        raise CliError("USAGE_ERROR", "--gap-x/--gap-y must be finite numbers")
     if args.mode == "legacy":
         if getattr(args, "island_columns", 1) != 1:
             raise CliError("USAGE_ERROR", "--island-columns requires --mode meticulous")

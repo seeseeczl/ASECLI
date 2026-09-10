@@ -9,6 +9,8 @@ from asecli.bridge.mcp_client import McpClient, McpError
 from asecli.bridge.recompile import RECOMPILE_SNIPPET, recompile_via_mcp
 from asecli.bridge.graph_inspect import BOUNDS_SNIPPET, measure_node_bounds_via_mcp
 from asecli.bridge.graph_geometry import GEOMETRY_SNIPPET, inspect_graph_geometry_via_mcp
+from asecli.bridge.graph_geometry_parser import parse_geometry_payload
+from asecli.bridge.graph_geometry import EditorNodeGeometry
 from asecli.core import AseFile, meticulous_layout_positions
 
 
@@ -115,6 +117,25 @@ def test_bounds_probe_surfaces_multiple_instance_refusal(tmp_path, monkeypatch):
         measure_node_bounds_via_mcp(str(shader))
 
 
+def test_bounds_probe_rejects_non_finite_rectangles(tmp_path, monkeypatch):
+    shader = _shader_project(tmp_path)
+
+    class NonFiniteClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            envelope = {"success": True, "data": {"result": "ASECLI_BOUNDS_V1\n1|0|0|nan|50\n"}}
+            return {"content": [{"type": "text", "text": json.dumps(envelope)}]}
+
+    monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", NonFiniteClient)
+    with pytest.raises(McpError, match="non-finite rectangle"):
+        measure_node_bounds_via_mcp(str(shader))
+
+
 def test_geometry_probe_returns_relative_port_offsets(tmp_path, monkeypatch):
     shader = _shader_project(tmp_path)
 
@@ -155,6 +176,19 @@ def test_geometry_v3_probe_decodes_optional_node_and_port_labels(tmp_path, monke
     assert geometry.node_title == "Custom Function"
     assert geometry.input_port_labels == {"0": "Strength"}
     assert geometry.output_port_labels == {"2": "Out"}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "ASECLI_GEOMETRY_V3\nN|1|nan|200|180|90|24|\n",
+        "ASECLI_GEOMETRY_V3\nN|1|100|200|inf|90|24|\n",
+        "ASECLI_GEOMETRY_V3\nN|1|100|200|180|90|24|\nI|1|0|nan|230|\n",
+    ],
+)
+def test_geometry_parser_rejects_non_finite_values(payload):
+    with pytest.raises(McpError, match="invalid node geometry|non-finite port geometry"):
+        parse_geometry_payload(payload, EditorNodeGeometry)
 
 
 def test_layout_ignores_unrendered_disconnected_multipass_master_placeholder():

@@ -289,11 +289,12 @@ asecli recompile Assets/Example.shader
 
 ## JSON 契约
 
-stdout 恒为单行 JSON，agent 可直接解析：
+除显式 `--help` 保留人类可读文本外，stdout 恒为单行严格 JSON，agent 可直接解析。`--version` 也返回 JSON：
 
 ```json
-{"ok": true,  "data": {"node_count": 7}}
-{"ok": false, "error": {"code": "NOT_FOUND", "message": "..."}}
+{"contract_version":1,"cli_version":"0.6.4","command":"parse","ok":true,"data":{"node_count":7}}
+{"contract_version":1,"cli_version":"0.6.4","command":"parse","ok":false,"error":{"code":"NOT_FOUND","message":"..."}}
+{"contract_version":1,"cli_version":"0.6.4","command":"version","ok":true,"data":{"version":"0.6.4"}}
 ```
 
 常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。

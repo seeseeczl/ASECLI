@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from .mcp_client import McpClient, McpError, tool_text
@@ -128,6 +129,8 @@ def measure_node_bounds_via_mcp(
             rect = tuple(float(value) for value in parts[1:])
         except ValueError as exc:
             raise McpError("MCP node-bounds result contains a non-numeric rectangle") from exc
+        if not all(math.isfinite(value) for value in rect):
+            raise McpError("MCP node-bounds result contains a non-finite rectangle")
         if node_id in bounds:
             raise McpError(f"MCP node-bounds result contains duplicate node id {node_id}")
         bounds[node_id] = rect  # type: ignore[assignment]

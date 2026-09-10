@@ -4,7 +4,7 @@
 
 1. **单元测试**（pytest）：core 解析/序列化、check 校验规则、checksum 重算；schema 查询。
 2. **Roundtrip 测试**：真实 ASE `.shader` 样本 parse -> serialize -> 逐字节比对；变异操作后与预期最小差异比对。
-3. **契约测试**：CLI 每个子命令 stdout 必须为合法 JSON 且含 `ok` 字段；错误码枚举固定。
+3. **契约测试**：除显式 help 外，CLI 每个子命令 stdout 必须为拒绝 NaN/Infinity 的严格单行 JSON，包含 `contract_version`、`cli_version`、`command`、`ok`；错误码注册表、实现和 Skill 文档集合一致。
 4. **桥接集成测试**（需 Unity/Tuanjie 开启）：标记 `@pytest.mark.bridge`，验证 recompile 后 HLSL 变更与 CHKSM 更新；2026-09-01 已在 Tuanjie 2022.3.62t2 隔离工程通过。
 5. **Agent 端到端**：SKILL.md 指引下完成 create→add-node→validate→recompile；2026-09-01 已在隔离工程完成并保留脱敏日志、前后哈希和 JSON 结果。
 6. **安全契约**：MCP URL、token、重定向、tool error、SSE/JSON 请求 ID 一一关联与脱敏使用纯本地 mock；真实 loopback 另行验收。

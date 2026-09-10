@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Mapping
 
 from .commentary import inspect_comment_groups
@@ -84,9 +85,12 @@ def node_position(node) -> tuple[float, float]:
     if node is None:
         raise ValueError("layout node not found")
     try:
-        return tuple(float(value) for value in node.raw_fields[3].split(","))  # type: ignore[return-value]
+        values = tuple(float(value) for value in node.raw_fields[3].split(","))
     except (IndexError, ValueError) as exc:
         raise ValueError(f"node {node.node_id} has invalid x,y position") from exc
+    if len(values) != 2 or not all(math.isfinite(value) for value in values):
+        raise ValueError(f"node {node.node_id} has invalid or non-finite x,y position")
+    return values  # type: ignore[return-value]
 
 
 def is_master(graph: AseGraph, node_id: str) -> bool:

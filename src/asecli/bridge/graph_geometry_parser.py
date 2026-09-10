@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import math
 
 from .mcp_client import McpError
 
@@ -18,7 +19,11 @@ def parse_geometry_payload(payload: str, geometry_type):
                 values = [float(value) for value in parts[2:7]]
             except ValueError as exc:
                 raise McpError("MCP graph-geometry result contains non-numeric node geometry") from exc
-            if parts[1] in nodes or min(values[2:]) <= 0:
+            if (
+                parts[1] in nodes
+                or not all(math.isfinite(value) for value in values)
+                or min(values[2:]) <= 0
+            ):
                 raise McpError(f"MCP graph-geometry result contains invalid node geometry for {parts[1]}")
             node_title = ""
             if len(parts) == 8 and version == "ASECLI_GEOMETRY_V3":
@@ -44,6 +49,8 @@ def parse_geometry_payload(payload: str, geometry_type):
         elif row:
             raise McpError("MCP graph-geometry result contains a malformed row")
     for direction, node_id, port_id, x, y, label in ports:
+        if not math.isfinite(x) or not math.isfinite(y):
+            raise McpError("MCP graph-geometry result contains non-finite port geometry")
         if node_id not in nodes:
             raise McpError(f"MCP graph-geometry port references missing node {node_id}")
         key = "input_ports" if direction == "I" else "output_ports"
