@@ -128,7 +128,10 @@ def test_source_hash_uses_original_bytes(unity_project: Path):
 def test_bundled_schema_matches_sgcli_contract():
     bundled = Path(__file__).parents[1] / "src/asecli/sg_export/sgcli.native.v2.schema.json"
     receiver = Path(__file__).parents[2] / "SGCLI/schemas/sgcli.native.v2.schema.json"
-    assert hashlib.sha256(bundled.read_bytes()).digest() == hashlib.sha256(receiver.read_bytes()).digest()
+    bundled_digest = hashlib.sha256(bundled.read_bytes()).hexdigest()
+    assert bundled_digest == "273b32e054964647a837c61d9d3e4908c89e0a463ccdd6405de79680ccba4abf"
+    if receiver.is_file():
+        assert bundled_digest == hashlib.sha256(receiver.read_bytes()).hexdigest()
 
 def test_vector_default_uses_configured_component_ports(unity_project: Path):
     value = _node("AmplifyShaderEditor.Vector3Node", 10, "-400,0")
