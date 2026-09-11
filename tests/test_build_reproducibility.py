@@ -121,3 +121,10 @@ def test_wheel_contains_every_ordered_csharp_resource_fragment(tmp_path):
     } <= names
     assert resource_root + "asecli_material_gui.cs.txt" not in names
     assert resource_root + "editor_create.cs.txt" not in names
+    assert {
+        "asecli/contracts/editor-graph-spec.v3.schema.json",
+        "asecli/contracts/sgcli.native.v3.schema.json",
+        "asecli/skills/asecli/SKILL.md",
+        "asecli/skills/asecli/references/conversion-workflow.md",
+        "asecli/skills/asecli/references/conversion-publication-receipt.v1.schema.json",
+    } <= names

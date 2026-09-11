@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgcli.local/schemas/conversion-publication-receipt.v1.schema.json",
+  "title": "SGCLI conversion publication receipt v1",
+  "type": "object",
+  "required": ["schema", "direction", "complete", "spec", "report"],
+  "properties": {
+    "schema": {"const": "sgcli.conversion-publication-receipt.v1"},
+    "direction": {"enum": ["sgcli-to-asecli", "asecli-to-sgcli"]},
+    "complete": {"type": "boolean"},
+    "spec": {"$ref": "#/$defs/artifact"},
+    "report": {"$ref": "#/$defs/artifact"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["path", "sha256", "committed"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "committed": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -133,7 +134,7 @@ def test_cli_rejects_legacy_v1_spec_before_mcp(tmp_path, monkeypatch, capsys):
     assert not target.exists()
 
 
-def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, monkeypatch, capsys):
+def test_spec_uses_editor_by_default_then_parses_and_validates_result(tmp_path, monkeypatch, capsys):
     target = _project_target(tmp_path)
     spec_path = _write_spec(tmp_path)
 
@@ -153,7 +154,7 @@ def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, m
         }
 
     monkeypatch.setattr("asecli.cli.create_command.create_shader_via_mcp", fake_create)
-    rc = app(["create", str(target), "--backend", "auto", "--spec", str(spec_path)])
+    rc = app(["create", str(target), "--spec", str(spec_path)])
     payload = json.loads(capsys.readouterr().out)
 
     assert rc == 0
@@ -167,6 +168,7 @@ def test_auto_with_spec_uses_editor_then_parses_and_validates_result(tmp_path, m
     assert created.graph.nodes
     assert created.graph.node_by_id("1").raw_fields[9] == MZGUI_EDITOR
     assert payload["data"]["gui_support"]["recommended_editor"] == MZGUI_EDITOR
+    assert payload["data"]["spec_sha256"] == hashlib.sha256(spec_path.read_bytes()).hexdigest()
 
 
 def test_auto_without_spec_uses_legacy_text_path(tmp_path):

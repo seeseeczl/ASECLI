@@ -196,3 +196,4 @@ def test_wheel_contains_the_full_skill_tree(tmp_path):
         names = set(archive.namelist())
     assert "asecli/skills/asecli/SKILL.md" in names
     assert "asecli/skills/asecli/references/layout-standard.md" in names
+    assert "asecli/skills/asecli/references/conversion-publication-receipt.v1.schema.json" in names

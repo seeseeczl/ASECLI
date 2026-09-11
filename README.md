@@ -6,7 +6,7 @@ AseCLI 是面向 AI Agent 的本地 CLI：离线读取、编辑和校验 ASE 节
 
 当前正式版：**[0.7.0](https://github.com/seeseeczl/ASECLI/releases/tag/v0.7.0)** · [PyPI](https://pypi.org/project/asecli/0.7.0/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
 
-ASECLI 接收 `EditorGraphSpec`，不直接承担任意 Shader Graph 的转换。SGCLI 导出的源图 JSON、转换后的创建规格和已经整理的 `.shader` 是不同资产；创建成功不代表转换效果等价。
+ASECLI 接收 SGCLI 生成的裸 `EditorGraphSpec v3`，并可把受支持的 ASE Shader 直接导出为 SGCLI 的裸 `sgcli.native.v3`。两个方向都只有“生产者 spec 原文件→消费者 `--spec`”；独立 report 与发布 receipt 都不进入创建输入，创建成功也不代表转换效果等价。
 
 ```
 你：提需求（"给这个 shader 加个可调描边"）
@@ -23,6 +23,7 @@ Agent：设计节点图 → asecli 写文件 → 校验 → 触发编译 → 你
 | 转换后核对 | `graph-review` 保守比较计算基线，按输出端口生成 Local Var 复用计划 | 只读计划不需要；不会自动创建 Register/Get |
 | 材质 Inspector | 原生 MZGUI 优先；缺失时才注入 ASECLI ShaderGUI fallback。两者兼容 `FoldoutMzgui`、`TooltipMzgui`、`HelpBoxMzgui` 和条件置灰 `EnableIfMzgui`；默认只生成 Tooltip，HelpBox 由用户按需添加 | 写元数据否；安装、重编译和最终 Inspector 验收需要 |
 | Shader 创建 | 从已满足属性呈现契约的编译壳克隆；或由严格 `EditorGraphSpec v2/v3` 让 ASE 自己创建节点、连线、保存和重载核对 | Editor 后端需要 |
+| ASE→SG 导出 | `export-sg` 直接生成裸 `sgcli.native.v3` 和同方向独立报告；名称槽位由 SGCLI 消费端解析 | 导出本身不需要；实际 SG 创建需要 |
 | 编译桥接 | 通过 MCP for Unity 请求 ASE 重新生成 HLSL，并验证工具结果/保存语义 | 是 |
 | Agent 集成 | 全部子命令单行 JSON 输出；稳定错误码与退出码，适合 Agent 子进程编排 | 否 |
 | 工程交付 | 双 Python CI、锁文件、回归目录、可复现 wheel/sdist、SBOM、供应链与许可证检查 | 否 |
@@ -162,13 +163,33 @@ asecli graph-audit Assets/Example.shader
 前提：SGCLI 已生成合法的 EditorGraphSpec；目标工程已打开，MCP 地址与当前实例一致。下面的目标必须尚不存在。
 
 ```bash
-asecli create Assets/ConvertedNew.shader --backend editor --spec graph.json \
+sgcli convert Assets/Source.shadergraph --out-dir ./out
+asecli create Assets/ConvertedNew.shader \
+  --spec ./out/Source.sgcli-to-asecli.spec.json \
   --mcp-url http://127.0.0.1:9080/mcp
 asecli validate Assets/ConvertedNew.shader
 asecli recompile Assets/ConvertedNew.shader --mcp-url http://127.0.0.1:9080/mcp
 ```
 
 核对创建结果的节点、端口、连接及属性 manifest。`staging_reloaded=true` 只表示暂存图重载成功；目标图仍需独立 `recompile`。超时后先检查目标与同目录 `ASECLI-Temp-*`，禁止盲目重试。
+
+### 将 ASE Shader 直接导出给 SGCLI
+
+```bash
+asecli export-sg Assets/ConvertedNew.shader --out-dir ./out
+sgcli sg create Assets/ConvertedNew.shadergraph \
+  --spec ./out/ConvertedNew.asecli-to-sgcli.spec.json
+```
+
+`export-sg` 自动从源 Shader 向上识别 Unity/Tuanjie 工程；跨工程资源解析时显式传 `--target-project`。它强制生成 `<stem>.asecli-to-sgcli.spec.json`、`.report.json` 与 `.receipt.json`，同名即失败；receipt 只证明 spec/report 两份文件的提交状态与 SHA，不是中间交接包。命令不调用 SGCLI，也不生成 ASE 自有中间 JSON。未知节点、Master/Pass、外部属性或纹理 Importer 语义时只写规范报告，不写半成品 spec。反方向 `.asecli-to-sgcli.spec.json` 不能交给 ASECLI `create --spec`。
+
+ASECLI 随 wheel 发布自己拥有的 EditorGraphSpec v3 Schema，并固定一份 SGCLI `0.2.0` 的 `sgcli.native.v3` 生产快照；SGCLI 同样固定 ASECLI `0.7.0` 快照。双仓兼容检查会比较两组原始 Schema SHA-256，任何漂移都必须先升级生产者再放行。
+
+可用 `asecli contract editor-graph --version 3 --spec FILE` 在不连接 Editor 时执行权威 Schema/loader 并返回原文件 SHA。报告分开记录来源快照、发布前复核、生产者 Schema 与真实消费者读取状态。旧 `{graph,report}` wrapper 只允许按已登记形状显式迁移，且内层必须已经是 `sgcli.native.v3`；无版本 discriminator 的旧输入只报告 `legacy_format`，不得伪称已识别版本化 Schema：
+
+```bash
+asecli migrate-package Old-graph-for-sgcli.json --out-dir ./out --extract-sg-spec
+```
 
 ### 整理转换后的复杂图
 
@@ -223,6 +244,9 @@ asecli recompile Assets/Example.shader
 | `validate <file>` | 检查悬空连线、重复 ID、输入多来源、Local Var 一致性和 CHKSM。 | 只读；有 error 时返回退出码 2。 |
 | `graph-review <file> [--baseline FILE] [--reuse-policy consumer-groups\\|fanout]` | 保守核对计算基线并列出复用计划。 | 只读；基线不一致返回 `SEMANTIC_MISMATCH` / 2，不自动创建 Local Var。 |
 | `graph-audit <file>` | 从 Master 反向分析未参与输出的节点，区分 `unused_candidates` 与外部消费者。 | 只读；Property 的源码/HLSL/GUI 引用不会被误报为可删。 |
+| `export-sg <file> --out-dir DIR [--target-project PROJECT]` | 直接输出裸 `sgcli.native.v3`、独立转换报告和发布回执。 | spec 是唯一交接输入；receipt 只证明 spec/report 提交状态；不调用 SGCLI；同名失败；转换失败只写 report。 |
+| `contract editor-graph --version 3 [--spec FILE]` | 输出 wheel 内权威 EditorGraphSpec v3 JSON Schema；可离线校验并回执输入 SHA。 | 只读；loader 仍执行端口、中文属性和模板等更强语义校验。 |
+| `migrate-package <file> --out-dir DIR --extract-sg-spec` | 显式提取登记的旧 `{graph,report}` wrapper。 | 只接受内层 `sgcli.native.v3`；未知/v2 wrapper 只留失败报告，不进入正常消费者。 |
 | `set-field <file> --node N --field I --value V [--write]` | 修改一个已知节点的绝对序列化字段。 | 默认预演；`--write` 后写入。不要用它猜写 Master 或未知版本尾部。 |
 | `add-node <file> --type T [--id N] [--pos X,Y] [--write]` | 按 schema 创建可写节点与默认参数。 | 默认预演；未知、opaque 或版本不兼容节点会拒绝。`--line` 是复用真实序列化行的专家入口；若新行含 schema 占位符的 32 位 hex 标识，会返回 `warnings` 提示在 Unity 中核对唯一性。 |
 | `connect <file> --from A:P --to B:P [--write]` | 将来源节点输出端接到目标节点输入端。 | 默认预演；`--from` 是数据源，`--to` 是消费者。 |
@@ -235,7 +259,7 @@ asecli recompile Assets/Example.shader
 | `install-skill [--agent A] [--scope user\|project] [--project-root DIR] [--skill-root DIR]` | 将 wheel 内置的通用 ASECLI Agent Skill 安装到开放 `.agents` 目录或 Codex、Claude Code、Cursor、Gemini CLI、GitHub Copilot 原生目录。 | 无参数保持旧 Codex 目录；省略 `--agent` 但给 `--scope`/`--project-root` 时默认 `agents`；`all` 以两个非重复目标覆盖五类 Agent；相同内容幂等，任一冲突先整体拒绝，不修改 Shader、材质或 Unity/Tuanjie 工程。 |
 | `comment-group <file> [--nodes IDS --title T] [--note NOTE --padding P --id N] … [--write]` | 查询、创建、嵌套 ASE 原生 Comment 框；可检查成员越框或重叠。 | 创建默认用离线尺寸估算。`--editor-bounds`、`--check-bounds`、`--fit` 需连接 Editor；`--note` 写 Comment 头小字（默认 "Comment"），`--padding` 默认 50，`--id` 指定 Comment 节点 ID。 |
 | `create <out> --from TEMPLATE [--name NAME] [--graph-from DONOR]` | 复制一个已编译模板壳；可替换图或同步 Shader 名与 CHKSM。 | **立即创建/覆盖目标**；模板和 donor 组合后的文件必须已满足属性呈现契约，否则写前拒绝。 |
-| `create <out> --backend editor --spec graph.json` | 用白名单 `EditorGraphSpec v2/v3` 让 ASE 自身创建、保存和重载目标图。 | **立即请求 Editor 写入**；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。v3 另支持版本化 primitive/recipe 与属性精度、默认值和范围。 |
+| `create <out> --spec graph.json` | 用白名单 `EditorGraphSpec v2/v3` 让 ASE 自身创建、保存和重载目标图。 | 提供 `--spec` 时默认选择 Editor 后端并立即请求写入；每个 Property 必填中文 `inspector_name` 和中文 `tooltip`，可选 `help` 写用户 HelpBox。v3 另支持版本化 primitive/recipe 与属性精度、默认值和范围。 |
 | `recompile <file> [--mcp-url URL] [--allow-remote-mcp]` | 调用运行中 ASE 重新生成 HLSL/保存，报告 `changed`；并自动快照→恢复材质 GUI 元数据、重算 CHKSM、强制 `AssetDatabase.ImportAsset` 二次导入。 | **立即触发 Editor 操作**；默认仅允许 loopback MCP。返回 `changed`，元数据被恢复时另返回 `metadata_restored` 与 `asset_import`。 |
 
 ### 详细操作入口
@@ -250,7 +274,7 @@ asecli recompile Assets/Example.shader
 
 ### Editor API 创建
 
-默认 `create` 仍是原有纯文本后端。`--backend editor --spec graph.json` 明确使用 Editor；`--backend auto` 在提供 `--spec` 时选择 Editor，否则选择文本后端。Editor 目标必须位于 Unity/Tuanjie 工程的 `Assets/` 下且尚不存在，不允许 `--force`。
+`create` 默认自动路由：提供 `--spec` 时选择 Editor；没有 `--spec` 时走原有纯文本后端。仍可用 `--backend editor|text|auto` 显式指定。Editor 目标必须位于 Unity/Tuanjie 工程的 `Assets/` 下且尚不存在，不允许 `--force`。
 
 最小 Caster-like 规格：
 
@@ -297,7 +321,7 @@ asecli recompile Assets/Example.shader
 {"contract_version":1,"cli_version":"0.7.0","command":"version","ok":true,"data":{"version":"0.7.0"}}
 ```
 
-常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
+常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`SG_EXPORT_BLOCKED`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`WRITE_PARTIAL`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。
 退出码：`0` 成功 · `2` 用法/校验/解析错误 · `3` 桥接错误
 
 ## 安全与验收边界

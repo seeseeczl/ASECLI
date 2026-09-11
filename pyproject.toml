@@ -27,7 +27,7 @@ Issues = "https://github.com/seeseeczl/ASECLI/issues"
 Changelog = "https://github.com/seeseeczl/ASECLI/releases"
 
 [dependency-groups]
-dev = ["hatchling==1.32.0", "pytest>=8.0"]
+dev = ["hatchling==1.32.0", "jsonschema>=4.23,<5", "pytest>=8.0"]
 
 [project.scripts]
 asecli = "asecli.cli.main:app"
@@ -45,6 +45,8 @@ packages = ["src/asecli"]
 # wheel-based CLI install.
 [tool.hatch.build.targets.wheel.force-include]
 "skills/asecli" = "asecli/skills/asecli"
+"src/asecli/contracts/editor-graph-spec.v3.schema.json" = "asecli/contracts/editor-graph-spec.v3.schema.json"
+"src/asecli/contracts/sgcli.native.v3.schema.json" = "asecli/contracts/sgcli.native.v3.schema.json"
 
 [tool.hatch.build.targets.sdist]
 # Release/audit records contain artifact evidence and are kept outside the

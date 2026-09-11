@@ -35,7 +35,9 @@ from .skill_command import AGENT_CHOICES, SCOPE_CHOICES, cmd_install_skill
 from .usage_command import cmd_graph_audit, cmd_remove_node
 from .layout_command import configure_layout_parser
 from .graph_review_command import cmd_graph_review
-
+from .export_sg_command import configure_export_sg_parser
+from .contract_command import configure_contract_parser
+from .migrate_package_command import configure_migrate_package_parser
 
 def build_parser() -> argparse.ArgumentParser:
     p = JsonArgumentParser(prog="asecli", description="Agent-native CLI for Amplify Shader Editor assets")
@@ -102,6 +104,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--baseline", help="original Shader backup for conservative semantic comparison")
     s.add_argument("--reuse-policy", choices=("consumer-groups", "fanout"), default="consumer-groups")
     s.set_defaults(func=cmd_graph_review)
+
+    configure_export_sg_parser(sub)
+    configure_contract_parser(sub)
+    configure_migrate_package_parser(sub)
 
     configure_layout_parser(sub)
 
@@ -190,8 +196,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--from", dest="from_template")
     s.add_argument("--name")
     s.add_argument("--graph-from", help="donor ASE file whose graph is injected")
-    s.add_argument("--backend", choices=("text", "editor", "auto"), default="text")
-    s.add_argument("--spec", help="strict EditorGraphSpec v2 JSON (editor/auto backend)")
+    s.add_argument("--backend", choices=("text", "editor", "auto"), default="auto")
+    s.add_argument("--spec", help="strict EditorGraphSpec v2/v3 JSON (editor/auto backend)")
     s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
     s.add_argument("--allow-remote-mcp", action="store_true")
     s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
@@ -239,7 +245,5 @@ def app(argv: list[str] | None = None) -> int:
         return EXIT_ERROR
     payload = envelope(cli_version=__version__, command=command, data=data)
     return EXIT_OK if emit_json(payload, cli_version=__version__, command=command) else EXIT_ERROR
-
-
 if __name__ == "__main__":
     raise SystemExit(app())

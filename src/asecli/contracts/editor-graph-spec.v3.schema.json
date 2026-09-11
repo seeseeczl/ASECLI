@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asecli.local/schemas/editor-graph-spec.v3.schema.json",
+  "title": "ASECLI EditorGraphSpec v3",
+  "$comment": "Authoritative structural consumer contract. ASECLI additionally enforces alias uniqueness, property uniqueness, port compatibility, acyclicity, Chinese property presentation, finite numbers, safe text, render-setting/template compatibility, primitive DAG references, and ASE 1.9.6.2 capability constraints before Editor access.",
+  "type": "object",
+  "required": ["version", "primitives_version", "template", "nodes", "connections"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 3},
+    "primitives_version": {"const": 1},
+    "template": {"$ref": "#/$defs/template"},
+    "nodes": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {"$ref": "#/$defs/node"}
+    },
+    "connections": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/connection"}
+    }
+  },
+  "$defs": {
+    "position": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "number", "minimum": -1000000, "maximum": 1000000},
+        {"type": "number", "minimum": -1000000, "maximum": 1000000}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "template": {
+      "type": "object",
+      "required": ["guid", "shader_name"],
+      "additionalProperties": false,
+      "properties": {
+        "guid": {"type": "string", "pattern": "^[0-9a-fA-F]{32}$"},
+        "shader_name": {"type": "string", "minLength": 1, "maxLength": 255},
+        "settings": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "surface": {"enum": ["Opaque", "Transparent"]},
+            "blend": {"enum": ["Alpha", "Premultiply", "Additive", "Multiply"]},
+            "two_sided": {"enum": ["On", "Cull Back", "Cull Front"]},
+            "vertex_position": {"enum": ["Absolute", "Relative"]},
+            "cast_shadows": {"type": "boolean"},
+            "receive_shadows": {"type": "boolean"},
+            "fog": {"type": "boolean"},
+            "lod_crossfade": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "common": {
+      "type": "object",
+      "required": ["alias", "kind", "position"],
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"type": "string"},
+        "position": {"$ref": "#/$defs/position"}
+      }
+    },
+    "precision": {"enum": ["Float", "Half", "Inherit"]},
+    "generic_type": {
+      "enum": [
+        "WorldPosInputsNode", "TextureCoordinatesNode", "BreakToComponentsNode",
+        "SimpleAddOpNode", "SimpleSubtractOpNode", "SimpleMultiplyOpNode",
+        "SimpleDivideOpNode", "SimpleMinOpNode", "SimpleMaxOpNode",
+        "SaturateNode", "OneMinusNode", "LerpOp"
+      ]
+    },
+    "property_type": {
+      "enum": ["TexturePropertyNode", "RangedFloatNode", "Matrix4X4Node", "Vector4Node", "ColorNode"]
+    },
+    "parameter_type": {"enum": ["Constant", "Property", "InstancedProperty", "Global"]},
+    "input_type": {
+      "enum": [
+        "INT", "FLOAT", "FLOAT2", "FLOAT3", "FLOAT4", "FLOAT3x3", "FLOAT4x4",
+        "SAMPLER1D", "SAMPLER2D", "SAMPLER3D", "SAMPLERCUBE", "SAMPLER2DARRAY", "SAMPLERSTATE"
+      ]
+    },
+    "output_type": {"enum": ["INT", "FLOAT", "FLOAT2", "FLOAT3", "FLOAT4", "FLOAT3x3", "FLOAT4x4"]},
+    "input": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"},
+        "type": {"$ref": "#/$defs/input_type"}
+      }
+    },
+    "enabled_if": {
+      "type": "object",
+      "required": ["property", "operator", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "property": {"type": "string", "pattern": "^_[A-Za-z][A-Za-z0-9_]{0,126}$"},
+        "operator": {"enum": ["Less", "LessEqual", "Equal", "NotEqual", "GreaterEqual", "Greater"]},
+        "value": {"type": "number"}
+      }
+    },
+    "node": {
+      "oneOf": [
+        {"$ref": "#/$defs/generic_node"},
+        {"$ref": "#/$defs/property_node"},
+        {"$ref": "#/$defs/sampler_node"},
+        {"$ref": "#/$defs/custom_expression_node"},
+        {"$ref": "#/$defs/primitive_node"},
+        {"$ref": "#/$defs/recipe_node"}
+      ]
+    },
+    "generic_node": {
+      "type": "object",
+      "required": ["alias", "kind", "position", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"const": "node"},
+        "position": {"$ref": "#/$defs/position"},
+        "type": {"$ref": "#/$defs/generic_type"},
+        "precision": {"$ref": "#/$defs/precision"}
+      }
+    },
+    "property_node": {
+      "type": "object",
+      "required": ["alias", "kind", "position", "type", "property_name", "inspector_name", "tooltip", "parameter_type"],
+      "additionalProperties": false,
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"const": "property"},
+        "position": {"$ref": "#/$defs/position"},
+        "type": {"$ref": "#/$defs/property_type"},
+        "property_name": {"type": "string", "pattern": "^_[A-Za-z][A-Za-z0-9_]{0,126}$"},
+        "inspector_name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "tooltip": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "help": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "enabled_if": {"$ref": "#/$defs/enabled_if"},
+        "parameter_type": {"$ref": "#/$defs/parameter_type"},
+        "precision": {"$ref": "#/$defs/precision"},
+        "default": {},
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "hdr": {"type": "boolean"}
+      }
+    },
+    "sampler_node": {
+      "type": "object",
+      "required": ["alias", "kind", "position", "property_name", "inspector_name", "tooltip", "parameter_type"],
+      "additionalProperties": false,
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"const": "sampler"},
+        "position": {"$ref": "#/$defs/position"},
+        "property_name": {"type": "string", "pattern": "^_[A-Za-z][A-Za-z0-9_]{0,126}$"},
+        "inspector_name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "tooltip": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "help": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "enabled_if": {"$ref": "#/$defs/enabled_if"},
+        "parameter_type": {"$ref": "#/$defs/parameter_type"},
+        "precision": {"$ref": "#/$defs/precision"},
+        "texture_guid": {"type": "string", "pattern": "^[0-9a-fA-F]{32}$"},
+        "hidden": {"type": "boolean"}
+      }
+    },
+    "custom_expression_node": {
+      "type": "object",
+      "required": ["alias", "kind", "position", "name", "code", "output_type", "inputs"],
+      "additionalProperties": false,
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"const": "custom_expression"},
+        "position": {"$ref": "#/$defs/position"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "code": {"type": "string", "minLength": 1, "maxLength": 65535},
+        "output_type": {"$ref": "#/$defs/output_type"},
+        "inputs": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/input"}},
+        "precision": {"$ref": "#/$defs/precision"}
+      }
+    },
+    "primitive_op": {
+      "enum": [
+        "abs", "acos", "add", "and", "append", "asin", "atan", "atan2", "ceil", "clamp",
+        "component_mask", "contrast", "cos", "cosh", "cross", "degrees", "desaturate", "distance",
+        "div", "dot", "exp", "exp2", "floor", "fmod", "fract", "gamma_to_linear", "hsv_to_rgb",
+        "instance_id", "length", "lerp", "linear_to_gamma", "log", "log10", "log2", "luminance",
+        "max", "min", "mul", "nand", "negate", "normalize", "not", "one_minus", "or", "posterize",
+        "pow", "radians", "rcp", "reflect", "refract", "remainder", "remap", "rgb_to_hsv",
+        "rotate_axis", "round", "rsqrt", "saturate", "select", "sign", "sin", "sinh", "smoothstep",
+        "split", "sqrt", "step", "sub", "swizzle", "tan", "tanh", "texcoord", "time", "trunc",
+        "vertex_color", "vertex_id", "world_normal", "world_position"
+      ]
+    },
+    "primitive_node": {
+      "type": "object",
+      "required": ["alias", "kind", "position", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"const": "primitive"},
+        "position": {"$ref": "#/$defs/position"},
+        "op": {"$ref": "#/$defs/primitive_op"}
+      }
+    },
+    "recipe_node": {
+      "type": "object",
+      "required": ["alias", "kind", "position", "recipe", "code", "output_type", "inputs", "expansion"],
+      "additionalProperties": false,
+      "properties": {
+        "alias": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$", "not": {"const": "master"}},
+        "kind": {"const": "recipe"},
+        "position": {"$ref": "#/$defs/position"},
+        "recipe": {"type": "string", "minLength": 1, "maxLength": 64},
+        "code": {"type": "string", "minLength": 1, "maxLength": 65535},
+        "output_type": {"$ref": "#/$defs/output_type"},
+        "inputs": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/input"}},
+        "expansion": {"$ref": "#/$defs/expansion"}
+      }
+    },
+    "primitive_entry": {
+      "type": "object",
+      "required": ["id", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"},
+        "op": {"type": "string", "minLength": 1, "maxLength": 64},
+        "args": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 64}},
+        "value": {"type": "string"}
+      }
+    },
+    "expansion": {
+      "type": "object",
+      "required": ["primitives", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "primitives": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/primitive_entry"}},
+        "output": {"type": "string", "minLength": 1}
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "required": ["node", "port"],
+      "additionalProperties": false,
+      "properties": {
+        "node": {"type": "string", "minLength": 1, "maxLength": 64},
+        "port": {"type": "integer", "minimum": 0, "maximum": 63}
+      }
+    },
+    "connection": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {"$ref": "#/$defs/endpoint"},
+        "to": {"$ref": "#/$defs/endpoint"}
+      }
+    }
+  }
+}

@@ -12,7 +12,7 @@ from ..bridge import (
     SpecError,
     create_shader_via_mcp,
     install_gui_support,
-    load_editor_graph_spec,
+    load_editor_graph_spec_with_sha256,
     route_create_backend,
 )
 from ..checks import ChecksumFormatError, fix_checksum, validate_file
@@ -37,9 +37,10 @@ _TEMPLATE_NAME_FIELD = {
 
 def cmd_create(args) -> dict:
     spec = None
+    spec_sha256 = None
     if args.spec:
         try:
-            spec = load_editor_graph_spec(args.spec)
+            spec, spec_sha256 = load_editor_graph_spec_with_sha256(args.spec)
         except FileNotFoundError as exc:
             raise CliError("NOT_FOUND", str(exc)) from exc
         except SpecError as exc:
@@ -48,9 +49,8 @@ def cmd_create(args) -> dict:
         backend = route_create_backend(args.backend, spec)
     except SpecError as exc:
         raise CliError("USAGE_ERROR", str(exc)) from exc
-    if backend == "editor":
-        return _cmd_create_editor(args, spec)
-    return _cmd_create_text(args, spec)
+    result = _cmd_create_editor(args, spec) if backend == "editor" else _cmd_create_text(args, spec)
+    return {**result, **({"spec_sha256": spec_sha256} if spec_sha256 is not None else {})}
 
 
 def _cmd_create_text(args, spec) -> dict:

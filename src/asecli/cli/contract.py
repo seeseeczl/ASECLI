@@ -29,6 +29,7 @@ ERROR_CODES = frozenset(
         "SCHEMA_UNAVAILABLE",
         "SCHEMA_VERSION_MISMATCH",
         "SEMANTIC_MISMATCH",
+        "SG_EXPORT_BLOCKED",
         "SKILL_INSTALL_CONFLICT",
         "SKILL_INSTALL_ERROR",
         "UNSAFE_PATH",
@@ -36,6 +37,7 @@ ERROR_CODES = frozenset(
         "VALIDATION_ERROR",
         "WRITE_CONFLICT",
         "WRITE_ERROR",
+        "WRITE_PARTIAL",
     }
 )
 

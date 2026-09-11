@@ -123,7 +123,8 @@ def test_every_parser_command_has_a_machine_contract_case(tmp_path):
     usage_failure_commands = {
         "parse", "set-field", "add-node", "connect", "disconnect", "remove-node",
         "graph-audit", "validate", "fix-checksum", "graph-review", "layout", "custom-gui",
-        "gui-support", "comment-group", "create", "recompile",
+            "gui-support", "comment-group", "create", "recompile", "export-sg", "contract",
+            "migrate-package",
     }
     assert _subcommands() == usage_failure_commands | {"install-skill"}
     for command in sorted(usage_failure_commands):

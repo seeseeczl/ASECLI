@@ -192,3 +192,13 @@
 - 决策：新增 `--agent agents|codex|claude|cursor|gemini|copilot|all`、`--scope user|project` 和 `--project-root`。`.agents/skills` 是 Codex、Cursor、Gemini CLI 与 GitHub Copilot 共同识别的开放目录；Claude Code 另用 `.claude/skills`。因此 `all` 只安装这两个根，避免向每个兼容别名重复复制同名 Skill。单一 Agent 仍可选择其原生目录。
 - 兼容与安全：无参数继续解析 `$CODEX_HOME/skills` 或 `~/.codex/skills`，`--skill-root` 保持显式覆盖。所有目标沿用完整树 digest、幂等、符号链接保护与不同内容拒绝覆盖；`all` 在创建任一目标前预检全部已有 Skill 内容冲突。
 - 边界：Skill 只约定 shell 与单行 JSON，不假设 Agent 专属工具、权限或消息格式。Editor、目标工程和视觉验收能力仍由实际运行环境决定；本 CR 不发布版本、不修改 Shader、不启动 Editor。
+
+### ADR-0022 双 CLI 使用消费者原生裸规格直连
+
+- 状态：已实现，视觉验收未关闭（2026-09-11，CR-0030）
+- 背景：历史 ASE→SG 需要 ASE 自有语义 JSON 和一次性翻译脚本，SG→ASE 又曾使用 `graph + report` wrapper；两者都让用户交接文件不能直接成为对方 CLI 的正式输入。
+- 决策：ASECLI 的 `export-sg` 直接生成裸 `sgcli.native.v3`，文件名为 `<stem>.asecli-to-sgcli.spec.json`；独立报告为同 stem 的 `.report.json`。反向由 SGCLI 直接生成裸 `EditorGraphSpec v3`，ASECLI `create --spec` 原样读取。两个 CLI 不互调，不发布 source-native 中间协议。
+- 契约所有权：ASECLI 随 wheel 发布并导出 EditorGraphSpec v3 Schema；SGCLI 随 wheel 发布 native v3 Schema。生产者快照固定消费者版本与 Schema SHA；消费者严格拒绝 wrapper、未知字段、已知反方向后缀和 report 文件。
+- 写入语义：输出目录由生产者强制生成规范名称；同名失败；转换失败可以写规范 report，但不得写不完整 spec。Schema 版本仅存在于内容。
+- 证据边界：producer/consumer 文件 SHA 完全一致只证明无变换交接。Editor 创建、保存重载、编译、正常缩放画布和同条件渲染仍分别验收；未运行渲染时 `visual_equivalent=false`。
+- 回滚：可禁用 `export-sg` 新入口或恢复旧发布版本，但不得让 `create --spec` 接受 wrapper，也不得把一次性 translator 恢复为正式主链。

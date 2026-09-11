@@ -10,6 +10,13 @@ permissions:
   contents: read
 
 jobs:
+  cross-cli:
+    uses: ./.github/workflows/cross-cli.yml
+    with:
+      sgcli_ref: main
+    permissions:
+      contents: read
+
   verify:
     strategy:
       fail-fast: false
@@ -32,7 +39,7 @@ jobs:
       - run: uv run --frozen --python ${{ matrix.python-version }} python tools/check_ci_governance.py
 
   package:
-    needs: verify
+    needs: [verify, cross-cli]
     runs-on: ubuntu-latest
     env:
       SOURCE_DATE_EPOCH: "1788220800"

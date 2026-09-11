@@ -9,6 +9,16 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 
 从 SG JSON/EditorGraphSpec 创建或整理转换图时，还必须读取 [转换后图交付流程](references/conversion-workflow.md)。以当前 Shader 为基线，先 `graph-review` 锁定计算连接/常量，再处理复用、递归鱼骨与计算岛；不得把 JSON 初排或创建成功当作完成。`graph-review` 是只读计划与对照，不是自动 Local Var 创建器。用户明确指定按输出端口两次消费注册时，用 `--reuse-policy fanout` 覆盖本任务默认门槛，不修改其他任务的消费组策略。
 
+## 与 SGCLI 的双向 JSON 直连
+
+- SG→ASE：`sgcli convert Graph.shadergraph --out-dir ./out` 生成裸 `Graph.sgcli-to-asecli.spec.json`、独立 report 和发布 receipt；`asecli create Assets/Graph.shader --spec ./out/Graph.sgcli-to-asecli.spec.json` 只直接消费 spec 原文件。
+- ASE→SG：`asecli export-sg Graph.shader --out-dir ./out` 生成裸 `Graph.asecli-to-sgcli.spec.json`（`sgcli.native.v3`）、独立 report 和发布 receipt；SGCLI `sg create --spec` 只直接消费 spec 原文件。
+- 不生成 `asecli.ase-graph.*` 中间 JSON，不调用 SGCLI，不使用 wrapper、`.graph` 解包、jq、Agent 改写或一次性 translator。
+- `*.report.json` 与 `*.receipt.json` 都不能传给 `--spec`。receipt 只证明 spec/report 是否都提交及其 SHA，不是中间包；结构见 [发布回执 Schema](references/conversion-publication-receipt.v1.schema.json)。Schema 版本只在内容中；文件名固定小写方向后缀。同名失败；转换失败只留规范 report，不留不完整 spec。
+- ASECLI 的消费者契约由 `asecli contract editor-graph --version 3` 随 wheel 发布；追加 `--spec FILE` 可在 Editor 前严格校验并返回原文件 SHA。已知反方向 `.asecli-to-sgcli.spec.json` 立即拒绝。
+- 旧 `{graph,report}` wrapper 只经 `asecli migrate-package OLD --out-dir DIR --extract-sg-spec` 按登记形状显式提取；只接受内层 `sgcli.native.v3`，未知或 v2 wrapper 失败关闭。无版本 discriminator 时记录 `legacy_format`，不能声称识别出 legacy schema 版本。
+- 报告中的 `source_snapshot_sha256/source_recheck_sha256` 必须一致；`producer_schema_validated` 与 `consumer_loaded` 分开记录，未实际调用 SGCLI 时后者保持 `not_run`。
+
 ## Agent 兼容性
 
 本 Skill 遵循通用 Agent Skills 目录结构：标准 YAML frontmatter、`SKILL.md` 正文和相对路径引用。它只要求 Agent 能运行本地 shell 命令并读取 ASECLI 的单行 JSON，不依赖 Codex、Claude Code、Cursor、Gemini CLI 或 GitHub Copilot 的专属工具名、权限模型或消息格式。
@@ -268,9 +278,9 @@ Editor 创建规则：
 ## JSON 契约
 
 - 除显式 `--help` 保留人类可读文本外，stdout 恒为单行严格 JSON：`{"contract_version": 1, "cli_version": "...", "command": "...", "ok": true, "data": {...}}` 或对应的 `ok=false/error`；`--version` 也返回 JSON。
-- 错误码：`BRIDGE_ERROR` / `CHECKSUM_FORMAT_ERROR` / `COMMENT_GROUP_ERROR` / `CUSTOM_GUI_ERROR` / `EXTERNAL_REFERENCE` / `GRAPH_REVIEW_ERROR` / `GUI_SUPPORT_ERROR` / `INTERNAL` / `LAYOUT_ERROR` / `NOT_FOUND` / `PARSE_ERROR` / `PROPERTY_PRESENTATION_ERROR` / `SCHEMA_UNAVAILABLE` / `SCHEMA_VERSION_MISMATCH` / `SEMANTIC_MISMATCH` / `SKILL_INSTALL_CONFLICT` / `SKILL_INSTALL_ERROR` / `UNSAFE_PATH` / `USAGE_ERROR` / `VALIDATION_ERROR` / `WRITE_CONFLICT` / `WRITE_ERROR`。
+- 错误码：`BRIDGE_ERROR` / `CHECKSUM_FORMAT_ERROR` / `COMMENT_GROUP_ERROR` / `CUSTOM_GUI_ERROR` / `EXTERNAL_REFERENCE` / `GRAPH_REVIEW_ERROR` / `GUI_SUPPORT_ERROR` / `INTERNAL` / `LAYOUT_ERROR` / `NOT_FOUND` / `PARSE_ERROR` / `PROPERTY_PRESENTATION_ERROR` / `SCHEMA_UNAVAILABLE` / `SCHEMA_VERSION_MISMATCH` / `SEMANTIC_MISMATCH` / `SG_EXPORT_BLOCKED` / `SKILL_INSTALL_CONFLICT` / `SKILL_INSTALL_ERROR` / `UNSAFE_PATH` / `USAGE_ERROR` / `VALIDATION_ERROR` / `WRITE_CONFLICT` / `WRITE_ERROR` / `WRITE_PARTIAL`。
 - 退出码：0 成功；2 用法/校验/解析错误；3 桥接错误。
-- 多数修改命令不加 `--write` 时只做 dry-run（`data.written=false`）；`create`、`recompile` 会立即创建资产或请求 Editor 写回，`install-skill` 会写入 Skill 目录，不能套用此规则。
+- 多数修改命令不加 `--write` 时只做 dry-run（`data.written=false`）；`create`、`recompile` 会立即创建资产或请求 Editor 写回，`export-sg` 固定写规范 JSON 产物，`install-skill` 会写入 Skill 目录，不能套用此规则。
 - Editor `create` 成功 data 保留 `reloaded` 作为暂存重载兼容别名，并含 `staging_reloaded=true` 与 `target_graph_reloaded=false`；目标图重载必须走随后的独立 `recompile`。
 
 ## 桥接前提

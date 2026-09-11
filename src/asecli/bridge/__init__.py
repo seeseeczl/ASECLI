@@ -2,7 +2,13 @@
 
 from .mcp_client import McpClient, McpError
 from .editor_create import create_shader_via_mcp
-from .editor_spec import EditorGraphSpec, SpecError, load_editor_graph_spec, route_create_backend
+from .editor_spec import (
+    EditorGraphSpec,
+    SpecError,
+    load_editor_graph_spec,
+    route_create_backend,
+)
+from ._editor_spec_io import load_editor_graph_spec_with_sha256
 from .graph_inspect import measure_node_bounds_via_mcp
 from .graph_geometry import EditorNodeGeometry, inspect_graph_geometry_via_mcp
 from .gui_support import (
@@ -27,6 +33,7 @@ __all__ = [
     "SpecError",
     "create_shader_via_mcp",
     "load_editor_graph_spec",
+    "load_editor_graph_spec_with_sha256",
     "inspect_gui_support",
     "handoff_gui_support",
     "install_gui_support",
