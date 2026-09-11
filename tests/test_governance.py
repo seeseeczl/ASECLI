@@ -109,7 +109,7 @@ def test_publish_workflow_keeps_all_gates_before_oidc_publish():
     )
     for marker in required:
         assert marker in workflow
-    assert workflow.index("needs: package") < workflow.index("id-token: write")
+    assert workflow.index("needs: [package, cross-cli]") < workflow.index("id-token: write")
 
 
 def test_governance_markdown_cells_preserve_escaped_pipes():

@@ -1,3 +1,3 @@
 """AseCLI — agent-native toolkit for Amplify Shader Editor assets."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"

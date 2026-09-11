@@ -21,7 +21,7 @@ if ($env:ASECLI_REF) {
     $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name
 }
 if (-not $tag) {
-    $tag = "v0.7.0"
+    $tag = "v0.8.0"
 }
 
 $version = $tag.TrimStart("v")

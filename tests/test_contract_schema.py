@@ -135,6 +135,14 @@ def test_native_property_names_and_contains_are_enforced():
         "contains": {"properties": {"direction": {"const": "Output"}}, "required": ["direction"]},
     }),
     ({"": 1}, {"type": "object", "propertyNames": {"minLength": 1}}),
+    (1, {"type": "integer"}),
+    (1.0, {"type": "integer"}),
+    (1.5, {"type": "integer"}),
+    (True, {"type": "integer"}),
+    ([1, 1.0], {"type": "array", "uniqueItems": True}),
+    ([1, True], {"type": "array", "uniqueItems": True}),
+    ([{"a": [1]} , {"a": [1.0]}], {"type": "array", "uniqueItems": True}),
+    (True, {"const": 1}),
 ])
 def test_builtin_validator_matches_draft_202012_for_contract_keywords(value, schema):
     expected_valid = Draft202012Validator(schema).is_valid(value)

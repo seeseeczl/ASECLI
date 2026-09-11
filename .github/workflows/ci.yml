@@ -10,13 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  cross-cli:
-    uses: ./.github/workflows/cross-cli.yml
-    with:
-      sgcli_ref: main
-    permissions:
-      contents: read
-
   verify:
     strategy:
       fail-fast: false
@@ -39,7 +32,7 @@ jobs:
       - run: uv run --frozen --python ${{ matrix.python-version }} python tools/check_ci_governance.py
 
   package:
-    needs: [verify, cross-cli]
+    needs: verify
     runs-on: ubuntu-latest
     env:
       SOURCE_DATE_EPOCH: "1788220800"
@@ -97,6 +90,17 @@ jobs:
           test -f "$test_project/Assets/Editor/ASECLI/ASECLIMaterialGUI.cs"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
-          name: asecli-${{ env.ASECLI_VERSION }}-python-${{ runner.arch }}
+          name: asecli-candidate-${{ github.sha }}
           path: dist/
           if-no-files-found: error
+
+  cross-cli:
+    needs: package
+    uses: ./.github/workflows/cross-cli.yml
+    with:
+      sgcli_ref: ${{ vars.SGCLI_CANDIDATE_SHA }}
+      asecli_artifact_name: asecli-candidate-${{ github.sha }}
+    secrets:
+      sgcli_read_ssh_key: ${{ secrets.SGCLI_READ_SSH_KEY }}
+    permissions:
+      contents: read

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import math
 import re
 from typing import Any
@@ -61,9 +60,9 @@ def _validate(value: Any, rule: Any, root: dict[str, Any], path: str, errors: li
         branch = rule.get("then") if _matches(value, rule["if"], root, path) else rule.get("else")
         if branch is not None:
             _validate(value, branch, root, path, errors)
-    if "const" in rule and value != rule["const"]:
+    if "const" in rule and not _json_equal(value, rule["const"]):
         errors.append(f"{path}: expected constant {rule['const']!r}")
-    if "enum" in rule and value not in rule["enum"]:
+    if "enum" in rule and not any(_json_equal(value, item) for item in rule["enum"]):
         errors.append(f"{path}: value is not in the allowed enum")
     expected_type = rule.get("type")
     if expected_type is not None and not _is_type(value, expected_type):
@@ -111,8 +110,11 @@ def _validate_array(value, rule, root, path, errors):
     if "maxItems" in rule and len(value) > rule["maxItems"]:
         errors.append(f"{path}: array has more than maxItems")
     if rule.get("uniqueItems"):
-        encoded = [json.dumps(item, sort_keys=True, separators=(",", ":")) for item in value]
-        if len(encoded) != len(set(encoded)):
+        if any(
+            _json_equal(value[left], value[right])
+            for left in range(len(value))
+            for right in range(left + 1, len(value))
+        ):
             errors.append(f"{path}: array items must be unique")
     if "contains" in rule and not any(
         _matches(item, rule["contains"], root, f"{path}[{index}]")
@@ -153,7 +155,7 @@ def _is_type(value, expected):
         "string": lambda: isinstance(value, str),
         "boolean": lambda: isinstance(value, bool),
         "null": lambda: value is None,
-        "integer": lambda: isinstance(value, int) and not isinstance(value, bool),
+        "integer": lambda: _is_number(value) and float(value).is_integer(),
         "number": lambda: _is_number(value),
     }.get(expected, lambda: False)()
 
@@ -164,6 +166,33 @@ def _is_number(value):
         and not isinstance(value, bool)
         and (not isinstance(value, float) or math.isfinite(value))
     )
+
+
+def _json_equal(left: Any, right: Any) -> bool:
+    """Compare JSON values using JSON Schema's mathematical number equality."""
+    if _is_number(left) and _is_number(right):
+        return left == right
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left == right
+    if left is None or right is None:
+        return left is None and right is None
+    if isinstance(left, str) or isinstance(right, str):
+        return isinstance(left, str) and isinstance(right, str) and left == right
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right))
+        )
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    return type(left) is type(right) and left == right
 
 
 def unsupported_schema_keywords(schema: Any) -> list[str]:

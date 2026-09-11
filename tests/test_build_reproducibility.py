@@ -83,7 +83,7 @@ def test_ci_build_outputs_live_outside_checkout_and_backend_is_locked():
     assert "shasum -a 256 dist/*.whl dist/*.tar.gz" not in workflow
     assert 'dist/asecli-$ASECLI_VERSION-py3-none-any.whl' in workflow
     assert 'dist/asecli-$ASECLI_VERSION.spdx.json' in workflow
-    assert "name: asecli-${{ env.ASECLI_VERSION }}-python-${{ runner.arch }}" in workflow
+    assert "name: asecli-candidate-${{ github.sha }}" in workflow
     assert "dist/asecli-0.1.0" not in workflow
     assert 'requires = ["hatchling==1.32.0"]' in project
 
