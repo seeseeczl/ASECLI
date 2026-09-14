@@ -183,7 +183,7 @@ sgcli sg create Assets/ConvertedNew.shadergraph \
 
 `export-sg` 自动从源 Shader 向上识别 Unity/Tuanjie 工程；跨工程资源解析时显式传 `--target-project`。它强制生成 `<stem>.asecli-to-sgcli.spec.json`、`.report.json` 与 `.receipt.json`，同名即失败；receipt 只证明 spec/report 两份文件的提交状态与 SHA，不是中间交接包。命令不调用 SGCLI，也不生成 ASE 自有中间 JSON。未知节点、Master/Pass、外部属性或纹理 Importer 语义时只写规范报告，不写半成品 spec。反方向 `.asecli-to-sgcli.spec.json` 不能交给 ASECLI `create --spec`。
 
-ASECLI 随 wheel 发布自己拥有的 EditorGraphSpec v3 Schema，并固定一份 SGCLI `0.3.2` 的 `sgcli.native.v3` 生产快照；SGCLI 同样固定 ASECLI `0.8.1` 快照。双仓兼容检查会比较两组原始 Schema SHA-256，任何漂移都必须先升级生产者再放行。
+ASECLI 随 wheel 发布自己拥有的 EditorGraphSpec v3 Schema，并固定一份 SGCLI `0.3.3` 的 `sgcli.native.v3` 生产快照；SGCLI 同样固定 ASECLI `0.8.1` 快照。双仓兼容检查会比较两组原始 Schema SHA-256，任何漂移都必须先升级生产者再放行。
 
 可用 `asecli contract editor-graph --version 3 --spec FILE` 在不连接 Editor 时执行权威 Schema/loader 并返回原文件 SHA。报告分开记录来源快照、发布前复核、生产者 Schema 与真实消费者读取状态。旧 `{graph,report}` wrapper 只允许按已登记形状显式迁移，且内层必须已经是 `sgcli.native.v3`；无版本 discriminator 的旧输入只报告 `legacy_format`，不得伪称已识别版本化 Schema：
 
