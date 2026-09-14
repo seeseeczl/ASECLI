@@ -396,4 +396,3 @@ def test_wave_noise_color_and_sampler_fields_are_relative_to_create_marker(tmp_p
     )
     assert sampler.raw_fields[20] == "-1"
     assert sampler_texture_guid(sampler) == "944392c2985544e1887f5223b229458a"
-
