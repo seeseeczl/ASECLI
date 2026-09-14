@@ -1,7 +1,6 @@
 """Build an unbound SGCLI candidate from certified ASE semantics."""
 
 from __future__ import annotations
-
 from pathlib import Path
 
 from ..core import (AseFile, COMMENTARY_TYPE, GET_LOCAL_VAR_TYPE,
@@ -13,7 +12,7 @@ from .model import (
 )
 from .nodes import convert_node
 from .sources import compiled_properties, load_asset_map
-from .evidence import inspector_degradations, record_custom_functions, record_port, validate_template_passes
+from .evidence import mark_folded_functions, inspector_degradations, record_custom_functions, record_port, validate_template_passes
 from .surface_semantics import normalize_surface_outputs
 from .reconciliation import (
     groups, reconcile_shaderlab_properties, unique_properties, verify_texture_dependencies,
@@ -123,8 +122,9 @@ def build_candidate(
     for node in nodes:
         for target_id in node.source_ids:
             edges.append(SemanticEdge(node.target_id, 0, target_id, -1))
-    record_custom_functions(nodes, report)
+    record_custom_functions(nodes, report, _graph_precision(master))
     nodes, edges = normalize_surface_outputs(nodes, edges, target_spec, mappings, report, text)
+    mark_folded_functions(nodes, report)
     groups_spec = groups(ase, mappings, diagnostics)
     report["output_bindings"] = [
         {"block": edge.target_id, "port": edge.target_port}

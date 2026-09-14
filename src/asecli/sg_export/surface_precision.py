@@ -1,66 +1,56 @@
-"""Conservative precision proof for moving graph arithmetic into URP."""
+"""Record precision boundaries separately from certified algorithm rewrites."""
 
 import re
 
 from .alpha_modulate import _strip_comments
-from .model import diagnostic
 
 
-def fold_precision_verified(node, nodes, edges, report, semantics):
-    """Do not replace float/inherited lerp with URP's half3/half overload.
+def record_fold_precision(node, nodes, edges, report, semantics):
+    """Called only after expression, inputs and blend equations match.
 
-    Custom Function parameters establish their own half conversion boundary.
-    Native lerp additionally needs explicitly half operands (no mixed promotion).
-    This is a narrow proof, not an assertion that half equals float on every GPU.
+    A precision boundary is not a proof of bitwise or visual equivalence.
+    Explicit body types are evidence, not the effective type of a whole function.
     """
-    precision = node.settings.get("precision", "Inherit")
-    effective_precision = precision
-    verified = precision == "Half"
-    body = None
-    if node.target_type == "custom-function":
-        body = _strip_comments((node.function or {}).get("body", ""))
-        if body and re.search(r"\bfloat(?:[1-4])?\s*\(", body):
-            effective_precision = "Single"
-        elif body and re.search(r"\bhalf(?:[1-4])?\s*\(", body):
-            effective_precision = "Half"
-        verified = verified and body is not None and bool(re.search(r"\bhalf3\s*\(", body))
-    else:
-        by_id = {item.target_id: item for item in nodes}
-        operands = [by_id.get(edge.source_id) for edge in edges if edge.target_id == node.target_id]
-        verified = verified and bool(operands) and all(
-            item is not None and item.settings.get("precision") == "Half" for item in operands
-        )
+    declared = node.settings.get("precision", "Inherit")
+    graph = report.get("source_graph_precision")
+    inherited = declared in {"Inherit", "Graph"}
+    resolved = graph if inherited else declared
+    body = (_strip_comments((node.function or {}).get("body", ""))
+            if node.target_type == "custom-function" else None)
+    explicit = sorted(set(re.findall(r"\b(?:float|half)(?:[1-4])?\b", body or "")))
+    by_id = {item.target_id: item for item in nodes}
+    operands = [by_id.get(edge.source_id) for edge in edges if edge.target_id == node.target_id]
+    operand_precisions = [item.settings.get("precision", "Inherit") if item else "Unknown"
+                          for item in operands]
+    half_boundary = resolved == "Half" and (
+        (bool(explicit) and all(t.startswith("half") for t in explicit))
+        if body is not None else
+        (bool(operands) and all((graph if p in {"Inherit", "Graph"} else p) == "Half"
+                               for p in operand_precisions))
+    )
     proof = {
         "source_node_id": node.source_id,
-        "source_node_precision": precision,
-        "source_effective_precision": effective_precision,
+        "source_node_precision": declared,
+        "source_graph_precision": graph,
+        "inheritance_source": "graph" if inherited else "node",
+        "source_resolved_precision": resolved or "Unknown",
+        "source_explicit_types": explicit,
+        "source_operand_precisions": operand_precisions,
         "source_expression": body,
         "target_precision": "Half",
         "target_function": "half3 AlphaModulate(half3 albedo, half alpha)",
-        "status": "verified" if verified else "unproven",
+        "status": "matched_half_boundary" if half_boundary else "precision_difference_or_unknown",
+        "bitwise_equivalence": "not_proven",
+        "transformation": "fold_explicit_alpha_modulate_into_pipeline",
     }
     semantics["fold_precision"] = proof
-    if not verified:
-        requirement = {
-            "surface": semantics.get("source", {}).get("surface"),
-            "rgb_blend": (semantics.get("source_pass_blend") or {}).get("rgb"),
-            "alpha_blend": (semantics.get("source_pass_blend") or {}).get("alpha"),
-            "explicit_alpha_modulate": {
-                "preserve_in_graph": True,
-                "precision": effective_precision,
-                "source_node_id": node.source_id,
-            },
-            "implicit_alpha_modulate": False,
-        }
-        semantics["required_target_capabilities"] = requirement
-        semantics["unresolved"] = {
-            "rule": "SEM-BLEND-001",
-            "source_node": node.source_id,
-            "reason": "target cannot preserve explicit AlphaModulate precision while disabling its implicit AlphaModulate",
-        }
-        report.setdefault("diagnostics", []).append(diagnostic(
-            node.source_id, "ALPHA_MODULATE_TARGET_CAPABILITY_REQUIRED",
-            {"precision_proof": proof, "required_target_capabilities": requirement},
-            "The current public SG target contract cannot preserve this graph expression and blend equation without adding a second half-precision AlphaModulate",
-        ))
-    return verified
+    if not half_boundary:
+        report.setdefault("precision_warnings", []).append({
+            "code": "ALPHA_MODULATE_PRECISION_BOUNDARY",
+            "source_node_id": node.source_id,
+            "classification": "precision",
+            "evidence": proof,
+            "impact": "Certified mathematical mapping preserves one modulation and blend factors; "
+                      "the pipeline half boundary may change rounding or representable range. "
+                      "Bitwise and visual equivalence have not been verified.",
+        })

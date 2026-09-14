@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from ..contracts import validate_sgcli_native_spec
@@ -35,6 +36,7 @@ def configure_export_sg_parser(sub) -> None:
         help="target Unity project; defaults to the project containing the source Shader",
     )
     parser.add_argument("--name")
+    parser.add_argument("--output-suffix", help="filename suffix, e.g. _20260914_163000; does not change graph name")
     parser.add_argument("--asset-map")
     parser.set_defaults(func=cmd_export_sg)
 
@@ -42,7 +44,10 @@ def configure_export_sg_parser(sub) -> None:
 def cmd_export_sg(args) -> dict:
     source = Path(args.file).resolve()
     out = Path(args.out_dir).resolve()
-    spec_path, report_path = _conversion_paths(source, out)
+    suffix = getattr(args, "output_suffix", None) or ""
+    if suffix and not re.fullmatch(r"[A-Za-z0-9_-]+", suffix):
+        raise CliError("USAGE_ERROR", "output suffix must contain only letters, digits, underscores or hyphens")
+    spec_path, report_path = _conversion_paths(source, out, suffix)
     receipt_path = _receipt_path(spec_path)
     if not source.is_file():
         raise CliError("NOT_FOUND", f"file not found: {source}")
@@ -128,6 +133,8 @@ def cmd_export_sg(args) -> dict:
     write_result = _write_pair(spec_path, spec, report_path, report)
     return {
         "written": True,
+        "precision_warnings": internal.get("precision_warnings", []),
+        "surface_semantics": internal.get("surface_semantics"),
         "spec_json": str(spec_path),
         "report_json": str(report_path),
         "receipt_json": str(receipt_path),
@@ -135,13 +142,14 @@ def cmd_export_sg(args) -> dict:
         "connection_count": len(spec["connections"]),
         "source_sha256": internal["source"]["sha256"],
         "write": write_result,
+        "custom_function_manifest": internal.get("custom_function_manifest", []),
     }
 
 
-def _conversion_paths(source: Path, out: Path) -> tuple[Path, Path]:
+def _conversion_paths(source: Path, out: Path, suffix: str = "") -> tuple[Path, Path]:
     return (
-        out / f"{source.stem}{SPEC_SUFFIX}",
-        out / f"{source.stem}{REPORT_SUFFIX}",
+        out / f"{source.stem}{suffix}{SPEC_SUFFIX}",
+        out / f"{source.stem}{suffix}{REPORT_SUFFIX}",
     )
 
 
@@ -207,7 +215,8 @@ def _failure_details(report_path: Path, internal: dict | None, report: dict) -> 
         "blocker_count": len(blockers),
         "blocker_scope": "detected_in_this_run_not_exhaustive",
         "presentation_warnings": warnings,
-        "warning_count": len(warnings),
+        "precision_warnings": internal.get("precision_warnings", []),
+        "warning_count": len(warnings) + len(internal.get("precision_warnings", [])),
         "custom_function_manifest": internal.get("custom_function_manifest", []),
         "required_target_capabilities": (internal.get("surface_semantics") or {}).get(
             "required_target_capabilities"

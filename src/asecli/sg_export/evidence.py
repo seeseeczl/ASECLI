@@ -10,7 +10,8 @@ from .alpha_modulate import _strip_comments
 from .model import MASTER_TYPE, URP_UNLIT_GUID, URP_UNLIT_PASSES, diagnostic
 
 
-def record_custom_functions(nodes, report):
+def record_custom_functions(nodes, report, graph_precision=None):
+    report["source_graph_precision"] = graph_precision
     manifest = []
     for node in nodes:
         if node.target_type != "custom-function" or node.function is None:
@@ -102,3 +103,10 @@ def record_port(report, source_id, source_port, source_end, target_id, target_po
             row["ports"].append({"source": [source_id, source_port], "target": list(source_end)})
         if target_id in row["source_nodes"]:
             row["ports"].append({"source": [target_id, target_port], "target": list(target_end)})
+
+
+def mark_folded_functions(nodes, report):
+    remaining_ids = {node.target_id for node in nodes}
+    for item in report["custom_function_manifest"]:
+        if item["target_node_id"] not in remaining_ids:
+            item["mapping"] = "folded_into_target_pipeline"

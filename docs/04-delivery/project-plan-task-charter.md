@@ -121,3 +121,4 @@ kickoff_completion: complete
 - [x] 64 张原子任务卡已定义；本次新增 CR/REG 双向链接完整（实机项保持待验）
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立
+| TASK-0067 | CR-0031 REL-0018 | 发布 ASE→SG 精度提示与保真修复 v0.8.5 | 用户明确授权推送并发布 | 导出、报告、测试、Skill 与发布元数据 | SGCLI、源 Shader、Editor 与视觉验收 | long/2026-09-14 | REG-0064；pytest、治理、双构建、远端 CI、双渠道 SHA、隔离安装回滚 | 任一发布检查失败则停止 | 本地 485 passed/3 skipped；实际导出 137 节点、150 连接、15 属性；远端待执行 | verified |

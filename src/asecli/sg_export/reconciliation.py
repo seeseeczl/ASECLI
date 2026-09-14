@@ -22,6 +22,40 @@ _TEMPLATE_PROPERTIES = {
 
 def reconcile_shaderlab_properties(compiled, properties, report, diagnostics):
     mapped = {row["name"] for row in properties}
+    for prop in properties:
+        name = prop["name"]
+        source = compiled.get(name)
+        if source is None:
+            diagnostics.append(diagnostic(None, "PROPERTY_FIDELITY_MISMATCH",
+                {"property": name, "field": "name"}, "Target property has no source declaration"))
+            continue
+        for attribute in source.get("attributes", []):
+            tag = attribute.split("(", 1)[0].strip()
+            if tag in {"Toggle", "ToggleOff", "KeywordEnum", "Gamma", "PerRendererData",
+                       "Enum", "IntRange", "Normal", "NoScaleOffset", "MainTexture", "MainColor"}:
+                diagnostics.append(diagnostic(None, "PROPERTY_ATTRIBUTE_UNSUPPORTED",
+                    {"property": name, "field": "attributes", "attribute": attribute},
+                    "Runtime property attribute has no certified target mapping"))
+        kind = prop["type"]
+        expected = {"type": source["type"], "default": source.get("default"),
+                    "range": source.get("range"), "hdr": source.get("hdr", False),
+                    "hidden": not source["exposed"], "exposed": True}
+        actual = {"type": kind, "default": prop.get("default"), "range": prop.get("range"),
+                  "hdr": prop.get("hdr", False),
+                  "hidden": prop.get("settings", {}).get("hidden", False),
+                  "exposed": prop.get("exposed", True)}
+        if kind in {"vector2", "vector3"} and source["type"] == "vector4":
+            expected["type"] = kind
+            expected["default"] = source["default"][:int(kind[-1])]
+        # Texture bindings are checked against GUID/importer snapshots separately.
+        if kind == "texture2d":
+            expected.pop("default")
+            actual.pop("default")
+        for field, value in expected.items():
+            if actual[field] != value:
+                diagnostics.append(diagnostic(None, "PROPERTY_FIDELITY_MISMATCH",
+                    {"property": name, "field": field, "source": value, "target": actual[field]},
+                    "Property runtime data changed during conversion"))
     for name, row in sorted(compiled.items()):
         if name in mapped:
             continue

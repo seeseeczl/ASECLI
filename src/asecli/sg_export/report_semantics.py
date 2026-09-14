@@ -18,7 +18,6 @@ _VERIFIED_EVIDENCE = {
 _SEMANTIC_CODES = {
     "ALPHA_BLEND_UNREPRESENTABLE", "PASS_BLEND_UNPROVEN",
     "DUPLICATE_ALPHA_MODULATE_UNRESOLVED", "ALPHA_MODULATE_UNPROVEN",
-    "ALPHA_MODULATE_TARGET_CAPABILITY_REQUIRED",
 }
 
 
@@ -51,7 +50,6 @@ def _blend_details(name: str, internal: dict[str, Any] | None) -> str:
     rewrites = semantics.get("rewrites") or []
     matcher = (
         "unresolved" if semantics.get("unresolved")
-        or semantics.get("fold_precision", {}).get("status") == "unproven"
         else "folded" if rewrites
         else "preserved_graph_float_expression"
         if semantics.get("alpha_modulate_strategy") == "preserve_graph_float_expression"
@@ -63,4 +61,6 @@ def _blend_details(name: str, internal: dict[str, Any] | None) -> str:
         f" source={semantics.get('source_pass_blend')}"
         f" target={semantics.get('target_pass_blend')}"
         f" alpha_modulate=matcher-v4/{matcher}"
+        + "; precision_evidence=" + json.dumps(semantics.get("fold_precision"), ensure_ascii=False, sort_keys=True)
+        + "; algorithm verification excludes bitwise and visual equivalence"
     )

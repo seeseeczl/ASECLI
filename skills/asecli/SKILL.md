@@ -26,7 +26,9 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 
 - 先核对 CLI 路径/版本和源 SHA；当前 `.shader`、历史 `.bak`、旧 report 不可混为同一次转换证据。
 - 新版失败返回的顶层 `data` 包含 `blockers`、`blocker_count`、`unverified_checks`、源快照与 `surface_semantics`。它是本次检测清单，不保证穷尽所有潜在问题；旧版没有这些字段时读取 `report_json`，不要猜测只有一个阻断。
-- `ALPHA_MODULATE_TARGET_CAPABILITY_REQUIRED` 表示末端表达式不能安全折叠到 URP 的 half AlphaModulate；读取 `required_target_capabilities`，不得把 `MultiplySourceAlpha` 用于需要保留背景 Alpha 的源 Shader。
+- AlphaModulate 仅在表达式、Alpha 来源及 RGB/Alpha 混合方程匹配后折叠到目标管线，输出路径只调制一次。局部精度差异通过 `precision_warnings` / `ALPHA_MODULATE_PRECISION_BOUNDARY` 报告，不阻断导出；不得全局改为 Half，也不得把 `MultiplySourceAlpha` 用于需要保留背景 Alpha 的源 Shader。旧版 `ALPHA_MODULATE_TARGET_CAPABILITY_REQUIRED` 不是 SG 不支持 float 的证据。
+- 默认门禁检查算法映射、变量名、默认值、范围、类型、资源和 Shader 设置；最终视觉及浮点逐位一致不作为 JSON 发布前置，未运行的 Editor/效果证据保持 `not_run`。
+- 同目录时间后缀使用 `export-sg FILE --out-dir DIR --output-suffix _YYYYMMDD_HHMMSS`，同时命名 spec/report/receipt；`--name` 只修改图名称，不能替代文件名后缀。
 - 上游 Custom Function 作为目标 Custom Function 原样交接；用 `custom_function_manifest` 核对节点、精度和规范化函数载荷 SHA，不因 Agent 无法解释函数数学意义而拒绝。
 - 已确认的 `MZGUI.MZGUI`、Tooltip/Foldout/HelpBox 只影响 Inspector 呈现，列在 `presentation_warnings`，不阻断渲染语义交接。其他未知 Custom ShaderGUI 仍可能有材质副作用并失败关闭。
 - `retry_unchanged_input=false` 时不要重复相同导出、猜命令或找强制开关。报告缺失能力并停止；SGCLI 的新增能力必须通过公开 JSON 契约另行交接，不跨仓修补。

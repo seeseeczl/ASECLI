@@ -12,7 +12,7 @@ from __future__ import annotations
 from .alpha_modulate import inputs as alpha_modulate_inputs
 from .model import SemanticEdge, SemanticNode, diagnostic
 from .pass_blend import record_pass_blend
-from .surface_precision import fold_precision_verified
+from .surface_precision import record_fold_precision
 from .surface_matching import (
     _input_port,
     _native_alpha_modulate,
@@ -81,6 +81,11 @@ def normalize_surface_outputs(
             semantics.get("pass_blend_parser", {}),
             "The source Forward-pass RGB and alpha blend factors were not uniquely proved",
         ))
+    if (target.get("surface") == "Transparent" and (
+        semantics.get("rgb_blend_equivalent") is not True
+        or semantics.get("alpha_blend_equivalent") is not True
+    )):
+        return nodes, edges
     if not semantics["target_pipeline"]["implicit_alpha_modulate"]:
         return nodes, edges
 
@@ -95,9 +100,7 @@ def normalize_surface_outputs(
     native = _native_alpha_modulate(nodes, edges, color_edge, alpha_edge)
     if native is not None:
         modulate, color_input, alpha_input, route_nodes, white_node = native
-        precision_ok = fold_precision_verified(modulate, nodes, edges, report, semantics)
-        if not precision_ok:
-            return nodes, edges
+        record_fold_precision(modulate, nodes, edges, report, semantics)
         replacement = SemanticEdge(
             color_input.source_id,
             color_input.source_port,
@@ -185,9 +188,7 @@ def normalize_surface_outputs(
             "AlphaModulate alpha input differs from Surface Alpha",
         )
         return nodes, edges
-    precision_ok = fold_precision_verified(node, nodes, edges, report, semantics)
-    if not precision_ok:
-        return nodes, edges
+    record_fold_precision(node, nodes, edges, report, semantics)
     replacement = SemanticEdge(
         color_input.source_id,
         color_input.source_port,
