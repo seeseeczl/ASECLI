@@ -4,7 +4,7 @@
 
 AseCLI 是面向 AI Agent 的本地 CLI：离线读取、编辑和校验 ASE 节点图；通过运行中的 Unity/团结引擎与 MCP，让真实 ASE 创建节点、提供精排几何并重新生成 HLSL。Skill 提供跨 Agent 的操作规则，CLI 提供可验证的执行结果。
 
-当前正式版：**[0.8.3](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.3)** · [PyPI](https://pypi.org/project/asecli/0.8.3/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
+当前正式版：**[0.8.4](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.4)** · [PyPI](https://pypi.org/project/asecli/0.8.4/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
 
 ASECLI 接收 SGCLI 生成的裸 `EditorGraphSpec v3`，并可把受支持的 ASE Shader 直接导出为 SGCLI 的裸 `sgcli.native.v3`。两个方向都只有“生产者 spec 原文件→消费者 `--spec`”；独立 report 与发布 receipt 都不进入创建输入，创建成功也不代表转换效果等价。
 
@@ -108,7 +108,7 @@ curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/insta
 uv tool uninstall asecli
 ```
 
-当前正式版本为 `0.8.3`（独立 CI／发布流程与单工具 wheel 验证），可从 [PyPI](https://pypi.org/project/asecli/0.8.3/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.3) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.8.0` 保留为回滚点。
+当前正式版本为 `0.8.4`（ASE→SG 诊断收敛、Custom Function 原样证据与 MZGUI 呈现分层），可从 [PyPI](https://pypi.org/project/asecli/0.8.4/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.4) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.8.3` 保留为回滚点。
 
 已知限制：真实 MCP 下，属性+纹理 v2 和 Reciprocal 降级 v2 的 create、manifest、validate、独立 recompile 已通过；SGCLI SphereMask v3 spec 在重载时仍可能返回 `node missing after reload: Radius` 并回滚。本次不承诺该 recipe 端到端可用，也不改变 SGCLI v2 默认值契约。
 
@@ -138,7 +138,7 @@ asecli --help
 
 ```bash
 shasum -a 256 -c SHA256SUMS
-uv tool install /path/to/asecli-0.8.3-py3-none-any.whl
+uv tool install /path/to/asecli-0.8.4-py3-none-any.whl
 asecli --help
 ```
 
@@ -316,9 +316,9 @@ asecli recompile Assets/Example.shader
 除显式 `--help` 保留人类可读文本外，stdout 恒为单行严格 JSON，agent 可直接解析。`--version` 也返回 JSON：
 
 ```json
-{"contract_version":1,"cli_version":"0.8.3","command":"parse","ok":true,"data":{"node_count":7}}
-{"contract_version":1,"cli_version":"0.8.3","command":"parse","ok":false,"error":{"code":"NOT_FOUND","message":"..."}}
-{"contract_version":1,"cli_version":"0.8.3","command":"version","ok":true,"data":{"version":"0.8.3"}}
+{"contract_version":1,"cli_version":"0.8.4","command":"parse","ok":true,"data":{"node_count":7}}
+{"contract_version":1,"cli_version":"0.8.4","command":"parse","ok":false,"error":{"code":"NOT_FOUND","message":"..."}}
+{"contract_version":1,"cli_version":"0.8.4","command":"version","ok":true,"data":{"version":"0.8.4"}}
 ```
 
 常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`SG_EXPORT_BLOCKED`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`WRITE_PARTIAL`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。

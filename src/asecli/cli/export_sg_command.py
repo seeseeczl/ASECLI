@@ -106,24 +106,24 @@ def cmd_export_sg(args) -> dict:
                         raise ValueError(f'resource changed before publication: {file}')
     except ExportError as exc:
         internal = exc.report
-        _write_failure_report(
+        failure_report = _write_failure_report(
             source, spec_path, report_path, internal, str(exc),
             source_raw=source_raw, schema_status=schema_status,
         )
         raise CliError(
             "SG_EXPORT_BLOCKED",
             str(exc),
-            {"report_json": str(report_path)},
+            _failure_details(report_path, internal, failure_report),
         ) from exc
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
-        _write_failure_report(
+        failure_report = _write_failure_report(
             source, spec_path, report_path, internal, str(exc),
             source_raw=source_raw, schema_status=schema_status,
         )
         raise CliError(
             "SG_EXPORT_BLOCKED",
             str(exc),
-            {"report_json": str(report_path)},
+            _failure_details(report_path, internal, failure_report),
         ) from exc
     write_result = _write_pair(spec_path, spec, report_path, report)
     return {
@@ -175,7 +175,7 @@ def _write_failure_report(
     *,
     source_raw: bytes,
     schema_status: str,
-) -> None:
+) -> dict:
     if report_path.exists():
         raise CliError("WRITE_CONFLICT", f"output already exists: {report_path}")
     report = build_public_report(
@@ -189,6 +189,35 @@ def _write_failure_report(
         producer_schema_validated=schema_status,
     )
     _write_new(report_path, report)
+    return report
+
+
+def _failure_details(report_path: Path, internal: dict | None, report: dict) -> dict:
+    """Agent-facing diagnostics, separate from the fixed consumer report schema."""
+    internal = internal or {}
+    blockers = [dict(item, classification="semantic") for item in internal.get("diagnostics", [])]
+    blockers.extend(dict(item) for item in internal.get("degradations", []))
+    warnings = [dict(item) for item in internal.get("presentation_warnings", [])]
+    return {
+        "report_json": str(report_path),
+        "spec_written": False,
+        "receipt_written": False,
+        "source": report["source"],
+        "blockers": blockers,
+        "blocker_count": len(blockers),
+        "blocker_scope": "detected_in_this_run_not_exhaustive",
+        "presentation_warnings": warnings,
+        "warning_count": len(warnings),
+        "custom_function_manifest": internal.get("custom_function_manifest", []),
+        "required_target_capabilities": (internal.get("surface_semantics") or {}).get(
+            "required_target_capabilities"
+        ),
+        "unverified_checks": [name for name, check in report["checks"].items()
+                              if check["status"] != "verified"],
+        "surface_semantics": internal.get("surface_semantics"),
+        "retry_unchanged_input": False,
+        "next_action": "Inspect all blockers and report evidence; do not force export, substitute a .shadergraph, or edit the source to bypass validation",
+    }
 
 
 def _assert_source_unchanged(source: Path, snapshot: bytes, phase: str) -> bytes:

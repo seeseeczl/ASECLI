@@ -30,6 +30,8 @@ def test_parser_candidate_folds_explicit_alpha_modulate(tmp_path: Path):
     project=_project(tmp_path)
     modulate=("Node;AmplifyShaderEditor.CustomExpressionNode;146;0,0;Inherit;False;lerp(float3(1,1,1), C, A);3;Create;2;True;C;FLOAT3;0,0,0;In;;Inherit;False;True;A;FLOAT;0;In;;Inherit;False;AlphaModulate;True;False;0;;False;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0").split(";")
     source=project/"Assets"/"multiply.shader"
+    modulate[4] = "Half"
+    modulate[6] = "lerp(half3(1,1,1), C, A)"
     source.write_text(_shader([_node("AmplifyShaderEditor.Vector3Node",10),_node("AmplifyShaderEditor.RangedFloatNode",20),modulate,_master()],["WireConnection;146;0;10;0","WireConnection;146;1;20;0","WireConnection;1;2;146;0","WireConnection;1;3;20;0"]),encoding="utf-8")
     candidate,report,nodes,edges=build_candidate(source,project)
     result=bind_named_ports(candidate,report,nodes,edges)

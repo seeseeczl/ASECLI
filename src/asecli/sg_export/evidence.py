@@ -3,8 +3,27 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import json
 
+from .alpha_modulate import _strip_comments
 from .model import MASTER_TYPE, URP_UNLIT_GUID, URP_UNLIT_PASSES, diagnostic
+
+
+def record_custom_functions(nodes, report):
+    manifest = []
+    for node in nodes:
+        if node.target_type != "custom-function" or node.function is None:
+            continue
+        canonical = json.dumps(node.function, ensure_ascii=False, sort_keys=True,
+                               separators=(",", ":")).encode("utf-8")
+        manifest.append({
+            "source_node_id": node.source_id, "target_node_id": node.target_id,
+            "function_sha256": hashlib.sha256(canonical).hexdigest(),
+            "precision": node.settings.get("precision", "Inherit"),
+            "mapping": "preserved_custom_function_payload",
+        })
+    report["custom_function_manifest"] = manifest
 
 
 def validate_template_passes(ase, master, diagnostics, report):
@@ -38,18 +57,39 @@ def inspector_degradations(ase, properties, report):
         match = re.search(rf"(?m)^\s*(?P<attrs>(?:\[[^\]\r\n]*\]\s*)*){re.escape(name)}\s*\(", ase.prefix)
         present = [kind for kind in attributes if match and f"[{kind}" in match.group("attrs")]
         if present:
-            report["degradations"].append({
+            report["presentation_warnings"].append({
                 "source": {"property": name}, "code": "INSPECTOR_METADATA_NOT_MIGRATED",
                 "details": present, "impact": "Property data is preserved; ASE Inspector UI behavior is not migrated",
+                "classification": "presentation_only",
+                "source_attributes": match.group("attrs").strip(),
+                "material_side_effects": "none",
             })
-    custom_gui = sorted({node.raw_fields[9] for node in ase.graph.nodes
+    graph_gui = {node.raw_fields[9] for node in ase.graph.nodes
                          if node.type_name == MASTER_TYPE and len(node.raw_fields) > 9
                          and node.raw_fields[6] == "True"
-                         and node.raw_fields[9] not in {"", "UnityEditor.ShaderGraphUnlitGUI"}})
-    if custom_gui:
+                         and node.raw_fields[9] not in {"", "UnityEditor.ShaderGraphUnlitGUI"}}
+    # Compiled ShaderLab may disagree with the ASE graph. Neither declaration
+    # can be ignored when an unknown GUI can alter keywords/material state.
+    shaderlab = ase.prefix.rsplit("/*ASEBEGIN", 1)[0]
+    compiled_gui = set(re.findall(r'\bCustomEditor\s+"([^"]+)"', _strip_comments(shaderlab) or ""))
+    custom_gui = (graph_gui | compiled_gui) - {"", "UnityEditor.ShaderGraphUnlitGUI"}
+    known_presentation = sorted(custom_gui & {"MZGUI.MZGUI"})
+    unknown_gui = sorted(custom_gui - {"MZGUI.MZGUI"})
+    if known_presentation:
+        report["presentation_warnings"].append({
+            "source": {"file": str(report["source"]["path"])},
+            "code": "CUSTOM_INSPECTOR_PRESENTATION_NOT_MIGRATED",
+            "details": known_presentation,
+            "classification": "presentation_only",
+            "material_side_effects": "none",
+            "impact": "MZGUI Inspector styling is not migrated; Shader properties and runtime graph semantics are unchanged",
+        })
+    if unknown_gui:
         report["degradations"].append({
             "source": {"file": str(report["source"]["path"])}, "code": "CUSTOM_INSPECTOR_NOT_MIGRATED",
-            "details": custom_gui,
+            "details": unknown_gui,
+            "classification": "custom_shader_gui",
+            "material_side_effects": "unproven",
             "impact": "ShaderGUI behavior has no equivalent in the creation specification",
         })
     if report["degradations"]:

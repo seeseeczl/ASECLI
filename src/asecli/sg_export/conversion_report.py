@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .report_semantics import check_evidence
+from .report_presentation import presentation_degradations
 
 
 CHECK_RULES = {
@@ -76,6 +77,7 @@ def build_public_report(
         "blend_equation": "verified" if blend_passed else "unknown",
     }
     internal_degradations = (internal or {}).get('degradations', [])
+    presentation_warnings = (internal or {}).get('presentation_warnings', [])
     if internal_degradations:
         check_status['properties'] = 'unsupported'
     checks = {
@@ -125,6 +127,7 @@ def build_public_report(
                       + str(item.get('impact', 'Inspector behavior is unproven'))
                       + '; details=' + json.dumps(item.get('details', []), ensure_ascii=False),
         })
+    degradations.extend(presentation_degradations(presentation_warnings, source, spec_path))
     if failure:
         degradations.append({
             "rule": "SEM-REPORT-001",

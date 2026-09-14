@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from .alpha_modulate import inputs as alpha_modulate_inputs
 from .model import SemanticEdge, SemanticNode, diagnostic
 
 
@@ -39,7 +38,7 @@ def _unproven_modulation(report: dict, semantics: dict, node: SemanticNode) -> N
     report.setdefault("diagnostics", []).append(diagnostic(
         node.source_id,
         "ALPHA_MODULATE_UNPROVEN",
-        reason,
+        {"message": reason, "function": node.function, "precision": node.settings.get("precision", "Inherit")},
         "The exporter cannot prove that target AlphaModulate will execute exactly once",
     ))
 
@@ -134,36 +133,3 @@ def _white_value(value) -> bool:
 
 def _one(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and float(value) == 1.0
-
-
-def _first_upstream_custom_function(
-    nodes: list[SemanticNode], edges: list[SemanticEdge], source_id: str
-) -> SemanticNode | None:
-    by_id = {node.target_id: node for node in nodes}
-    incoming: dict[str, list[str]] = {}
-    for edge in edges:
-        incoming.setdefault(edge.target_id, []).append(edge.source_id)
-    pending = [source_id]
-    visited: set[str] = set()
-    while pending:
-        current = pending.pop()
-        if current in visited:
-            continue
-        visited.add(current)
-        node = by_id.get(current)
-        if node is not None and node.target_type == "custom-function":
-            return node
-        pending.extend(reversed(incoming.get(current, [])))
-    return None
-
-
-def _reject_upstream_function(report: dict, semantics: dict, node: SemanticNode) -> None:
-    if alpha_modulate_inputs(node.function) is not None:
-        _unresolved_modulation(
-            report,
-            semantics,
-            node,
-            "AlphaModulate remains upstream of the Multiply BaseColor output",
-        )
-    else:
-        _unproven_modulation(report, semantics, node)

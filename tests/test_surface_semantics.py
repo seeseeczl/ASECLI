@@ -9,7 +9,7 @@ from asecli.sg_export.surface_semantics import normalize_surface_outputs
 
 
 def _node(
-    body: str = "Out = lerp(float3(1,1,1), C, A);", output_name: str = "Out"
+    body: str = "Out = lerp(half3(1,1,1), C, A);", output_name: str = "Out"
 ) -> SemanticNode:
     return SemanticNode(
         source_id="146",
@@ -18,6 +18,7 @@ def _node(
         position=[0.0, 0.0],
         input_names={0: "C", 1: "A"},
         output_names={0: output_name},
+        settings={"precision": "Half"},
         function={
             "name": "ASEExpression_146",
             "source": "String",
@@ -41,7 +42,7 @@ def _edges(alpha_source: str = "alpha") -> list[SemanticEdge]:
 
 
 def _normalize(
-    *, body: str = "Out = lerp(float3(1,1,1), C, A);",
+    *, body: str = "Out = lerp(half3(1,1,1), C, A);",
     alpha_source: str = "alpha",
     blend: str = "Multiply",
     extra_edges: list[SemanticEdge] | None = None,
@@ -69,7 +70,7 @@ def _normalize(
 
 @pytest.mark.parametrize(
     "white",
-    ["float3(1,1,1)", "float3(1.0, 1.00, 1.000f)", "half3(1,1,1)", "(1.0).xxx"],
+    ["half3(1,1,1)", "half3(1.0, 1.00, 1.000)"],
 )
 def test_multiply_folds_explicit_alpha_modulate_with_same_alpha(white: str):
     (nodes, edges), mappings, report = _normalize(
@@ -117,9 +118,9 @@ def test_non_white_lerp_does_not_fold():
 @pytest.mark.parametrize(
     ("body", "output_name"),
     [
-        ("Out = lerp(float3(1,1,1), C, A); // exact modulation", "Out"),
-        ("Result = lerp(float3(1,1,1), C, A);", "Result"),
-        ("/* prefix */ Out = lerp(float3(1,1,1), C, A);", "Out"),
+        ("Out = lerp(half3(1,1,1), C, A); // exact modulation", "Out"),
+        ("Result = lerp(half3(1,1,1), C, A);", "Result"),
+        ("/* prefix */ Out = lerp(half3(1,1,1), C, A);", "Out"),
     ],
 )
 def test_equivalent_alpha_modulate_syntax_is_folded(body: str, output_name: str):
@@ -138,7 +139,7 @@ def test_unproven_base_color_custom_function_fails_closed():
     assert report["diagnostics"][0]["code"] == "ALPHA_MODULATE_UNPROVEN"
 
 
-def test_upstream_alpha_modulate_behind_passthrough_fails_closed():
+def test_terminal_alpha_modulate_behind_passthrough_is_folded():
     modulate = _node()
     passthrough = SemanticNode(
         source_id="147",
@@ -171,10 +172,10 @@ def test_upstream_alpha_modulate_behind_passthrough_fails_closed():
         'Pass {\nName "Forward"\nBlend DstColor Zero, Zero One\nHLSLPROGRAM\nENDHLSL\n}',
     )
 
-    assert result_nodes == nodes
-    assert result_edges == edges
-    assert report["diagnostics"][0]["code"] == "DUPLICATE_ALPHA_MODULATE_UNRESOLVED"
-    assert report["surface_semantics"]["unresolved"]["source_node"] == "146"
+    assert result_nodes == []
+    assert SemanticEdge("color", 0, "SurfaceDescription.BaseColor", 0) in result_edges
+    assert report["diagnostics"] == []
+    assert report["surface_semantics"]["rewrites"][0]["source_node"] == "146"
 
 
 def test_unproved_upstream_custom_function_fails_closed():
@@ -223,6 +224,8 @@ def _native_lerp_case(*, white=(1.0, 1.0, 1.0), alpha_source="alpha", reroute=Fa
     lerp = SemanticNode("34", "modulate", "lerp", [200.0, 100.0],
                         {0: "A", 1: "B", 2: "T"}, {0: "Out"})
     nodes = [white_node, color_node, alpha_node, other_alpha, lerp]
+    for item in nodes:
+        item.settings["precision"] = "Half"
     output = "modulate"
     edges = [
         SemanticEdge("white", 0, "modulate", -1),

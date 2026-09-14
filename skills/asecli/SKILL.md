@@ -22,6 +22,16 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 - 旧 `{graph,report}` wrapper 只经 `asecli migrate-package OLD --out-dir DIR --extract-sg-spec` 按登记形状显式提取；只接受内层 `sgcli.native.v3`，未知或 v2 wrapper 失败关闭。无版本 discriminator 时记录 `legacy_format`，不能声称识别出 legacy schema 版本。
 - 报告中的 `source_snapshot_sha256/source_recheck_sha256` 必须一致；`producer_schema_validated` 与 `consumer_loaded` 分开记录，未实际调用 SGCLI 时后者保持 `not_run`。
 
+### 导出阻断的确定性处理
+
+- 先核对 CLI 路径/版本和源 SHA；当前 `.shader`、历史 `.bak`、旧 report 不可混为同一次转换证据。
+- 新版失败返回的顶层 `data` 包含 `blockers`、`blocker_count`、`unverified_checks`、源快照与 `surface_semantics`。它是本次检测清单，不保证穷尽所有潜在问题；旧版没有这些字段时读取 `report_json`，不要猜测只有一个阻断。
+- `ALPHA_MODULATE_TARGET_CAPABILITY_REQUIRED` 表示末端表达式不能安全折叠到 URP 的 half AlphaModulate；读取 `required_target_capabilities`，不得把 `MultiplySourceAlpha` 用于需要保留背景 Alpha 的源 Shader。
+- 上游 Custom Function 作为目标 Custom Function 原样交接；用 `custom_function_manifest` 核对节点、精度和规范化函数载荷 SHA，不因 Agent 无法解释函数数学意义而拒绝。
+- 已确认的 `MZGUI.MZGUI`、Tooltip/Foldout/HelpBox 只影响 Inspector 呈现，列在 `presentation_warnings`，不阻断渲染语义交接。其他未知 Custom ShaderGUI 仍可能有材质副作用并失败关闭。
+- `retry_unchanged_input=false` 时不要重复相同导出、猜命令或找强制开关。报告缺失能力并停止；SGCLI 的新增能力必须通过公开 JSON 契约另行交接，不跨仓修补。
+- 原生 `.shadergraph` 虽然使用 JSON 序列化，但不是 `sgcli.native.v3` 创建 spec。只有本次命令成功并核对 spec/report/receipt 完整提交与 SHA，才能称“导出成功”；这仍不等于 Editor 编译或最终效果一致已验收。
+
 ## Agent 兼容性
 
 本 Skill 遵循通用 Agent Skills 目录结构：标准 YAML frontmatter、`SKILL.md` 正文和相对路径引用。它只要求 Agent 能运行本地 shell 命令并读取 ASECLI 的单行 JSON，不依赖 Codex、Claude Code、Cursor、Gemini CLI 或 GitHub Copilot 的专属工具名、权限模型或消息格式。

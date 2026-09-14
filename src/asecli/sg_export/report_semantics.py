@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
 
 _VERIFIED_EVIDENCE = {
@@ -17,6 +18,7 @@ _VERIFIED_EVIDENCE = {
 _SEMANTIC_CODES = {
     "ALPHA_BLEND_UNREPRESENTABLE", "PASS_BLEND_UNPROVEN",
     "DUPLICATE_ALPHA_MODULATE_UNRESOLVED", "ALPHA_MODULATE_UNPROVEN",
+    "ALPHA_MODULATE_TARGET_CAPABILITY_REQUIRED",
 }
 
 
@@ -28,9 +30,9 @@ def check_evidence(
         return _VERIFIED_EVIDENCE[name] + details
     diagnostics = internal.get("diagnostics", []) if isinstance(internal, dict) else []
     codes = _SEMANTIC_CODES if name in {"alpha_equation", "blend_equation"} else set()
-    relevant = next((item for item in diagnostics if item.get("code") in codes), None)
+    relevant = [item for item in diagnostics if item.get("code") in codes]
     if relevant:
-        return f"{relevant['code']}: {relevant.get('reason', 'not proven')}" + details
+        return json.dumps(relevant, ensure_ascii=False, sort_keys=True) + details
     if failure:
         return f"conversion stopped before this invariant was proved: {failure}" + details
     if diagnostics:
@@ -49,6 +51,7 @@ def _blend_details(name: str, internal: dict[str, Any] | None) -> str:
     rewrites = semantics.get("rewrites") or []
     matcher = (
         "unresolved" if semantics.get("unresolved")
+        or semantics.get("fold_precision", {}).get("status") == "unproven"
         else "folded" if rewrites
         else "preserved_graph_float_expression"
         if semantics.get("alpha_modulate_strategy") == "preserve_graph_float_expression"

@@ -12,13 +12,13 @@ from __future__ import annotations
 from .alpha_modulate import inputs as alpha_modulate_inputs
 from .model import SemanticEdge, SemanticNode, diagnostic
 from .pass_blend import record_pass_blend
+from .surface_precision import fold_precision_verified
 from .surface_matching import (
-    _first_upstream_custom_function,
     _input_port,
     _native_alpha_modulate,
-    _reject_upstream_function,
     _single_edge_to,
     _target_alpha_modulates,
+    _through_reroutes,
     _unproven_modulation,
     _unresolved_modulation,
 )
@@ -95,9 +95,8 @@ def normalize_surface_outputs(
     native = _native_alpha_modulate(nodes, edges, color_edge, alpha_edge)
     if native is not None:
         modulate, color_input, alpha_input, route_nodes, white_node = native
-        upstream = _first_upstream_custom_function(nodes, edges, color_input.source_id)
-        if upstream is not None:
-            _reject_upstream_function(report, semantics, upstream)
+        precision_ok = fold_precision_verified(modulate, nodes, edges, report, semantics)
+        if not precision_ok:
             return nodes, edges
         replacement = SemanticEdge(
             color_input.source_id,
@@ -152,6 +151,10 @@ def normalize_surface_outputs(
                 row["target_nodes"] = [] if removed else row.get("target_nodes", [])
                 row["rule"] = "SEM-BLEND-001"
         return nodes, rewritten
+    source_edge, route_nodes = _through_reroutes(color_edge, by_id, edges)
+    node = by_id.get(source_edge.source_id)
+    if node is None:
+        return nodes, edges
     matched = (
         alpha_modulate_inputs(node.function)
         if node.target_type == "custom-function"
@@ -160,10 +163,6 @@ def normalize_surface_outputs(
     if matched is None:
         if node.target_type == "custom-function":
             _unproven_modulation(report, semantics, node)
-        else:
-            upstream = _first_upstream_custom_function(nodes, edges, node.target_id)
-            if upstream is not None:
-                _reject_upstream_function(report, semantics, upstream)
         return nodes, edges
     color_input_name, alpha_input_name = matched
     color_port = _input_port(node, color_input_name)
@@ -186,9 +185,8 @@ def normalize_surface_outputs(
             "AlphaModulate alpha input differs from Surface Alpha",
         )
         return nodes, edges
-    upstream = _first_upstream_custom_function(nodes, edges, color_input.source_id)
-    if upstream is not None:
-        _reject_upstream_function(report, semantics, upstream)
+    precision_ok = fold_precision_verified(node, nodes, edges, report, semantics)
+    if not precision_ok:
         return nodes, edges
     replacement = SemanticEdge(
         color_input.source_id,
@@ -197,16 +195,16 @@ def normalize_surface_outputs(
         color_edge.target_port,
     )
     rewritten = [replacement if edge == color_edge else edge for edge in edges]
-    remaining_consumers = [
-        edge for edge in rewritten
-        if edge.source_id == node.target_id
-    ]
-    removed = False
-    if not remaining_consumers:
-        rewritten = [edge for edge in rewritten if edge.target_id != node.target_id]
-        nodes = [item for item in nodes if item.target_id != node.target_id]
-        mappings.pop(node.source_id, None)
-        removed = True
+    removable_ids = {node.target_id, *(item.target_id for item in route_nodes)}
+    external_consumers = [edge for edge in rewritten
+                          if edge.source_id in removable_ids and edge.target_id not in removable_ids]
+    removed = not external_consumers
+    if removed:
+        rewritten = [edge for edge in rewritten
+                     if edge.source_id not in removable_ids and edge.target_id not in removable_ids]
+        nodes = [item for item in nodes if item.target_id not in removable_ids]
+        for item in [node, *route_nodes]:
+            mappings.pop(item.source_id, None)
 
     semantics["source"].update({
         "explicit_alpha_modulate": True,

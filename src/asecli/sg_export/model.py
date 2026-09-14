@@ -78,7 +78,8 @@ def report_template(source: Path, target: Path, version: str, source_raw: bytes)
         "mapping_version": MAPPING_VERSION,
         "receiver_schema": {"name": "sgcli.native.v3", "path": None, "sha256": None},
         "source_validation": {"error_count": 0, "warning_count": 0, "issues": []},
-        "mappings": [], "dependencies": [], "degradations": [], "diagnostics": [],
+        "mappings": [], "dependencies": [], "degradations": [], "presentation_warnings": [],
+        "custom_function_manifest": [], "diagnostics": [],
         "equivalence": {"status": "not_proven", "reason": "effect validation has not run"},
         "verification": {
             "source_parse": dict(empty), "source_structure": dict(empty),
