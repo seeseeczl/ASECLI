@@ -107,17 +107,12 @@ def resolve_asset(guid: str | None, target: Path, asset_map: dict[str, str]) -> 
         if not (target / value).is_file():
             raise ValueError(f"mapped asset does not exist: {value}")
         return value
-    marker = f"guid: {guid}"
-    for root_name in ("Assets", "Packages"):
-        root = target / root_name
-        if not root.is_dir():
-            continue
-        for meta in root.rglob("*.meta"):
-            try:
-                if marker in meta.read_text(encoding="utf-8", errors="ignore"):
-                    return meta.with_suffix("").relative_to(target).as_posix()
-            except OSError:
-                continue
+    matches = _assets_for_guid(target, guid)
+    if len(matches) == 1:
+        return matches[0].relative_to(target).as_posix()
+    if len(matches) > 1:
+        paths = ", ".join(path.relative_to(target).as_posix() for path in matches)
+        raise ValueError(f"texture GUID {guid} is owned by multiple assets: {paths}")
     raise ValueError(f"texture GUID {guid} is unresolved in the target project; provide --asset-map")
 
 
@@ -169,18 +164,39 @@ def _unity_project_root(path: Path) -> Path | None:
 
 
 def _asset_for_guid(project: Path, guid: str) -> Path | None:
-    marker = f"guid: {guid}"
+    matches = _assets_for_guid(project, guid)
+    if len(matches) > 1:
+        paths = ", ".join(path.relative_to(project).as_posix() for path in matches)
+        raise ValueError(f"texture GUID {guid} is owned by multiple assets: {paths}")
+    return matches[0] if matches else None
+
+
+def _assets_for_guid(project: Path, guid: str) -> list[Path]:
+    matches = []
     for root_name in ("Assets", "Packages"):
         root = project / root_name
         if not root.is_dir():
             continue
         for meta in sorted(root.rglob("*.meta")):
             try:
-                if marker in meta.read_text(encoding="utf-8", errors="ignore"):
-                    return meta.with_suffix("")
+                count = _meta_guid_count(meta, guid)
             except OSError:
                 continue
-    return None
+            if count > 1:
+                relative = meta.relative_to(project).as_posix()
+                raise ValueError(f"meta file {relative} declares GUID {guid} {count} times")
+            if count == 1:
+                matches.append(meta.with_suffix(""))
+    return matches
+
+
+def _meta_owns_guid(meta: Path, guid: str) -> bool:
+    return _meta_guid_count(meta, guid) == 1
+
+
+def _meta_guid_count(meta: Path, guid: str) -> int:
+    text = meta.read_text(encoding="utf-8", errors="ignore")
+    return len(re.findall(rf"(?m)^guid:\s*{re.escape(guid)}\s*$", text))
 
 
 def _texture_importer(asset: Path) -> dict[str, int]:

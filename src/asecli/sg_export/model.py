@@ -12,7 +12,7 @@ from typing import Any
 from .. import __version__
 
 REPORT_SCHEMA = "sgcli.shader-conversion-report.v1"
-MAPPING_VERSION = 3
+MAPPING_VERSION = 4
 SUPPORTED_ASE_VERSIONS = frozenset({"19109", "19602"})
 MASTER_TYPE = "AmplifyShaderEditor.TemplateMultiPassMasterNode"
 WIRE_TYPE = "AmplifyShaderEditor.WireNode"

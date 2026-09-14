@@ -14,6 +14,7 @@ from .model import (
 from .nodes import convert_node
 from .sources import compiled_properties, load_asset_map
 from .evidence import inspector_degradations, record_port, validate_template_passes
+from .surface_semantics import normalize_surface_outputs
 from .reconciliation import (
     groups, reconcile_shaderlab_properties, unique_properties, verify_texture_dependencies,
 )
@@ -123,6 +124,7 @@ def build_candidate(
     for node in nodes:
         for target_id in node.source_ids:
             edges.append(SemanticEdge(node.target_id, 0, target_id, -1))
+    nodes, edges = normalize_surface_outputs(nodes, edges, target_spec, mappings, report, text)
     groups_spec = groups(ase, mappings, diagnostics)
     report["output_bindings"] = [
         {"block": edge.target_id, "port": edge.target_port}
@@ -243,8 +245,6 @@ def _template_option(fields, label, choices, diagnostics, node_id):
 
 
 def _template_bool(fields, label, diagnostics, node_id):
-    value = _template_option(fields, label, (False, True), diagnostics, node_id)
-    return value
-
+    return _template_option(fields, label, (False, True), diagnostics, node_id)
 def _graph_precision(master):
     return "Half" if master and len(master.raw_fields) > 4 and master.raw_fields[4] == "Half" else "Single"

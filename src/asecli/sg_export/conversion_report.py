@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .report_semantics import check_evidence
+
 
 CHECK_RULES = {
     "properties": "SEM-PROP-001",
@@ -74,7 +76,7 @@ def build_public_report(
         name: {
             "rule": rule,
             "status": check_status[name],
-            "evidence": _check_evidence(name, check_status[name], internal, failure),
+            "evidence": check_evidence(name, check_status[name], internal, failure),
         }
         for name, rule in CHECK_RULES.items()
     }
@@ -188,6 +190,9 @@ def _alpha_equation_verified(internal: dict[str, Any] | None) -> bool:
     target = internal.get("target_mapping", {})
     if target.get("surface") == "Opaque":
         return True
+    semantics = internal.get("surface_semantics", {})
+    if semantics.get("alpha_blend_equivalent") is not True or semantics.get("unresolved"):
+        return False
     return any(
         isinstance(item, dict)
         and item.get("block") == "SurfaceDescription.Alpha"
@@ -199,31 +204,16 @@ def _blend_equation_verified(internal: dict[str, Any] | None) -> bool:
     if not isinstance(internal, dict):
         return False
     target = internal.get("target_mapping", {})
+    semantics = internal.get("surface_semantics", {})
+    if target.get("surface") == "Transparent" and (
+        semantics.get("rgb_blend_equivalent") is not True
+        or semantics.get("alpha_blend_equivalent") is not True
+    ):
+        return False
+    if semantics.get("unresolved"):
+        return False
+    if semantics.get("target_pipeline", {}).get("implicit_alpha_modulate"):
+        source_explicit = semantics.get("source", {}).get("explicit_alpha_modulate", False)
+        if source_explicit and not semantics.get("rewrites"):
+            return False
     return target.get("blend") in {"Alpha", "Premultiply", "Additive", "Multiply"}
-
-
-def _check_evidence(
-    name: str,
-    state: str,
-    internal: dict[str, Any] | None,
-    failure: str | None,
-) -> str:
-    if state == "verified":
-        return {
-            "properties": "ASE properties reconciled with ShaderLab declarations",
-            "resources": "all texture dependencies are null or have matching importer evidence",
-            "graph_algorithm": "certified ASE nodes, defaults and wires were deterministically mapped",
-            "target": "certified URP Unlit Master settings were mapped",
-            "passes": "the certified ASE URP Unlit pass set was recognized",
-            "alpha_equation": "opaque alpha behavior or the explicit Alpha block binding was preserved",
-            "blend_equation": "the certified ASE Master blend mode was mapped to the SG target",
-        }[name]
-    if failure:
-        return f"conversion stopped before this invariant was proved: {failure}"
-    diagnostics = internal.get("diagnostics", []) if isinstance(internal, dict) else []
-    if diagnostics:
-        first = diagnostics[0]
-        return f"{first.get('code', 'UNPROVEN')}: {first.get('reason', 'not proven')}"
-    if name in {"alpha_equation", "blend_equation"}:
-        return "the source target equation could not be proved from the certified Master mapping"
-    return "not proven by the producer-only export"
