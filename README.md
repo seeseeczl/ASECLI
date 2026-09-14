@@ -4,9 +4,9 @@
 
 AseCLI 是面向 AI Agent 的本地 CLI：离线读取、编辑和校验 ASE 节点图；通过运行中的 Unity/团结引擎与 MCP，让真实 ASE 创建节点、提供精排几何并重新生成 HLSL。Skill 提供跨 Agent 的操作规则，CLI 提供可验证的执行结果。
 
-当前正式版：**[0.8.5](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.5)** · [PyPI](https://pypi.org/project/asecli/0.8.5/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
+当前正式版：**[0.8.6](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.6)** · [PyPI](https://pypi.org/project/asecli/0.8.6/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
 
-ASECLI 接收 SGCLI 生成的裸 `EditorGraphSpec v3`，并可把受支持的 ASE Shader 直接导出为 SGCLI 的裸 `sgcli.native.v3`。两个方向都只有“生产者 spec 原文件→消费者 `--spec`”；独立 report 与发布 receipt 都不进入创建输入，创建成功也不代表转换效果等价。
+ASECLI 接收 SGCLI 生成的裸 `EditorGraphSpec v3`，并可把受支持的 ASE Shader 直接导出为 SGCLI 的裸 `sgcli.native.v3`。两个方向都只有“生产者 spec 原文件→消费者 `--spec`”；spec 是唯一图规格；独立 report 与发布 receipt 通过各自参数提供转换认证证据，创建成功也不代表转换效果等价。
 
 ```
 你：提需求（"给这个 shader 加个可调描边"）
@@ -108,7 +108,7 @@ curl -fsSL https://raw.githubusercontent.com/seeseeczl/ASECLI/main/scripts/insta
 uv tool uninstall asecli
 ```
 
-当前正式版本为 `0.8.5`（ASE→SG 算法与精度分层、属性保真对账与输出时间后缀），可从 [PyPI](https://pypi.org/project/asecli/0.8.5/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.5) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.8.4` 保留为回滚点。
+当前正式版本为 `0.8.6`（补齐 ASE→SG 三文件交接、时间后缀与验收边界说明；运行行为沿用 0.8.5），可从 [PyPI](https://pypi.org/project/asecli/0.8.6/) 或 [GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.6) 安装。历史版本见 [GitHub Releases](https://github.com/seeseeczl/ASECLI/releases)，`v0.8.5` 保留为回滚点。
 
 已知限制：真实 MCP 下，属性+纹理 v2 和 Reciprocal 降级 v2 的 create、manifest、validate、独立 recompile 已通过；SGCLI SphereMask v3 spec 在重载时仍可能返回 `node missing after reload: Radius` 并回滚。本次不承诺该 recipe 端到端可用，也不改变 SGCLI v2 默认值契约。
 
@@ -138,7 +138,7 @@ asecli --help
 
 ```bash
 shasum -a 256 -c SHA256SUMS
-uv tool install /path/to/asecli-0.8.5-py3-none-any.whl
+uv tool install /path/to/asecli-0.8.6-py3-none-any.whl
 asecli --help
 ```
 
@@ -178,10 +178,27 @@ asecli recompile Assets/ConvertedNew.shader --mcp-url http://127.0.0.1:9080/mcp
 ```bash
 asecli export-sg Assets/ConvertedNew.shader --out-dir ./out
 sgcli sg create Assets/ConvertedNew.shadergraph \
-  --spec ./out/ConvertedNew.asecli-to-sgcli.spec.json
+  --spec ./out/ConvertedNew.asecli-to-sgcli.spec.json \
+  --conversion-report ./out/ConvertedNew.asecli-to-sgcli.report.json \
+  --publication-receipt ./out/ConvertedNew.asecli-to-sgcli.receipt.json \
+  --write
 ```
 
 `export-sg` 自动从源 Shader 向上识别 Unity/Tuanjie 工程；跨工程资源解析时显式传 `--target-project`。它强制生成 `<stem>.asecli-to-sgcli.spec.json`、`.report.json` 与 `.receipt.json`，同名即失败；receipt 只证明 spec/report 两份文件的提交状态与 SHA，不是中间交接包。命令不调用 SGCLI，也不生成 ASE 自有中间 JSON。未知节点、Master/Pass、外部属性或纹理 Importer 语义时只写规范报告，不写半成品 spec。反方向 `.asecli-to-sgcli.spec.json` 不能交给 ASECLI `create --spec`。
+
+需要保存在源文件同目录并添加时间后缀时：
+
+```bash
+asecli export-sg /path/to/Shader.shader \
+  --out-dir /path/to \
+  --output-suffix "_$(date +%Y%m%d_%H%M%S)"
+```
+
+三份文件共用同一后缀，例如 `Shader_20260914_163000.asecli-to-sgcli.spec.json`。`--name` 只修改图名称，不能用于文件命名。将实际生成的三份路径原样传给 SGCLI；不要合并、解包或改写 JSON。
+
+导出检查算法连接或已识别的数学等价映射、变量名、属性类型、默认值、范围、资源和 Shader 设置。已匹配的 AlphaModulate 可折叠到目标管线，输出路径保持一次调制；局部精度差异在 CLI 的 `precision_warnings` 和报告的检查证据中说明，不把整个图改成 Half，也不因缺少浮点逐位证明而阻断。错误连接、混合变化及无法映射的运行时属性仍会阻断。
+
+验收分三层：ASECLI 导出通过；SGCLI 契约/转换认证及真实创建通过；最终编译、画布与效果验收。前一层不代表后一层。最终视觉不是生成 JSON 的前置条件，未运行证据保持 `not_run`。消费者若返回 `SEM-BLEND-002` 等认证错误，应在 SGCLI 侧核对具体规则，不修改 JSON 或省略证据绕过认证。
 
 ASECLI 随 wheel 发布自己的 EditorGraphSpec v3 Schema，以及源自 SGCLI `0.3.5` 的固定 `sgcli.native.v3` JSON 快照。快照 SHA-256 标识本包完整性与精确协议修订，不依赖对方当前分支或安装版本。构建、测试、发布与安装只使用 ASECLI，不拉取或执行 SGCLI 源码，不要求同步发布。`MultiplySourceAlpha` 等扩展仍要求实际消费者和目标 URP 支持，导出成功不代表旧消费者兼容。跨产品端到端验收是独立黑盒流程，不是本仓发布前置；本仓任务不自动跨仓修改。
 
@@ -244,7 +261,7 @@ asecli recompile Assets/Example.shader
 | `validate <file>` | 检查悬空连线、重复 ID、输入多来源、Local Var 一致性和 CHKSM。 | 只读；有 error 时返回退出码 2。 |
 | `graph-review <file> [--baseline FILE] [--reuse-policy consumer-groups\\|fanout]` | 保守核对计算基线并列出复用计划。 | 只读；基线不一致返回 `SEMANTIC_MISMATCH` / 2，不自动创建 Local Var。 |
 | `graph-audit <file>` | 从 Master 反向分析未参与输出的节点，区分 `unused_candidates` 与外部消费者。 | 只读；Property 的源码/HLSL/GUI 引用不会被误报为可删。 |
-| `export-sg <file> --out-dir DIR [--target-project PROJECT]` | 直接输出裸 `sgcli.native.v3`、独立转换报告和发布回执。 | spec 是唯一交接输入；receipt 只证明 spec/report 提交状态；不调用 SGCLI；同名失败；转换失败只写 report。 |
+| `export-sg <file> --out-dir DIR [--target-project PROJECT] [--output-suffix SUFFIX]` | 直接输出裸 `sgcli.native.v3`、独立转换报告和发布回执。 | spec 是唯一图规格；report/receipt 分别作为转换认证证据；receipt 证明 spec/report 提交状态；不调用 SGCLI；同名失败；转换失败只写 report。 |
 | `contract editor-graph --version 3 [--spec FILE]` | 输出 wheel 内权威 EditorGraphSpec v3 JSON Schema；可离线校验并回执输入 SHA。 | 只读；loader 仍执行端口、中文属性和模板等更强语义校验。 |
 | `migrate-package <file> --out-dir DIR --extract-sg-spec` | 显式提取登记的旧 `{graph,report}` wrapper。 | 只接受内层 `sgcli.native.v3`；未知/v2 wrapper 只留失败报告，不进入正常消费者。 |
 | `set-field <file> --node N --field I --value V [--write]` | 修改一个已知节点的绝对序列化字段。 | 默认预演；`--write` 后写入。不要用它猜写 Master 或未知版本尾部。 |
@@ -316,9 +333,9 @@ asecli recompile Assets/Example.shader
 除显式 `--help` 保留人类可读文本外，stdout 恒为单行严格 JSON，agent 可直接解析。`--version` 也返回 JSON：
 
 ```json
-{"contract_version":1,"cli_version":"0.8.5","command":"parse","ok":true,"data":{"node_count":7}}
-{"contract_version":1,"cli_version":"0.8.5","command":"parse","ok":false,"error":{"code":"NOT_FOUND","message":"..."}}
-{"contract_version":1,"cli_version":"0.8.5","command":"version","ok":true,"data":{"version":"0.8.5"}}
+{"contract_version":1,"cli_version":"0.8.6","command":"parse","ok":true,"data":{"node_count":7}}
+{"contract_version":1,"cli_version":"0.8.6","command":"parse","ok":false,"error":{"code":"NOT_FOUND","message":"..."}}
+{"contract_version":1,"cli_version":"0.8.6","command":"version","ok":true,"data":{"version":"0.8.6"}}
 ```
 
 常见错误码：`PARSE_ERROR`、`NOT_FOUND`、`USAGE_ERROR`、`SCHEMA_UNAVAILABLE`、`SCHEMA_VERSION_MISMATCH`、`VALIDATION_ERROR`、`PROPERTY_PRESENTATION_ERROR`、`LAYOUT_ERROR`、`CHECKSUM_FORMAT_ERROR`、`GUI_SUPPORT_ERROR`、`CUSTOM_GUI_ERROR`、`COMMENT_GROUP_ERROR`、`GRAPH_REVIEW_ERROR`、`SEMANTIC_MISMATCH`、`SG_EXPORT_BLOCKED`、`EXTERNAL_REFERENCE`、`SKILL_INSTALL_CONFLICT`、`SKILL_INSTALL_ERROR`、`WRITE_CONFLICT`、`WRITE_PARTIAL`、`UNSAFE_PATH`、`WRITE_ERROR`、`BRIDGE_ERROR`、`INTERNAL`。

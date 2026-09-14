@@ -100,3 +100,4 @@
 | 2026-09-14 | v0.8.1 双渠道发布与本机安装完成 | tag `v0.8.1` 解引用到 `610a7a3`；[publish run 34796442345](https://github.com/seeseeczl/ASECLI/actions/runs/34796442345) 的双 Python、可复现构建、供应链、锁定 SGCLI `b4f8310` 的跨 CLI 门禁与 PyPI OIDC 全绿。[GitHub Release](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.1) wheel/sdist 与 PyPI 摘要一致，本机 CLI 为 `0.8.1`，用户级 Skill 已同步；Editor/画布/render 保持开放披露。 | REL-0017 CR-0030 TASK-0066 REG-0063 |
 | 2026-09-14 | v0.8.5 发布准备 | 用户授权推送发布；本地 485 passed/3 skipped，实文件导出成功；算法/属性/设置门禁保留，精度边界提示；远端与双渠道校验待执行 | CR-0031 TASK-0067 REG-0064 REL-0018 |
 | 2026-09-14 | v0.8.5 双渠道发布完成 | tag cb80828；主线 CI 34823345703 与 publish 34823348963 全成功；GitHub 五资产回读与 PyPI SHA 一致，本机 0.8.5 和 Skill 校验通过；隔离回滚通过，Editor/视觉未运行 | CR-0031 TASK-0067 REG-0064 REL-0018 |
+| 2026-09-14 | v0.8.6 文档补丁准备 | 已按用户要求删除仓库内三份未跟踪实机副本；README 补齐三文件认证、--write、时间后缀和分层验收；运行行为不变 | CR-0031 TASK-0068 REG-0064 REL-0019 |

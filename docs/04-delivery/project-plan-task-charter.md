@@ -122,3 +122,4 @@ kickoff_completion: complete
 - [x] 里程碑、验收命令、停止条件与回滚已定义
 - [x] 门禁与审计计划已建立
 | TASK-0067 | CR-0031 REL-0018 | 发布 ASE→SG 精度提示与保真修复 v0.8.5 | 用户明确授权推送并发布 | 导出、报告、测试、Skill 与发布元数据 | SGCLI、源 Shader、Editor 与视觉验收 | long/2026-09-14 | REG-0064；pytest、治理、双构建、远端 CI、双渠道 SHA、隔离安装回滚 | 任一发布检查失败则停止 | 本地 485 passed/3 skipped；正式候选 484 passed/4 skipped；run 34823348963、GitHub/PyPI SHA、本机安装与回滚通过 | released |
+| TASK-0068 | CR-0031 REL-0019 | 清理本地实机副本并发布 README 说明补丁 0.8.6 | 用户授权丢弃三文件、更新 README、推送发布和本机安装 | 三个未跟踪文件、README 与版本发布记录 | 源 Tuanjie 资产、SGCLI 与运行逻辑 | long/2026-09-14 | REG-0064；文档 diff、发布治理、测试、双构建、双渠道 SHA 与安装回滚 | 发布检查失败则停止，保留 0.8.5 | 清理及 README 更新完成，发布验证中 | verified |
