@@ -6,7 +6,6 @@ from .commentary import _rect_overlap, inspect_comment_groups
 from .layout_graph import id_key, port_key
 from .wire_geometry import path_hits_rect, paths_cross, segment_hits_rect
 from .wire_router import logical_wires
-
 GRID_SIZE = 256.0
 
 
@@ -34,6 +33,7 @@ def subtree_overlaps(plan) -> list[dict]:
 
 def balance_errors(graph, plan, geometry) -> list[dict]:
     result = []
+    wires = _primary_wires(graph)
     for parent, children in plan.children.items():
         if not children:
             continue
@@ -41,7 +41,8 @@ def balance_errors(graph, plan, geometry) -> list[dict]:
         index = children.index(spine)
         upper = children[:index]
         lower = children[index + 1:]
-        axis = _edge_y(graph, plan, geometry, spine, parent)[1]
+        axis = _edge_y(graph, plan, geometry, spine, parent,
+                       wire=wires[(spine, parent)])[1]
         upper_height = 0.0 if not upper else axis - min(plan.subtree_bounds[item][1] for item in upper)
         lower_height = 0.0 if not lower else max(plan.subtree_bounds[item][3] for item in lower) - axis
         result.append({
@@ -56,13 +57,14 @@ def balance_errors(graph, plan, geometry) -> list[dict]:
 
 def stage_right_alignment(graph, plan, geometry, *, tolerance: float = 8.0) -> list[dict]:
     result = []
+    wires = _primary_wires(graph)
     for parent, children in sorted(plan.children.items(), key=lambda item: id_key(item[0])):
         if not children:
             continue
         expected = plan.stage_output_x[children[0]]
         deviations = []
         for child in children:
-            wire = _primary_wire(graph, child, parent)
+            wire = wires[(child, parent)]
             actual = plan.positions[child][0] + geometry[child].output_ports[wire.out_port][0]
             error = abs(actual - expected)
             if error > tolerance:
@@ -106,8 +108,9 @@ def branch_side_balance(plan) -> list[dict]:
 
 def horizontal_edge_ratio(graph, plan, geometry, *, tolerance: float = 8.0) -> dict:
     total = horizontal = 0
+    wires = _primary_wires(graph)
     for child, parent in plan.primary_parent.items():
-        wire = _primary_wire(graph, child, parent)
+        wire = wires[(child, parent)]
         source_y, target_y = _edge_y(graph, plan, geometry, child, parent, wire=wire)
         total += 1
         horizontal += abs(source_y - target_y) <= tolerance
@@ -210,19 +213,19 @@ def _wire_ports(graph):
             result[key] = wire.in_port
     return result
 
+def _primary_wires(graph):
+    result = {}
+    for item in logical_wires(graph):
+        wire = item.wire
+        key = (wire.out_node, wire.in_node)
+        previous = result.get(key)
+        if previous is None or (port_key(wire.in_port), port_key(wire.out_port)) < (
+                port_key(previous.in_port), port_key(previous.out_port)):
+            result[key] = wire
+    return result
 
-def _primary_wire(graph, child, parent):
-    choices = [
-        item.wire for item in logical_wires(graph)
-        if item.wire.out_node == child and item.wire.in_node == parent
-    ]
-    if not choices:
-        raise ValueError(f"primary layout edge {child}->{parent} is missing")
-    return min(choices, key=lambda wire: (port_key(wire.in_port), port_key(wire.out_port)))
 
-
-def _edge_y(graph, plan, geometry, child, parent, *, wire=None):
-    wire = wire or _primary_wire(graph, child, parent)
+def _edge_y(graph, plan, geometry, child, parent, *, wire):
     return (
         plan.positions[child][1] + geometry[child].output_ports[wire.out_port][1],
         plan.positions[parent][1] + geometry[parent].input_ports[wire.in_port][1],
