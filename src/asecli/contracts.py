@@ -11,6 +11,9 @@ from .schema_validation import validate_schema
 
 EDITOR_GRAPH_V3 = "contracts/editor-graph-spec.v3.schema.json"
 SGCLI_NATIVE_V3_SNAPSHOT = "contracts/sgcli.native.v3.schema.json"
+# Provenance of the bundled JSON document, not a runtime dependency or a
+# requirement to match another repository's current checkout. The SHA pins
+# this exact supported protocol revision independently of CLI releases.
 SGCLI_NATIVE_CONSUMER = {
     "package": "sgcli",
     "version": "0.3.5",

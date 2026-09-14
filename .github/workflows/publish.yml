@@ -76,6 +76,8 @@ jobs:
       - run: uv venv .artifact-venv --python 3.12
       - run: uv pip install --python .artifact-venv/bin/python "dist/asecli-${ASECLI_VERSION}-py3-none-any.whl"
       - run: .artifact-venv/bin/asecli parse tests/fixtures/step-antialiasing.function.txt
+      - name: Verify standalone wheel JSON contract
+        run: .artifact-venv/bin/python tools/independent_wheel_smoke.py
       - run: .artifact-venv/bin/asecli install-skill --skill-root "$RUNNER_TEMP/codex-skills"
       - name: Smoke test packaged GUI installer
         run: |
@@ -89,19 +91,8 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  cross-cli:
-    needs: package
-    uses: ./.github/workflows/cross-cli.yml
-    with:
-      sgcli_ref: ${{ vars.SGCLI_CANDIDATE_SHA }}
-      asecli_artifact_name: asecli-candidate-${{ github.sha }}
-    secrets:
-      sgcli_read_ssh_key: ${{ secrets.SGCLI_READ_SSH_KEY }}
-    permissions:
-      contents: read
-
   publish:
-    needs: [package, cross-cli]
+    needs: package
     if: ${{ vars.ASECLI_PYPI_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment:

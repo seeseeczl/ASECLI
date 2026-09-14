@@ -11,6 +11,9 @@ description: Create, modify, validate, and strictly lay out Amplify Shader Edito
 
 ## 与 SGCLI 的双向 JSON 直连
 
+- 单仓维护：ASECLI 修改、检查、发布、安装不自动修改 SGCLI；对方缺能力时报告协议需求，由用户另行授权对方任务。
+- 两 CLI 无运行代码依赖。用随包固定的公开 JSON Schema 自行验证，快照摘要不要求跟随对方 main。用户显式编排的端到端转换不是 ASECLI 开发或发布的前置条件。
+
 - SG→ASE：`sgcli convert Graph.shadergraph --out-dir ./out` 生成裸 `Graph.sgcli-to-asecli.spec.json`、独立 report 和发布 receipt；`asecli create Assets/Graph.shader --spec ./out/Graph.sgcli-to-asecli.spec.json` 只直接消费 spec 原文件。
 - ASE→SG：`asecli export-sg Graph.shader --out-dir ./out` 生成裸 `Graph.asecli-to-sgcli.spec.json`（`sgcli.native.v3`）、独立 report 和发布 receipt；SGCLI `sg create --spec` 只直接消费 spec 原文件。
 - 不生成 `asecli.ase-graph.*` 中间 JSON，不调用 SGCLI，不使用 wrapper、`.graph` 解包、jq、Agent 改写或一次性 translator。

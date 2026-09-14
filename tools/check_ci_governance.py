@@ -187,6 +187,7 @@ def main() -> int:
         "tools/supply_chain_check.py", "shasum -a 256 -c SHA256SUMS",
         "vars.ASECLI_PYPI_ENABLED == 'true'",
         "uv publish dist/*.whl dist/*.tar.gz",
+        "tools/independent_wheel_smoke.py",
     )
     for marker in release_markers:
         if marker not in publish:
