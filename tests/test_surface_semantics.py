@@ -301,20 +301,32 @@ def test_shared_alpha_modulate_is_kept_but_base_color_is_bypassed():
     assert report["surface_semantics"]["rewrites"][0]["removed"] is False
 
 
-def test_independent_source_alpha_blend_is_recorded_as_unrepresentable():
+def test_independent_source_alpha_blend_selects_exact_project_target():
     shader = '''
         Name "Forward"
         Blend DstColor Zero, One Zero
         HLSLPROGRAM
     '''
-    (_, _), _, report = _normalize(source_text=shader)
+    nodes, edges, mappings, report = _native_lerp_case()
+    target = {"surface": "Transparent", "blend": "Multiply"}
+    original_nodes = list(nodes)
+    original_edges = list(edges)
+    normalized_nodes, normalized_edges = normalize_surface_outputs(
+        nodes, edges, target, mappings, report, shader
+    )
 
     semantics = report["surface_semantics"]
+    assert target["blend"] == "MultiplySourceAlpha"
     assert semantics["rgb_blend_equivalent"] is True
-    assert semantics["alpha_blend_equivalent"] is False
+    assert semantics["alpha_blend_equivalent"] is True
     assert semantics["source_pass_blend"]["alpha"] == ["One", "Zero"]
-    assert semantics["target_pass_blend"]["alpha"] == ["Zero", "One"]
-    assert report["diagnostics"][0]["code"] == "ALPHA_BLEND_UNREPRESENTABLE"
+    assert semantics["target_pass_blend"]["alpha"] == ["One", "Zero"]
+    assert semantics["target_pipeline"]["implicit_alpha_modulate"] is False
+    assert semantics["alpha_modulate_strategy"] == "preserve_graph_float_expression"
+    assert semantics["rewrites"] == []
+    assert normalized_nodes == original_nodes
+    assert normalized_edges == original_edges
+    assert report["diagnostics"] == []
 
 
 def test_matching_multiply_pass_blend_is_fully_equivalent():

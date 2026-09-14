@@ -5,6 +5,36 @@ from pathlib import Path
 import pytest
 
 from asecli.sg_export.sources import resolve_asset
+from asecli.sg_export.sources import texture_dependency, _IMPORTER_KEYS
+
+
+@pytest.mark.parametrize('mutation', ['none', 'content', 'platform', 'guid'])
+def test_texture_dependency_binds_content_and_complete_importer(tmp_path, mutation):
+    guid = 'a' * 32
+    meta = 'fileFormatVersion: 2\nguid: ' + guid + '\nTextureImporter:\n'
+    meta += ''.join(f'  {key}: 0\n' for key in _IMPORTER_KEYS)
+    meta += '  platformSettings:\n  - buildTarget: Android\n    overridden: 1\n    maxTextureSize: 1024\n'
+    roots = [tmp_path / 'source', tmp_path / 'target']
+    for root in roots:
+        (root / 'Assets').mkdir(parents=True)
+        (root / 'ProjectSettings').mkdir()
+        (root / 'Assets/tex.png').write_bytes(b'image')
+        (root / 'Assets/tex.png.meta').write_text(meta)
+    shader = roots[0] / 'Assets/source.shader'
+    shader.write_text('Shader {}')
+    if mutation == 'content':
+        (roots[1] / 'Assets/tex.png').write_bytes(b'different')
+    elif mutation == 'platform':
+        (roots[1] / 'Assets/tex.png.meta').write_text(meta.replace('1024', '512'))
+    elif mutation == 'guid':
+        (roots[1] / 'Assets/tex.png.meta').write_text(meta.replace(guid, 'b' * 32))
+    if mutation != 'none':
+        with pytest.raises(ValueError, match='differs|settings differ'):
+            texture_dependency(shader, roots[1], guid, 'Assets/tex.png')
+    else:
+        evidence, kind = texture_dependency(shader, roots[1], guid, 'Assets/tex.png')
+        assert kind == 'Default'
+        assert evidence['snapshot']['source_sha256'] == evidence['snapshot']['target_sha256']
 
 
 def test_resolve_asset_ignores_guid_references_in_other_meta_files(tmp_path: Path):

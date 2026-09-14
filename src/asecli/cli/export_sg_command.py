@@ -97,6 +97,13 @@ def cmd_export_sg(args) -> dict:
         assert_spec_publishable(report)
         _assert_source_unchanged(source, source_raw, "after report construction")
         _assert_source_unchanged(source, source_raw, "before publication")
+        for item in report.get('resource_snapshots', []):
+            for side in ('source', 'target'):
+                path = Path(item[side + '_path'])
+                for file, key in ((path, side + '_sha256'),
+                                  (Path(str(path)+'.meta'), side + '_meta_sha256')):
+                    if hashlib.sha256(file.read_bytes()).hexdigest() != item[key]:
+                        raise ValueError(f'resource changed before publication: {file}')
     except ExportError as exc:
         internal = exc.report
         _write_failure_report(

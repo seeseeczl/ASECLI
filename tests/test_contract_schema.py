@@ -46,9 +46,9 @@ def test_sgcli_consumer_schema_snapshot_is_pinned_and_packaged():
     schema = load_sgcli_native_schema_snapshot()
     assert SGCLI_NATIVE_CONSUMER == {
         "package": "sgcli",
-        "version": "0.2.0",
+        "version": "0.3.5",
         "contract": "sgcli.native.v3",
-        "sha256": "b0cee4774e6a3e4a7dfd32ba1c55f8969ee9c7f5f9d48eb4be7649287e817651",
+        "sha256": "bb16ce3f61e0772c51bcbfe89cd010ee426db12c59a6e84afad34fd512b41b82",
     }
     assert schema["properties"]["schema"] == {"const": "sgcli.native.v3"}
 

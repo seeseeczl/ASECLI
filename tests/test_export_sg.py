@@ -77,6 +77,23 @@ def test_named_v3_binding_preserves_defaults_and_connections(unity_project: Path
     ]
 
 
+def test_custom_editor_degradation_blocks_publication(unity_project: Path):
+    value = _node('AmplifyShaderEditor.RangedFloatNode', 10, '-400,0')
+    master = _master()
+    master[9] = 'MZGUI.MZGUI'
+    source = unity_project / 'Assets/Inspector.shader'
+    source.write_text(_shader(value, master, wires=['WireConnection;1;2;10;0']))
+    out = unity_project / 'out'
+    with pytest.raises(CliError) as exc:
+        cmd_export_sg(SimpleNamespace(file=str(source), out_dir=str(out), target_project=None, name=None, asset_map=None))
+    assert exc.value.code == 'SG_EXPORT_BLOCKED'
+    assert not list(out.glob('*.spec.json'))
+    assert not list(out.glob('*.receipt.json'))
+    report = json.loads(next(out.glob('*.report.json')).read_text())
+    assert report['checks']['properties']['status'] == 'unsupported'
+    assert any(item['rule'] == 'SEM-PROP-001' and 'MZGUI' in item['reason'] for item in report['degradations'])
+
+
 def test_command_writes_canonical_pair_without_sgcli_runtime(unity_project: Path):
     value = _node("AmplifyShaderEditor.RangedFloatNode", 10, "-400,0")
     source = unity_project / "Assets" / "WaveNoise.shader"
@@ -379,3 +396,4 @@ def test_wave_noise_color_and_sampler_fields_are_relative_to_create_marker(tmp_p
     )
     assert sampler.raw_fields[20] == "-1"
     assert sampler_texture_guid(sampler) == "944392c2985544e1887f5223b229458a"
+

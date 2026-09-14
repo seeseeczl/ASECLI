@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import re
 from typing import Any
@@ -57,15 +58,23 @@ def property_spec(node, kind: str, compiled: dict[str, dict[str, Any]], fallback
         default = default[:width]
     result = {
         "name": name, "type": kind, "display_name": row["display_name"],
-        "default": default, "exposed": row["exposed"],
+        # ShaderLab HideInInspector controls presentation, not whether a
+        # Material can store and override the property. Shader Graph models
+        # those as separate `exposed` and `hidden` settings.
+        "default": default, "exposed": True,
     }
     if kind == "float" and "range" in row:
         result["range"] = row["range"]
     if kind == "color" and row["hdr"]:
         result["hdr"] = True
+    settings = {}
+    if not row["exposed"]:
+        settings["hidden"] = True
     precision = {"Float": "Single", "Half": "Half"}.get(node.raw_fields[4])
     if precision:
-        result["settings"] = {"precision": precision}
+        settings["precision"] = precision
+    if settings:
+        result["settings"] = settings
     return result
 
 
@@ -133,6 +142,18 @@ def texture_dependency(source_shader: Path, target_project: Path, guid: str,
     if source_asset is None:
         raise ValueError(f"source texture GUID {guid} cannot be resolved for importer verification")
     target_file = target_project / target_asset
+    paths = (source_asset, target_file, Path(str(source_asset)+'.meta'), Path(str(target_file)+'.meta'))
+    snapshots = [path.read_bytes() for path in paths]
+    if snapshots[0] != snapshots[1]:
+        raise ValueError(f'texture content differs for GUID {guid}')
+    if not _meta_owns_guid(paths[2], guid) or not _meta_owns_guid(paths[3], guid):
+        raise ValueError(f'texture GUID differs for {target_asset}')
+    # Compare the complete importer serialization, including every platform
+    # override. Unknown fields are retained, never silently defaulted away.
+    importer_blocks = [raw.decode('utf-8').replace('\r\n', '\n').split('TextureImporter:', 1)[-1]
+                       for raw in snapshots[2:]]
+    if importer_blocks[0] != importer_blocks[1]:
+        raise ValueError(f'complete texture importer settings differ for GUID {guid}')
     source_settings = _texture_importer(source_asset)
     target_settings = _texture_importer(target_file)
     if source_settings != target_settings:
@@ -147,12 +168,23 @@ def texture_dependency(source_shader: Path, target_project: Path, guid: str,
         raise ValueError(
             f"texture importer type {source_settings['textureType']} is not certified for Texture2D sampling"
         )
+    if any(path.read_bytes() != raw for path, raw in zip(paths, snapshots)):
+        raise ValueError('texture or importer changed during verification')
     return {
         "source_guid": guid,
         "source_asset": source_asset.relative_to(source_project).as_posix(),
         "target_asset": target_asset,
         "status": "verified_importer",
         "importer": source_settings,
+        "snapshot": {
+            "source_path": str(source_asset.resolve()),
+            "target_path": str(target_file.resolve()),
+            "target_project": str(target_project.resolve()),
+            "source_sha256": hashlib.sha256(snapshots[0]).hexdigest(),
+            "target_sha256": hashlib.sha256(snapshots[1]).hexdigest(),
+            "source_meta_sha256": hashlib.sha256(snapshots[2]).hexdigest(),
+            "target_meta_sha256": hashlib.sha256(snapshots[3]).hexdigest(),
+        },
     }, texture_type
 
 

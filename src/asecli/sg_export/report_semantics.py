@@ -47,7 +47,13 @@ def _blend_details(name: str, internal: dict[str, Any] | None) -> str:
     semantics = internal.get("surface_semantics", {}) if isinstance(internal, dict) else {}
     parser = semantics.get("pass_blend_parser") or {}
     rewrites = semantics.get("rewrites") or []
-    matcher = "unresolved" if semantics.get("unresolved") else "folded" if rewrites else "not_detected"
+    matcher = (
+        "unresolved" if semantics.get("unresolved")
+        else "folded" if rewrites
+        else "preserved_graph_float_expression"
+        if semantics.get("alpha_modulate_strategy") == "preserve_graph_float_expression"
+        else "not_detected"
+    )
     return (
         f"; pass_parser={parser.get('status', 'missing')}"
         f" candidates={parser.get('candidate_count', 0)}"

@@ -42,14 +42,21 @@ def normalize_surface_outputs(
     lerp alpha input is exactly the same endpoint as Surface Alpha and the
     target is URP Transparent/Multiply, whose pass performs AlphaModulate.
     """
+    source_target_blend = target.get("blend")
+    _select_exact_multiply_target(target, source_text)
     semantics = {
         "source": {
             "surface": target.get("surface"),
-            "blend": target.get("blend"),
+            "blend": source_target_blend,
         },
         "target_pipeline": {
             "implicit_alpha_modulate": _target_alpha_modulates(target),
         },
+        "alpha_modulate_strategy": (
+            "preserve_graph_float_expression"
+            if target.get("blend") == "MultiplySourceAlpha"
+            else "pipeline_fold"
+        ),
         "rewrites": [],
     }
     report["surface_semantics"] = semantics
@@ -183,7 +190,6 @@ def normalize_surface_outputs(
     if upstream is not None:
         _reject_upstream_function(report, semantics, upstream)
         return nodes, edges
-
     replacement = SemanticEdge(
         color_input.source_id,
         color_input.source_port,
@@ -226,3 +232,17 @@ def normalize_surface_outputs(
             row["target_nodes"] = [] if removed else row.get("target_nodes", [])
             row["rule"] = "SEM-BLEND-001"
     return nodes, rewritten
+
+
+def _select_exact_multiply_target(target: dict, source_text: str | None) -> None:
+    """Select the project-supported Multiply variant that writes source alpha."""
+    if target.get("surface") != "Transparent" or target.get("blend") != "Multiply":
+        return
+    from .pass_blend import forward_blend
+
+    source = forward_blend(source_text or "")
+    if source == {
+        "rgb": ["DstColor", "Zero"],
+        "alpha": ["One", "Zero"],
+    }:
+        target["blend"] = "MultiplySourceAlpha"

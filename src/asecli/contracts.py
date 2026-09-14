@@ -13,9 +13,9 @@ EDITOR_GRAPH_V3 = "contracts/editor-graph-spec.v3.schema.json"
 SGCLI_NATIVE_V3_SNAPSHOT = "contracts/sgcli.native.v3.schema.json"
 SGCLI_NATIVE_CONSUMER = {
     "package": "sgcli",
-    "version": "0.2.0",
+    "version": "0.3.5",
     "contract": "sgcli.native.v3",
-    "sha256": "b0cee4774e6a3e4a7dfd32ba1c55f8969ee9c7f5f9d48eb4be7649287e817651",
+    "sha256": "bb16ce3f61e0772c51bcbfe89cd010ee426db12c59a6e84afad34fd512b41b82",
 }
 
 

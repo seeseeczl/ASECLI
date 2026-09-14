@@ -1281,7 +1281,8 @@
             "Alpha",
             "Premultiply",
             "Additive",
-            "Multiply"
+            "Multiply",
+            "MultiplySourceAlpha"
           ]
         },
         "two_sided": {

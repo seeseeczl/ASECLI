@@ -42,17 +42,18 @@ def inspector_degradations(ase, properties, report):
                 "source": {"property": name}, "code": "INSPECTOR_METADATA_NOT_MIGRATED",
                 "details": present, "impact": "Property data is preserved; ASE Inspector UI behavior is not migrated",
             })
-    custom_gui = any(node.type_name == MASTER_TYPE and len(node.raw_fields) > 9
-                     and node.raw_fields[6] == "True"
-                     and node.raw_fields[9] not in {"", "UnityEditor.ShaderGraphUnlitGUI"}
-                     for node in ase.graph.nodes)
+    custom_gui = sorted({node.raw_fields[9] for node in ase.graph.nodes
+                         if node.type_name == MASTER_TYPE and len(node.raw_fields) > 9
+                         and node.raw_fields[6] == "True"
+                         and node.raw_fields[9] not in {"", "UnityEditor.ShaderGraphUnlitGUI"}})
     if custom_gui:
         report["degradations"].append({
             "source": {"file": str(report["source"]["path"])}, "code": "CUSTOM_INSPECTOR_NOT_MIGRATED",
+            "details": custom_gui,
             "impact": "ShaderGUI behavior has no equivalent in the creation specification",
         })
     if report["degradations"]:
-        report["equivalence"] = {"status": "degraded", "reason": "Inspector-only semantics were not migrated"}
+        report["equivalence"] = {"status": "degraded", "reason": "Inspector behavior and possible material side effects were not proved equivalent"}
 
 
 def record_port(report, source_id, source_port, source_end, target_id, target_port, target_end):

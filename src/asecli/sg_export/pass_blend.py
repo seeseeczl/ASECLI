@@ -66,6 +66,10 @@ def target_blend_factors(target: dict) -> dict | None:
         "Premultiply": {"rgb": ["One", "OneMinusSrcAlpha"], "alpha": ["One", "OneMinusSrcAlpha"]},
         "Additive": {"rgb": ["SrcAlpha", "One"], "alpha": ["One", "One"]},
         "Multiply": {"rgb": ["DstColor", "Zero"], "alpha": ["Zero", "One"]},
+        "MultiplySourceAlpha": {
+            "rgb": ["DstColor", "Zero"],
+            "alpha": ["One", "Zero"],
+        },
     }.get(target.get("blend"))
 
 

@@ -7,6 +7,10 @@ from .model import SemanticEdge, SemanticNode, diagnostic
 
 
 def _target_alpha_modulates(target: dict) -> bool:
+    # Standard URP Multiply inserts its built-in half-precision AlphaModulate.
+    # The exact source-alpha variant intentionally leaves modulation in the
+    # graph so ASE's original float expression is preserved byte-for-byte at
+    # the arithmetic boundary.
     return target.get("surface") == "Transparent" and target.get("blend") == "Multiply"
 
 

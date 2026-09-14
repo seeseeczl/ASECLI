@@ -34,6 +34,9 @@ def assert_spec_publishable(report: dict[str, Any]) -> None:
             "formal specification is not publishable; unverified semantics: "
             + (", ".join(unknown) if unknown else "producer evidence")
         )
+    for item in report.get('degradations', []):
+        if item.get('rule') in CHECK_RULES.values() or item.get('category') != 'evidence_gap':
+            raise ValueError('unresolved semantic degradation: ' + item.get('reason', 'unknown'))
 
 
 def build_public_report(
@@ -72,6 +75,9 @@ def build_public_report(
         "alpha_equation": "verified" if alpha_passed else "unknown",
         "blend_equation": "verified" if blend_passed else "unknown",
     }
+    internal_degradations = (internal or {}).get('degradations', [])
+    if internal_degradations:
+        check_status['properties'] = 'unsupported'
     checks = {
         name: {
             "rule": rule,
@@ -107,6 +113,18 @@ def build_public_report(
             "reason": "same-condition rendering inputs have not been matched",
         },
     ])
+    for item in internal_degradations:
+        location = item.get('source') or {}
+        if isinstance(location, dict):
+            location = str(location.get('file') or source) + (
+                '#' + str(location['property']) if 'property' in location else '')
+        degradations.append({
+            'rule': 'SEM-PROP-001', 'category': 'unsupported',
+            'source': str(location or source), 'target': str(spec_path),
+            'reason': str(item.get('code', 'UNMAPPED_METADATA')) + ': '
+                      + str(item.get('impact', 'Inspector behavior is unproven'))
+                      + '; details=' + json.dumps(item.get('details', []), ensure_ascii=False),
+        })
     if failure:
         degradations.append({
             "rule": "SEM-REPORT-001",
@@ -156,6 +174,8 @@ def build_public_report(
             )
         },
         "degradations": degradations,
+        "resource_snapshots": [dict(item['snapshot'], property=item['property'])
+                               for item in (internal or {}).get('dependencies', []) if 'snapshot' in item],
     }
 
 
@@ -170,7 +190,8 @@ def _resources_verified(internal: dict[str, Any] | None) -> bool:
     if not isinstance(internal, dict):
         return False
     return all(
-        isinstance(item, dict) and item.get("status") in {"verified_importer", "explicit_null"}
+        isinstance(item, dict) and (item.get("status") == "explicit_null" or
+            (item.get("status") == "verified_importer" and bool(item.get('snapshot'))))
         for item in internal.get("dependencies", [])
     )
 
@@ -216,4 +237,6 @@ def _blend_equation_verified(internal: dict[str, Any] | None) -> bool:
         source_explicit = semantics.get("source", {}).get("explicit_alpha_modulate", False)
         if source_explicit and not semantics.get("rewrites"):
             return False
-    return target.get("blend") in {"Alpha", "Premultiply", "Additive", "Multiply"}
+    return target.get("blend") in {
+        "Alpha", "Premultiply", "Additive", "Multiply", "MultiplySourceAlpha",
+    }

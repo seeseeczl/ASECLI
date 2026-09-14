@@ -39,7 +39,18 @@ def test_parser_candidate_folds_explicit_alpha_modulate(tmp_path: Path):
 
 def test_independent_alpha_blend_fails_closed(tmp_path: Path):
     project=_project(tmp_path);source=project/"Assets"/"alpha.shader"
-    source.write_text(_shader([_node("AmplifyShaderEditor.RangedFloatNode",10),_master()],["WireConnection;1;2;10;0","WireConnection;1;3;10;0"],"Blend DstColor Zero, One Zero"),encoding="utf-8")
+    source.write_text(_shader([_node("AmplifyShaderEditor.RangedFloatNode",10),_master()],["WireConnection;1;2;10;0","WireConnection;1;3;10;0"],"Blend DstColor Zero, One One"),encoding="utf-8")
     with pytest.raises(ExportError) as raised:build_candidate(source,project)
     issue=next(x for x in raised.value.report["diagnostics"] if x["code"]=="ALPHA_BLEND_UNREPRESENTABLE")
-    assert issue["reason"]["source"]["alpha"]==["One","Zero"]
+    assert issue["reason"]["source"]["alpha"]==["One","One"]
+
+
+def test_source_alpha_multiply_selects_exact_target(tmp_path: Path):
+    project=_project(tmp_path);source=project/"Assets"/"exact.shader"
+    source.write_text(_shader([_node("AmplifyShaderEditor.RangedFloatNode",10),_master()],
+        ["WireConnection;1;2;10;0","WireConnection;1;3;10;0"],
+        "Blend DstColor Zero, One Zero"),encoding="utf-8")
+    candidate,report,nodes,edges=build_candidate(source,project)
+    result=bind_named_ports(candidate,report,nodes,edges)
+    assert result["target"]["blend"] == "MultiplySourceAlpha"
+    assert report["surface_semantics"]["alpha_modulate_strategy"] == "preserve_graph_float_expression"
