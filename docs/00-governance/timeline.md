@@ -102,3 +102,4 @@
 | 2026-09-14 | v0.8.5 双渠道发布完成 | tag cb80828；主线 CI 34823345703 与 publish 34823348963 全成功；GitHub 五资产回读与 PyPI SHA 一致，本机 0.8.5 和 Skill 校验通过；隔离回滚通过，Editor/视觉未运行 | CR-0031 TASK-0067 REG-0064 REL-0018 |
 | 2026-09-14 | v0.8.6 文档补丁准备 | 已按用户要求删除仓库内三份未跟踪实机副本；README 补齐三文件认证、--write、时间后缀和分层验收；运行行为不变 | CR-0031 TASK-0068 REG-0064 REL-0019 |
 | 2026-09-14 | v0.8.6 双渠道发布及本机升级完成 | tag 48d9fc4；CI/publish 全绿，GitHub 五资产和 PyPI SHA 一致；本机正式 0.8.6/Skill 校验通过；三份未跟踪副本已删除 | CR-0031 TASK-0068 REG-0064 REL-0019 |
+| 2026-11-17 | v0.8.7 三编辑器后端发布 | 新增 Codely Bridge 与 DSH-Bridge 后端，MCP 保留；`--editor-backend` 默认改为 auto（DSH-Bridge → Codely → MCP）；四轮红队审计关闭 2×P1 + 3×P2 + 2×P3 | AUD-0087 REL-0020 |

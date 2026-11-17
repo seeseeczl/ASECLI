@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from ..bridge import McpError, measure_node_bounds_via_mcp
+from ..bridge import EDITOR_ERRORS, measure_node_bounds_via_mcp
 from ..checks import fix_checksum, validate_file
 from ..core import (
     comment_containment_issues,
@@ -137,8 +137,10 @@ def _editor_bounds(args) -> dict[str, tuple[float, float, float, float]]:
             instance_token=os.environ.get("ASECLI_MCP_INSTANCE_TOKEN"),
             unity_instance=args.unity_instance,
             allow_remote_mcp=args.allow_remote_mcp,
+            backend=args.editor_backend,
+            codely_port=args.codely_port,
         )
-    except McpError as exc:
+    except EDITOR_ERRORS as exc:
         raise CliError("BRIDGE_ERROR", str(exc), exc.data)
     except FileNotFoundError as exc:
         raise CliError("NOT_FOUND", str(exc))

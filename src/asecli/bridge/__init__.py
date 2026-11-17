@@ -1,6 +1,14 @@
 """Compile bridge (TASK-0011): MCP for Unity primary transport."""
 
 from .mcp_client import McpClient, McpError
+from .backend import BackendError
+from .codely_client import CodelyError
+from .codely_discovery import DiscoveryError
+from .editor_result import EditorExecutionError
+
+#: Every failure an editor transport can raise; CLI layers map these to
+#: BRIDGE_ERROR so backend problems are never reported as INTERNAL.
+EDITOR_ERRORS = (McpError, CodelyError, BackendError, DiscoveryError, EditorExecutionError)
 from .editor_create import create_shader_via_mcp
 from .editor_spec import (
     EditorGraphSpec,
@@ -29,6 +37,11 @@ __all__ = [
     "GUI_SUPPORT_ASSET_PATH",
     "McpClient",
     "McpError",
+    "CodelyError",
+    "BackendError",
+    "DiscoveryError",
+    "EditorExecutionError",
+    "EDITOR_ERRORS",
     "MZGUI_EDITOR",
     "SpecError",
     "create_shader_via_mcp",

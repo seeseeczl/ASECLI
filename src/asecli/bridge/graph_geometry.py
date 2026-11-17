@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+from .backend import EditorExecutionError, extract_payload, run_editor_code
 from .mcp_client import McpClient, McpError, tool_text
 from .recompile import _detect_project_root
 from .graph_geometry_parser import parse_geometry_payload
@@ -210,37 +211,30 @@ def inspect_graph_geometry_via_mcp(
     shader_path: str, *, mcp_url: str = "http://127.0.0.1:8080/mcp",
     instance_token: str | None = None, unity_instance: str | None = None,
     allow_remote_mcp: bool = False,
+    backend: str = "auto", codely_port: int | None = None,
 ) -> dict[str, EditorNodeGeometry]:
     path = Path(shader_path).resolve()
     if not path.exists():
         raise FileNotFoundError(shader_path)
     root = _detect_project_root(path)
     asset_path = path.as_posix().removeprefix(root.as_posix() + "/")
-    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
-    client.connect()
-    args = {"action": "execute", "code": GEOMETRY_SNIPPET.format(asset_path=json.dumps(asset_path))}
-    if unity_instance is not None:
-        args["unity_instance"] = unity_instance
-    envelope_text = tool_text(client.call_tool("execute_code", args), instance_token)
+    envelope_text, used = run_editor_code(
+        path,
+        GEOMETRY_SNIPPET.format(asset_path=json.dumps(asset_path)),
+        backend=backend,
+        mcp_url=mcp_url,
+        instance_token=instance_token,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        unity_instance=unity_instance,
+        mcp_factory=McpClient,
+    )
     try:
-        envelope = json.loads(envelope_text)
-    except json.JSONDecodeError as exc:
-        raise McpError("MCP graph-geometry result has an unexpected envelope") from exc
-    if not isinstance(envelope, dict):
-        raise McpError("MCP graph-geometry result has an unexpected envelope")
-    if envelope.get("success") is False:
-        data = envelope.get("data") if isinstance(envelope.get("data"), dict) else {}
-        detail = envelope.get("message") or data.get("reason") or "Unity execution failed"
-        available = data.get("available_instances")
-        if isinstance(available, list) and available:
-            detail = f"{detail}; available instances: {', '.join(str(item) for item in available)}"
-        raise McpError(str(detail), data=data)
-    try:
-        payload = envelope["data"]["result"]
-    except (KeyError, TypeError) as exc:
-        raise McpError("MCP graph-geometry result has an unexpected envelope") from exc
-    if not isinstance(payload, str) or not payload.startswith(("ASECLI_GEOMETRY_V2\n", "ASECLI_GEOMETRY_V3\n")):
-        raise McpError("MCP graph-geometry result has an unexpected payload")
+        payload = extract_payload(envelope_text, used)
+    except EditorExecutionError as exc:
+        raise McpError(str(exc)) from exc
+    if not payload.startswith(("ASECLI_GEOMETRY_V2\n", "ASECLI_GEOMETRY_V3\n")):
+        raise McpError("graph-geometry result has an unexpected payload")
     return parse_geometry_payload(payload, EditorNodeGeometry)
 
 

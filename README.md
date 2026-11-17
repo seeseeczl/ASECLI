@@ -4,7 +4,7 @@
 
 AseCLI 是面向 AI Agent 的本地 CLI：离线读取、编辑和校验 ASE 节点图；通过运行中的 Unity/团结引擎与 MCP，让真实 ASE 创建节点、提供精排几何并重新生成 HLSL。Skill 提供跨 Agent 的操作规则，CLI 提供可验证的执行结果。
 
-当前正式版：**[0.8.6](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.6)** · [PyPI](https://pypi.org/project/asecli/0.8.6/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
+当前正式版：**[0.8.7](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.7)** · [PyPI](https://pypi.org/project/asecli/0.8.7/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
 
 ASECLI 接收 SGCLI 生成的裸 `EditorGraphSpec v3`，并可把受支持的 ASE Shader 直接导出为 SGCLI 的裸 `sgcli.native.v3`。两个方向都只有“生产者 spec 原文件→消费者 `--spec`”；spec 是唯一图规格；独立 report 与发布 receipt 通过各自参数提供转换认证证据，创建成功也不代表转换效果等价。
 
@@ -324,7 +324,7 @@ asecli recompile Assets/Example.shader
 - 首期绑定 ASE `1.9.6.2`；Master 端口契约只开放已实测的 URP Unlit 模板 GUID。未知版本、模板 Master 端口、节点、字段、端口或类型在写入前失败。
 - 规格只传 JSON 数据。执行的 C# 来自包内固定资源；Custom Expression 的 HLSL 是可编辑节点内容，但任意 C#、任意反射字段和危险运行时标记不会透传。
 - 保存成功必须同时满足 Save、暂存重载、模板 GUID/Shader 名、节点/属性/动态端口/连接 manifest、移动提交和目标 Shader 身份一致；Editor 事务失败会回滚明确的目标/暂存资产并恢复原 ASE 窗口状态。为避免 MCP 插件重连吞掉成功回执，同一次创建调用不再重复加载目标图。成功 JSON 中 `reloaded` 与 `staging_reloaded` 表示暂存图已 LoadFromDisk；`target_graph_reloaded` 恒为 `false`。CLI 属性收尾后必须使用独立 `recompile` 完成目标图重载复验。若提交后 Python 后验解析失败，CLI 为避免竞态误删会保留目标和 `.meta`，并返回 `transaction_nonce`、Shader/meta SHA-256 供人工核对。
-- MCP 3.4.7 默认按源码模式拦截 `AssetDatabase.DeleteAsset`。CLI 仅对包内固定、参数已校验且暂存名带随机 nonce 的事务执行器设置该次 `safety_checks=false`；不会把用户 C# 透传到这一入口。
+- 按源码模式扫描 C# 的 MCP 服务会拦截 `AssetDatabase.DeleteAsset`。CLI 仅对包内固定、参数已校验且暂存名带随机 nonce 的事务执行器请求本次关闭该扫描（`safety_checks=false`）；不会把用户 C# 透传到这一入口。该参数按**能力**协商而非绑定服务版本：若服务拒绝该参数，CLI 去掉它重试一次并接受服务的默认扫描策略，因此不需要为适配新版 MCP 而改代码。
 - MCP 客户端超时代表完成状态未知，不等同于 Editor 已停止或已回滚。初始化握手共用 20 秒总预算，真实 `tools/call` 保留 120 秒执行预算；超时 JSON 会给出 `phase`、`elapsed_ms`、`budget_ms` 并返回 `BRIDGE_ERROR`/3。重试前先检查目标文件及同目录 `ASECLI-Temp-*`，避免把迟到成功误判为失败。
 - 隔离团结 E2E 已证明 Caster-like/Receiver-like 图可创建、保存、关闭并由新进程重载；这不证明目标工程的运行时矩阵注入、材质绑定或最终渲染画面正确。
 

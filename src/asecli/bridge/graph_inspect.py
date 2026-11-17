@@ -6,7 +6,8 @@ import json
 import math
 from pathlib import Path
 
-from .mcp_client import McpClient, McpError, tool_text
+from .backend import EditorExecutionError, extract_payload, run_editor_code
+from .mcp_client import McpClient, McpError  # McpClient re-exported for test patching
 from .recompile import _detect_project_root
 
 
@@ -76,6 +77,8 @@ def measure_node_bounds_via_mcp(
     instance_token: str | None = None,
     unity_instance: str | None = None,
     allow_remote_mcp: bool = False,
+    backend: str = "auto",
+    codely_port: int | None = None,
 ) -> dict[str, tuple[float, float, float, float]]:
     """Load a fresh hidden ASE window and return each node's runtime TruePosition."""
     path = Path(shader_path).resolve()
@@ -83,39 +86,23 @@ def measure_node_bounds_via_mcp(
         raise FileNotFoundError(shader_path)
     project_root = _detect_project_root(path)
     asset_path = path.as_posix().removeprefix(project_root.as_posix() + "/")
-    client = McpClient(
-        mcp_url,
+    envelope_text, used = run_editor_code(
+        path,
+        BOUNDS_SNIPPET.format(asset_path=json.dumps(asset_path)),
+        backend=backend,
+        mcp_url=mcp_url,
         instance_token=instance_token,
-        allow_remote=allow_remote_mcp,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        unity_instance=unity_instance,
+        mcp_factory=McpClient,
     )
-    client.connect()
-    arguments = {
-        "action": "execute",
-        "code": BOUNDS_SNIPPET.format(asset_path=json.dumps(asset_path)),
-    }
-    if unity_instance is not None:
-        arguments["unity_instance"] = unity_instance
-    result = client.call_tool("execute_code", arguments)
-    envelope_text = tool_text(result, instance_token)
     try:
-        envelope = json.loads(envelope_text)
-    except json.JSONDecodeError as exc:
-        raise McpError("MCP node-bounds result has an unexpected envelope") from exc
-    if not isinstance(envelope, dict):
-        raise McpError("MCP node-bounds result has an unexpected envelope")
-    if envelope.get("success") is False:
-        data = envelope.get("data") if isinstance(envelope.get("data"), dict) else {}
-        detail = envelope.get("message") or data.get("reason") or "Unity execution failed"
-        available = data.get("available_instances")
-        if isinstance(available, list) and available:
-            detail = f"{detail}; available instances: {', '.join(str(item) for item in available)}"
-        raise McpError(str(detail))
-    try:
-        payload = envelope["data"]["result"]
-    except (KeyError, TypeError) as exc:
-        raise McpError("MCP node-bounds result has an unexpected envelope") from exc
-    if not isinstance(payload, str) or not payload.startswith("ASECLI_BOUNDS_V1\n"):
-        raise McpError("MCP node-bounds result has an unexpected payload")
+        payload = extract_payload(envelope_text, used)
+    except EditorExecutionError as exc:
+        raise McpError(str(exc)) from exc
+    if not payload.startswith("ASECLI_BOUNDS_V1\n"):
+        raise McpError("node-bounds result has an unexpected payload")
 
     bounds: dict[str, tuple[float, float, float, float]] = {}
     for line in payload.splitlines()[1:]:
@@ -123,17 +110,17 @@ def measure_node_bounds_via_mcp(
             continue
         parts = line.split("|")
         if len(parts) != 5:
-            raise McpError("MCP node-bounds result contains a malformed row")
+            raise McpError("node-bounds result contains a malformed row")
         node_id = parts[0]
         try:
             rect = tuple(float(value) for value in parts[1:])
         except ValueError as exc:
-            raise McpError("MCP node-bounds result contains a non-numeric rectangle") from exc
+            raise McpError("node-bounds result contains a non-numeric rectangle") from exc
         if not all(math.isfinite(value) for value in rect):
-            raise McpError("MCP node-bounds result contains a non-finite rectangle")
+            raise McpError("node-bounds result contains a non-finite rectangle")
         if node_id in bounds:
-            raise McpError(f"MCP node-bounds result contains duplicate node id {node_id}")
+            raise McpError(f"node-bounds result contains duplicate node id {node_id}")
         bounds[node_id] = rect  # type: ignore[assignment]
     if not bounds:
-        raise McpError("MCP node-bounds result is empty")
+        raise McpError("node-bounds result is empty")
     return bounds

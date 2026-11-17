@@ -149,9 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("gui-support", help="prefer native MZGUI, otherwise install the Editor fallback")
     s.add_argument("project", help="Unity/Tuanjie project root containing Assets and ProjectSettings")
     s.add_argument("--runtime-probe", action="store_true", help="confirm MZGUI.MZGUI by reflection in the connected Editor")
-    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument("--allow-remote-mcp", action="store_true")
-    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    _add_editor_args(s)
     s.add_argument("--handoff-native", action="store_true", help="reversibly disable a known fallback for native MZGUI takeover")
     s.add_argument("--write", action="store_true", help="install the fallback into Assets/Editor only when MZGUI is absent")
     s.set_defaults(func=cmd_gui_support)
@@ -181,13 +179,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--note", help="small text in the Comment header; defaults to Comment")
     s.add_argument("--padding", type=float, help="frame padding in canvas units; defaults to 50")
     s.add_argument("--id", type=int, help="explicit Comment node id; defaults to the next free id")
-    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument(
-        "--unity-instance",
-        help="target Name@hash when multiple Unity/Tuanjie instances are connected",
-    )
-    s.add_argument("--allow-remote-mcp", action="store_true")
-    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    _add_editor_args(s, unity_instance=True)
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_comment_group)
 
@@ -198,17 +190,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--graph-from", help="donor ASE file whose graph is injected")
     s.add_argument("--backend", choices=("text", "editor", "auto"), default="auto")
     s.add_argument("--spec", help="strict EditorGraphSpec v2/v3 JSON (editor/auto backend)")
-    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument("--allow-remote-mcp", action="store_true")
-    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    _add_editor_args(s)
     s.add_argument("--force", action="store_true")
     s.set_defaults(func=cmd_create)
 
     s = sub.add_parser("recompile", help="trigger ASE regeneration inside running editor (MCP)")
     s.add_argument("file")
-    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument("--allow-remote-mcp", action="store_true")
-    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    _add_editor_args(s)
     s.set_defaults(func=cmd_recompile)
     return p
 
@@ -245,5 +233,17 @@ def app(argv: list[str] | None = None) -> int:
         return EXIT_ERROR
     payload = envelope(cli_version=__version__, command=command, data=data)
     return EXIT_OK if emit_json(payload, cli_version=__version__, command=command) else EXIT_ERROR
+def _add_editor_args(parser, *, unity_instance: bool = False) -> None:
+    """Transport arguments shared by every editor-facing subcommand."""
+    parser.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
+    if unity_instance:
+        parser.add_argument("--unity-instance", help="target Name@hash among several instances")
+    parser.add_argument("--allow-remote-mcp", action="store_true")
+    parser.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    parser.add_argument("--editor-backend", choices=("auto", "mcp", "codely", "bridge"), default="auto",
+                        help="editor transport: auto (default; DSH-Bridge first), or an explicit backend")
+    parser.add_argument("--codely-port", type=int, help="explicit Codely port")
+
+
 if __name__ == "__main__":
     raise SystemExit(app())

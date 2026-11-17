@@ -6,8 +6,8 @@ import base64
 import json
 from pathlib import Path
 
-from .mcp_client import McpClient, McpError
-from .editor_create import _execute_code_result_text
+from .backend import EditorExecutionError, extract_payload, run_editor_code
+from .mcp_client import McpClient, McpError  # McpClient re-exported for test patching
 from .recompile import _detect_project_root
 from .resource_text import compose_resource_text
 
@@ -25,6 +25,8 @@ def apply_wire_routes_via_mcp(
     instance_token: str | None = None,
     unity_instance: str | None = None,
     allow_remote_mcp: bool = False,
+    backend: str = "auto",
+    codely_port: int | None = None,
 ) -> dict:
     target = Path(shader_path).resolve()
     if not target.is_file():
@@ -37,13 +39,22 @@ def apply_wire_routes_via_mcp(
         json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     ).decode("ascii")
     code = WIRE_ROUTE_SNIPPET.replace("{payload_base64}", encoded)
-    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
-    client.connect()
-    arguments = {"action": "execute", "code": code}
-    if unity_instance is not None:
-        arguments["unity_instance"] = unity_instance
-    result = client.call_tool("execute_code", arguments)
-    response = _parse_result(_execute_code_result_text(result, instance_token))
+    result_text, used = run_editor_code(
+        target,
+        code,
+        backend=backend,
+        mcp_url=mcp_url,
+        instance_token=instance_token,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        unity_instance=unity_instance,
+        mcp_factory=McpClient,
+    )
+    try:
+        payload_text = extract_payload(result_text, used)
+    except EditorExecutionError as exc:
+        raise McpError(str(exc)) from exc
+    response = _parse_result(payload_text)
     if response.get("protocol") != "ASECLI_WIRE_ROUTE_V1":
         raise McpError("WireNode route protocol version is missing or unsupported")
     if response.get("asset_path") != asset_path:
@@ -116,12 +127,12 @@ def _point(value) -> list[float]:
 def _parse_result(text: str) -> dict:
     marker = text.find(_RESULT_MARKER)
     if marker < 0:
-        raise McpError("MCP tool result did not contain the WireNode route marker")
+        raise McpError("editor result did not contain the WireNode route marker")
     raw = text[marker + len(_RESULT_MARKER):].lstrip()
     try:
         value, _ = json.JSONDecoder().raw_decode(raw)
     except json.JSONDecodeError as exc:
-        raise McpError("MCP tool returned malformed WireNode route JSON") from exc
+        raise McpError("editor returned malformed WireNode route JSON") from exc
     if not isinstance(value, dict):
-        raise McpError("MCP WireNode route result must be a JSON object")
+        raise McpError("WireNode route result must be a JSON object")
     return value

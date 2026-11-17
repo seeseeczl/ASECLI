@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 import re
 
-from .mcp_client import McpClient, McpError, tool_text
+from .backend import run_editor_code
+from .mcp_client import McpClient, McpError
 
 
 _NATIVE_NAMESPACE_RE = re.compile(r"\bnamespace\s+MZGUI\b")
@@ -59,21 +60,29 @@ def probe_native_mzgui_for_assets(
     mcp_url: str,
     instance_token: str | None,
     allow_remote_mcp: bool,
+    backend: str = "auto",
+    codely_port: int | None = None,
 ) -> dict:
-    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
-    client.connect()
-    result = client.call_tool("execute_code", {"action": "execute", "code": GUI_SUPPORT_PROBE_SNIPPET})
-    text = tool_text(result, instance_token)
+    text, _used = run_editor_code(
+        project_assets,
+        GUI_SUPPORT_PROBE_SNIPPET,
+        backend=backend,
+        mcp_url=mcp_url,
+        instance_token=instance_token,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        mcp_factory=McpClient,
+    )
     marker = text.find(_GUI_PROBE_MARKER)
     if marker < 0:
-        raise McpError("MCP tool result did not contain the GUI support probe marker")
+        raise McpError("editor result did not contain the GUI support probe marker")
     raw = text[marker + len(_GUI_PROBE_MARKER) :].lstrip()
     try:
         value, _ = json.JSONDecoder().raw_decode(raw)
     except json.JSONDecodeError as exc:
-        raise McpError("MCP GUI support probe returned malformed JSON") from exc
+        raise McpError("GUI support probe returned malformed JSON") from exc
     if not isinstance(value, dict):
-        raise McpError("MCP GUI support probe result must be an object")
+        raise McpError("GUI support probe result must be an object")
     validate_runtime_probe(value, project_assets)
     return value
 

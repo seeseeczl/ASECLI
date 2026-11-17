@@ -8,7 +8,7 @@ import json
 import math
 import os
 
-from ..bridge import McpError, apply_wire_routes_via_mcp, inspect_graph_geometry_via_mcp
+from ..bridge import EDITOR_ERRORS, apply_wire_routes_via_mcp, inspect_graph_geometry_via_mcp
 from ..checks import fix_checksum, validate_file
 from ..core import (
     AseFile,
@@ -38,10 +38,8 @@ def configure_layout_parser(sub):
                    help="explicitly allow meticulous mode to move or add WireNode routing anchors")
     s.add_argument("--gap-x", type=float, default=280.0)
     s.add_argument("--gap-y", type=float, default=120.0)
-    s.add_argument("--mcp-url", default="http://127.0.0.1:8080/mcp")
-    s.add_argument("--unity-instance", help="target Name@hash when multiple Unity/Tuanjie instances are connected")
-    s.add_argument("--allow-remote-mcp", action="store_true")
-    s.add_argument("--instance-token", dest="instance_token_argv", help=argparse.SUPPRESS)
+    from .main import _add_editor_args
+    _add_editor_args(s, unity_instance=True)
     s.add_argument("--write", action="store_true")
     s.set_defaults(func=cmd_layout)
 
@@ -85,6 +83,8 @@ def _meticulous(args) -> dict:
             instance_token=os.environ.get("ASECLI_MCP_INSTANCE_TOKEN"),
             unity_instance=args.unity_instance,
             allow_remote_mcp=args.allow_remote_mcp,
+            backend=args.editor_backend,
+            codely_port=args.codely_port,
         )
         plan = meticulous_layout_positions(
             f.graph, geometry, route_wires=args.route_wires,
@@ -98,7 +98,7 @@ def _meticulous(args) -> dict:
         report = audit_meticulous_layout(
             f.graph, geometry, plan, moved=moved, comment_purpose=comment_purpose,
         )
-    except McpError as exc:
+    except EDITOR_ERRORS as exc:
         raise CliError("BRIDGE_ERROR", str(exc), exc.data) from exc
     except FileNotFoundError as exc:
         raise CliError("NOT_FOUND", str(exc)) from exc
@@ -141,6 +141,8 @@ def _meticulous(args) -> dict:
                     instance_token=os.environ.get("ASECLI_MCP_INSTANCE_TOKEN"),
                     unity_instance=args.unity_instance,
                     allow_remote_mcp=args.allow_remote_mcp,
+                    backend=args.editor_backend,
+                    codely_port=args.codely_port,
                 )
                 persisted = AseFile.from_path(args.file)
                 if logical_wire_manifest(persisted.graph) != expected_manifest:
@@ -159,7 +161,7 @@ def _meticulous(args) -> dict:
                 ]
                 if post_errors:
                     raise ValueError(f"WireNode routing left {len(post_errors)} structural error(s)")
-            except (McpError, FileNotFoundError, KeyError, ValueError) as exc:
+            except (*EDITOR_ERRORS, FileNotFoundError, KeyError, ValueError) as exc:
                 try:
                     restore_from_backup(args.file)
                 except OSError as restore_exc:
@@ -168,8 +170,9 @@ def _meticulous(args) -> dict:
                         f"WireNode routing failed and backup restore failed: {restore_exc}",
                         {"route_error": str(exc), "recovery": "failed"},
                     ) from restore_exc
-                code = "BRIDGE_ERROR" if isinstance(exc, (McpError, FileNotFoundError)) else "LAYOUT_ERROR"
-                data = getattr(exc, "data", None) if isinstance(exc, McpError) else None
+                bridge_failure = isinstance(exc, (*EDITOR_ERRORS, FileNotFoundError))
+                code = "BRIDGE_ERROR" if bridge_failure else "LAYOUT_ERROR"
+                data = getattr(exc, "data", None) if bridge_failure else None
                 raise CliError(
                     code, f"WireNode routing failed; original file restored: {exc}",
                     {**(data or {}), "written": False, "recovery": "restored_from_backup"},

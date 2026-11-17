@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 
 from ..bridge import (
     MZGUI_EDITOR,
-    McpError,
+    EDITOR_ERRORS,
     SpecError,
     create_shader_via_mcp,
     install_gui_support,
@@ -27,13 +27,11 @@ from .commands import CliError, _commit_text, _load
 from .gui_provider import select_editor_provider
 from .io import UnsafeWritePathError, file_digest
 
-
 _SHADER_DECLARATION = re.compile(r'(?m)^(?P<indent>[ \t]*)Shader[ \t]+"(?P<name>[^"\r\n]+)"')
 _TEMPLATE_NAME_FIELD = {
     "AmplifyShaderEditor.TemplateMultiPassMasterNode": 12,
     "AmplifyShaderEditor.TemplateMasterNode": 12,
 }
-
 
 def cmd_create(args) -> dict:
     spec = None
@@ -51,7 +49,6 @@ def cmd_create(args) -> dict:
         raise CliError("USAGE_ERROR", str(exc)) from exc
     result = _cmd_create_editor(args, spec) if backend == "editor" else _cmd_create_text(args, spec)
     return {**result, **({"spec_sha256": spec_sha256} if spec_sha256 is not None else {})}
-
 
 def _cmd_create_text(args, spec) -> dict:
     if spec is not None:
@@ -100,7 +97,6 @@ def _cmd_create_text(args, spec) -> dict:
         "property_presentation": presentation,
     }
 
-
 def _cmd_create_editor(args, spec) -> dict:
     if spec is None:
         raise CliError("USAGE_ERROR", "--spec is required for the editor create backend")
@@ -123,11 +119,12 @@ def _cmd_create_editor(args, spec) -> dict:
         result = create_shader_via_mcp(
             args.out,
             spec,
-            mcp_url=args.mcp_url,
+            mcp_url=args.mcp_url, allow_remote_mcp=args.allow_remote_mcp,
             instance_token=os.environ.get("ASECLI_MCP_INSTANCE_TOKEN"),
-            allow_remote_mcp=args.allow_remote_mcp,
+            backend=args.editor_backend,
+            codely_port=args.codely_port,
         )
-    except McpError as exc:
+    except EDITOR_ERRORS as exc:
         raise CliError("BRIDGE_ERROR", str(exc), exc.data) from exc
     except FileExistsError as exc:
         raise CliError("USAGE_ERROR", str(exc)) from exc
@@ -175,7 +172,6 @@ def _cmd_create_editor(args, spec) -> dict:
         **result,
     }
 
-
 def _finalize_editor_property_presentation(
     created: AseFile, spec, *, editor: str = MZGUI_EDITOR
 ) -> tuple[str, dict]:
@@ -211,7 +207,6 @@ def _preserved_editor_asset_details(path: str, result: dict) -> dict:
         "shader_sha256": result.get("shader_sha256"),
         "meta_sha256": result.get("meta_sha256"),
     }
-
 
 def _set_shader_name(ase_file: AseFile, name: str) -> None:
     if not name.strip() or len(name) > 255:

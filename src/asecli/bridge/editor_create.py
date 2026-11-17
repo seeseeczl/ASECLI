@@ -11,6 +11,7 @@ from pathlib import Path
 import secrets
 
 from .editor_spec import EditorGraphSpec, SUPPORTED_ASE_VERSIONS
+from .backend import EditorExecutionError, extract_payload, run_editor_code
 from .mcp_client import McpClient, McpError, redact, tool_text
 from .resource_text import compose_resource_text
 
@@ -34,6 +35,9 @@ def create_shader_via_mcp(
     mcp_url: str = "http://127.0.0.1:8080/mcp",
     instance_token: str | None = None,
     allow_remote_mcp: bool = False,
+    *,
+    backend: str = "auto",
+    codely_port: int | None = None,
 ) -> dict:
     """Create one absent shader and accept only a verified Save/Load manifest."""
     target = Path(shader_path).resolve()
@@ -48,20 +52,22 @@ def create_shader_via_mcp(
     temporary_asset_path = _temporary_asset_path(asset_path, transaction_nonce)
     payload = spec.editor_payload(asset_path, temporary_asset_path)
     code = build_executor_code(payload)
-    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
-    client.connect()
-    result = client.call_tool(
-        "execute_code",
-        {
-            "action": "execute",
-            "code": code,
-            # The fixed transactional executor uses AssetDatabase.DeleteAsset
-            # only to roll back its nonce-scoped staging asset. MCP 3.4.7 blocks
-            # that API by pattern unless the per-call safety scan is disabled.
-            "safety_checks": False,
-        },
+    result_text, used = run_editor_code(
+        target,
+        code,
+        backend=backend,
+        mcp_url=mcp_url,
+        instance_token=instance_token,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        mcp_factory=McpClient,
+        mcp_executor=call_execute_code,
     )
-    response = _parse_result(_execute_code_result_text(result, instance_token))
+    try:
+        payload_text = extract_payload(result_text, used)
+    except EditorExecutionError as exc:
+        raise McpError(str(exc)) from exc
+    response = _parse_result(payload_text)
     _validate_result(response, asset_path, spec.expected_manifest())
     if not target.is_file():
         raise McpError("Editor create reported success but target file is missing")
@@ -70,8 +76,8 @@ def create_shader_via_mcp(
         raise McpError("Editor create left a temporary asset after commit")
     meta_file = target.with_suffix(target.suffix + ".meta")
     return {
-        "transport": "mcp",
-        "server": mcp_url,
+        "transport": used,
+        "server": mcp_url if used == "mcp" else "codely",
         "asset_path": asset_path,
         "ase_version": response["ase_version"],
         "template_guid": response["template_guid"],
@@ -142,36 +148,60 @@ def _sha256(path: Path) -> str:
 def _parse_result(text: str) -> dict:
     marker_index = text.find(_RESULT_MARKER)
     if marker_index < 0:
-        raise McpError("MCP tool result did not contain the Editor create protocol marker")
+        raise McpError("editor result did not contain the Editor create protocol marker")
     raw = text[marker_index + len(_RESULT_MARKER) :].lstrip()
     try:
         value, _ = json.JSONDecoder().raw_decode(raw)
     except json.JSONDecodeError as exc:
-        raise McpError("MCP tool returned malformed Editor create JSON") from exc
+        raise McpError("editor returned malformed Editor create JSON") from exc
     if not isinstance(value, dict):
-        raise McpError("MCP Editor create result must be a JSON object")
+        raise McpError("Editor create result must be a JSON object")
     return value
+
+
+def call_execute_code(client, code: str) -> dict:
+    """Call ``execute_code`` by capability, never by server version.
+
+    The transactional executor needs ``AssetDatabase.DeleteAsset`` for its
+    nonce-scoped staging rollback, which pattern-scanning servers reject unless
+    the safety scan is disabled.  A rejected argument fails validation before
+    any C# runs, so one retry without it is safe.
+    """
+    arguments = {"action": "execute", "code": code, "safety_checks": False}
+    try:
+        return client.call_tool("execute_code", arguments)
+    except McpError as exc:
+        if not _rejects_unknown_argument(exc):
+            raise
+        arguments.pop("safety_checks")
+        try:
+            return client.call_tool("execute_code", arguments)
+        except McpError:
+            # Surface the original rejection: the retry without the opt-out is
+            # less likely to be the informative failure.
+            raise exc from None
+
+
+def _rejects_unknown_argument(exc: McpError) -> bool:
+    """True only for a schema/argument rejection, never for a tool failure."""
+    text = f"{exc} {getattr(exc, 'data', '')}".lower()
+    return "safety_checks" in text and any(
+        marker in text
+        for marker in (
+            "unknown", "unexpected", "unsupported", "not allowed", "not permitted",
+            "additional propert", "invalid argument", "invalid parameter",
+            "invalid_request", "unrecognized", "no such",
+        )
+    )
 
 
 def _execute_code_result_text(result: dict, instance_token: str | None) -> str:
     """Unwrap execute_code's JSON envelope while retaining legacy text support."""
     text = tool_text(result, instance_token)
     try:
-        envelope = json.loads(text)
-    except json.JSONDecodeError:
-        return text
-    if not isinstance(envelope, dict):
-        return text
-    if envelope.get("success") is False:
-        detail = envelope.get("message")
-        if not isinstance(detail, str) or not detail.strip():
-            details = envelope.get("data")
-            detail = str(details.get("reason", "no error details")) if isinstance(details, dict) else "no error details"
-        raise McpError(f"MCP execute_code reported failure: {redact(detail[:300], instance_token)}")
-    data = envelope.get("data")
-    if isinstance(data, dict) and isinstance(data.get("result"), str):
-        return data["result"]
-    return text
+        return extract_payload(text, "mcp")
+    except EditorExecutionError as exc:
+        raise McpError(f"editor execute_code reported failure: {redact(str(exc)[:300], instance_token)}") from exc
 
 
 def _validate_result(response: dict, asset_path: str, expected_manifest: dict) -> None:

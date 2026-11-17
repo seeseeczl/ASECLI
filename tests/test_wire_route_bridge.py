@@ -80,7 +80,7 @@ def test_wire_route_payload_is_base64_data_and_result_is_strict(tmp_path, monkey
             return {"content": [{"type": "text", "text": json.dumps(envelope)}]}
 
     monkeypatch.setattr("asecli.bridge.wire_route.McpClient", Client)
-    result = apply_wire_routes_via_mcp(target, _change(), unity_instance="Project@123")
+    result = apply_wire_routes_via_mcp(target, _change(), unity_instance="Project@123", backend="mcp")
     assert result["created_node_ids"] == [40, 41]
     assert seen["unity_instance"] == "Project@123"
 
@@ -89,7 +89,7 @@ def test_wire_route_rejects_more_than_two_new_anchors_before_mcp(tmp_path):
     target = _target(tmp_path)
     change = _change()[0] | {"anchors": [[1, 1], [2, 2], [3, 3]]}
     with pytest.raises(ValueError, match="one or two"):
-        apply_wire_routes_via_mcp(target, (change,))
+        apply_wire_routes_via_mcp(target, (change,), backend="mcp")
 
 
 def test_wire_route_rejects_unconfirmed_editor_result(tmp_path, monkeypatch):
@@ -111,4 +111,4 @@ def test_wire_route_rejects_unconfirmed_editor_result(tmp_path, monkeypatch):
 
     monkeypatch.setattr("asecli.bridge.wire_route.McpClient", Client)
     with pytest.raises(McpError, match="saved=True"):
-        apply_wire_routes_via_mcp(target, _change())
+        apply_wire_routes_via_mcp(target, _change(), backend="mcp")

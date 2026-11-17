@@ -87,7 +87,7 @@ def test_bounds_probe_routes_to_explicit_unity_instance(tmp_path, monkeypatch):
             return {"content": [{"type": "text", "text": json.dumps(envelope)}]}
 
     monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", SuccessClient)
-    bounds = measure_node_bounds_via_mcp(str(shader), unity_instance="Project@abc123")
+    bounds = measure_node_bounds_via_mcp(str(shader), unity_instance="Project@abc123", backend="mcp")
     assert seen["unity_instance"] == "Project@abc123"
     assert bounds == {"1": (0.0, 0.0, 100.0, 50.0)}
 
@@ -114,7 +114,7 @@ def test_bounds_probe_surfaces_multiple_instance_refusal(tmp_path, monkeypatch):
 
     monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", RefusingClient)
     with pytest.raises(McpError, match="available instances: A@111, B@222"):
-        measure_node_bounds_via_mcp(str(shader))
+        measure_node_bounds_via_mcp(str(shader), backend="mcp")
 
 
 def test_bounds_probe_rejects_non_finite_rectangles(tmp_path, monkeypatch):
@@ -133,7 +133,7 @@ def test_bounds_probe_rejects_non_finite_rectangles(tmp_path, monkeypatch):
 
     monkeypatch.setattr("asecli.bridge.graph_inspect.McpClient", NonFiniteClient)
     with pytest.raises(McpError, match="non-finite rectangle"):
-        measure_node_bounds_via_mcp(str(shader))
+        measure_node_bounds_via_mcp(str(shader), backend="mcp")
 
 
 def test_geometry_probe_returns_relative_port_offsets(tmp_path, monkeypatch):
@@ -151,7 +151,7 @@ def test_geometry_probe_returns_relative_port_offsets(tmp_path, monkeypatch):
             return {"content": [{"type": "text", "text": json.dumps({"success": True, "data": {"result": payload}})}]}
 
     monkeypatch.setattr("asecli.bridge.graph_geometry.McpClient", SuccessClient)
-    geometry = inspect_graph_geometry_via_mcp(str(shader))["1"]
+    geometry = inspect_graph_geometry_via_mcp(str(shader), backend="mcp")["1"]
     assert (geometry.width, geometry.height, geometry.title_height) == (180.0, 90.0, 24.0)
     assert geometry.input_ports == {"0": (0.0, 30.0)}
     assert geometry.output_ports == {"2": (180.0, 40.0)}
@@ -172,7 +172,7 @@ def test_geometry_v3_probe_decodes_optional_node_and_port_labels(tmp_path, monke
             return {"content": [{"type": "text", "text": json.dumps({"success": True, "data": {"result": payload}})}]}
 
     monkeypatch.setattr("asecli.bridge.graph_geometry.McpClient", SuccessClient)
-    geometry = inspect_graph_geometry_via_mcp(str(shader))["1"]
+    geometry = inspect_graph_geometry_via_mcp(str(shader), backend="mcp")["1"]
     assert geometry.node_title == "Custom Function"
     assert geometry.input_port_labels == {"0": "Strength"}
     assert geometry.output_port_labels == {"2": "Out"}
@@ -233,7 +233,7 @@ def test_tool_is_error_maps_to_cli_bridge_error(tmp_path, monkeypatch, capsys):
             return {"isError": True, "content": [{"type": "text", "text": "Unity execution failed"}]}
 
     monkeypatch.setattr("asecli.bridge.recompile.McpClient", ErrorClient)
-    rc = app(["recompile", str(shader)])
+    rc = app(["recompile", str(shader), "--editor-backend", "mcp"])
     payload = json.loads(capsys.readouterr().out)
     assert rc == 3
     assert payload["ok"] is False
@@ -257,7 +257,7 @@ def test_saved_result_reports_real_file_change(tmp_path, monkeypatch, mutate, ex
             return {"content": [{"type": "text", "text": "recompiled, saved=True"}]}
 
     monkeypatch.setattr("asecli.bridge.recompile.McpClient", SuccessClient)
-    data = recompile_via_mcp(str(shader))
+    data = recompile_via_mcp(str(shader), backend="mcp")
     assert data["saved"] is True
     assert data["changed"] is expected_changed
 
@@ -277,7 +277,7 @@ def test_unconfirmed_saved_result_is_bridge_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr("asecli.bridge.recompile.McpClient", UnknownClient)
     with pytest.raises(McpError, match="saved"):
-        recompile_via_mcp(str(shader))
+        recompile_via_mcp(str(shader), backend="mcp")
 
 
 def test_import_shader_via_mcp_is_exported_from_bridge_public_surface():
@@ -302,10 +302,10 @@ def test_metadata_import_is_targeted_synchronous_and_requires_receipt(tmp_path, 
             calls.append(args['code'])
             return {'content': [{'type': 'text', 'text': self.response}]}
     monkeypatch.setattr('asecli.bridge.recompile.McpClient', Client)
-    assert import_shader_via_mcp(str(shader), mcp_url='http://127.0.0.1:9080/mcp')['synchronized']
+    assert import_shader_via_mcp(str(shader), mcp_url='http://127.0.0.1:9080/mcp', backend='mcp')['synchronized']
     assert '"Assets/test.shader"' in calls[-1]
     assert 'ForceSynchronousImport' in calls[-1]
     assert 'AssetDatabase.Refresh' not in calls[-1]
     Client.response = 'unconfirmed'
     with pytest.raises(McpError, match='did not confirm'):
-        import_shader_via_mcp(str(shader), mcp_url='http://127.0.0.1:9080/mcp')
+        import_shader_via_mcp(str(shader), mcp_url='http://127.0.0.1:9080/mcp', backend='mcp')

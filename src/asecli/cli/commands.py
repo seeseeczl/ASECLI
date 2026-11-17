@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from ..bridge import McpError
+from ..bridge import EDITOR_ERRORS
 from ..bridge import import_shader_via_mcp, recompile_via_mcp
 from ..checks import (
     ChecksumFormatError,
@@ -222,6 +222,8 @@ def cmd_recompile(args) -> dict:
             mcp_url=args.mcp_url,
             instance_token=instance_token,
             allow_remote_mcp=args.allow_remote_mcp,
+            backend=args.editor_backend,
+            codely_port=args.codely_port,
         )
         if metadata_snapshot:
             ase_file, restored = restore_recompile_metadata(args.file, metadata_snapshot)
@@ -231,9 +233,11 @@ def cmd_recompile(args) -> dict:
             result["asset_import"] = import_shader_via_mcp(
                 args.file, mcp_url=args.mcp_url, instance_token=instance_token,
                 allow_remote_mcp=args.allow_remote_mcp,
+                backend=args.editor_backend,
+                codely_port=args.codely_port,
             )
         return result
-    except McpError as e:
+    except EDITOR_ERRORS as e:
         raise CliError("BRIDGE_ERROR", str(e), e.data)
     except FileNotFoundError as e:
         raise CliError("NOT_FOUND", str(e))

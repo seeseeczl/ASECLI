@@ -155,7 +155,7 @@ def test_payload_is_base64_json_not_csharp_interpolation(tmp_path, monkeypatch):
             return {"content": [{"type": "text", "text": _success_result(decoded["asset_path"], spec.expected_manifest())}]}
 
     monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
-    result = create_shader_via_mcp(target, spec)
+    result = create_shader_via_mcp(target, spec, backend="mcp")
 
     assert seen["action"] == "execute"
     assert seen["safety_checks"] is False
@@ -191,7 +191,7 @@ def test_current_execute_code_json_envelope_is_unwrapped(tmp_path, monkeypatch):
             return {"content": [{"type": "text", "text": _execute_code_envelope(protocol_result)}]}
 
     monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
-    result = create_shader_via_mcp(target, spec)
+    result = create_shader_via_mcp(target, spec, backend="mcp")
 
     assert result["committed"] is True
     assert result["manifest"] == spec.expected_manifest()
@@ -222,7 +222,7 @@ def test_current_execute_code_failure_envelope_fails_closed(tmp_path, monkeypatc
 
     monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
     with pytest.raises(McpError, match="compiler blocked"):
-        create_shader_via_mcp(target, spec)
+        create_shader_via_mcp(target, spec, backend="mcp")
 
     assert not target.exists()
 
@@ -256,7 +256,7 @@ def test_unconfirmed_editor_result_fails_closed(tmp_path, monkeypatch, payload_u
 
     monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
     with pytest.raises(McpError, match=match):
-        create_shader_via_mcp(target, spec)
+        create_shader_via_mcp(target, spec, backend="mcp")
 
 
 def test_manifest_mismatch_and_outside_assets_path_fail_closed(tmp_path, monkeypatch):
@@ -276,8 +276,121 @@ def test_manifest_mismatch_and_outside_assets_path_fail_closed(tmp_path, monkeyp
 
     monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
     with pytest.raises(McpError, match="manifest"):
-        create_shader_via_mcp(target, spec)
+        create_shader_via_mcp(target, spec, backend="mcp")
 
     outside = target.parents[2] / "outside.shader"
     with pytest.raises(ValueError, match="Assets"):
         create_shader_via_mcp(outside, spec)
+
+
+def test_execute_code_opt_out_is_negotiated_by_capability_not_version(tmp_path, monkeypatch):
+    """A server that rejects safety_checks must still be driveable."""
+    target = _project_target(tmp_path)
+    spec = EditorGraphSpec.from_dict(caster_spec())
+    calls = []
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            calls.append(dict(arguments))
+            if "safety_checks" in arguments:
+                raise McpError(
+                    "tools/call: Unknown argument 'safety_checks' in arguments for tool 'execute_code'"
+                )
+            encoded = arguments["code"].split('FromBase64String("', 1)[1].split('")', 1)[0]
+            decoded = json.loads(base64.b64decode(encoded).decode("utf-8"))
+            target.write_text('Shader "Tests/EditorCaster" {}\n/*ASEBEGIN\nVersion=19602\nASEEND*/\n//CHKSM=0\n')
+            return {"content": [{"type": "text", "text": _execute_code_envelope(
+                _success_result(decoded["asset_path"], spec.expected_manifest()))}]}
+
+    monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
+    result = create_shader_via_mcp(target, spec, backend="mcp")
+
+    assert len(calls) == 2
+    assert calls[0]["safety_checks"] is False
+    assert "safety_checks" not in calls[1]
+    assert result["committed"] is True
+
+
+def test_execute_code_tool_failure_is_not_retried_as_an_argument_problem(tmp_path, monkeypatch):
+    """A genuine tool failure must fail closed without a second call."""
+    target = _project_target(tmp_path)
+    spec = EditorGraphSpec.from_dict(caster_spec())
+    calls = []
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            calls.append(dict(arguments))
+            return {"content": [{"type": "text", "text": json.dumps(
+                {"success": False, "message": "compiler blocked", "data": None})}]}
+
+    monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
+    with pytest.raises(McpError, match="compiler blocked"):
+        create_shader_via_mcp(target, spec, backend="mcp")
+
+    assert len(calls) == 1
+    assert not target.exists()
+
+
+def test_retry_failing_closes_with_the_original_rejection(tmp_path, monkeypatch):
+    """When both attempts fail, report the argument rejection, not the retry."""
+    target = _project_target(tmp_path)
+    spec = EditorGraphSpec.from_dict(caster_spec())
+    calls = []
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            calls.append(dict(arguments))
+            if "safety_checks" in arguments:
+                raise McpError("Unsupported parameter: safety_checks")
+            raise McpError("transport exploded")
+
+    monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
+    with pytest.raises(McpError, match="Unsupported parameter"):
+        create_shader_via_mcp(target, spec, backend="mcp")
+
+    assert len(calls) == 2
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("key", ["result", "output", "value", "text"])
+def test_execute_code_payload_is_unwrapped_by_shape(key, tmp_path, monkeypatch):
+    """The envelope is matched by shape, so a renamed payload key still works."""
+    target = _project_target(tmp_path)
+    spec = EditorGraphSpec.from_dict(caster_spec())
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def connect(self):
+            return {}
+
+        def call_tool(self, name, arguments):
+            encoded = arguments["code"].split('FromBase64String("', 1)[1].split('")', 1)[0]
+            decoded = json.loads(base64.b64decode(encoded).decode("utf-8"))
+            target.write_text('Shader "Tests/EditorCaster" {}\n/*ASEBEGIN\nVersion=19602\nASEEND*/\n//CHKSM=0\n')
+            payload = _success_result(decoded["asset_path"], spec.expected_manifest())
+            return {"content": [{"type": "text", "text": json.dumps(
+                {"success": True, "data": {key: payload}}, separators=(",", ":"))}]}
+
+    monkeypatch.setattr("asecli.bridge.editor_create.McpClient", Client)
+    result = create_shader_via_mcp(target, spec, backend="mcp")
+    assert result["committed"] is True

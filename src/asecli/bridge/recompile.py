@@ -7,7 +7,8 @@ import json
 import re
 from pathlib import Path
 
-from .mcp_client import McpClient, McpError, tool_text
+from .backend import run_editor_code
+from .mcp_client import McpClient, McpError  # McpClient re-exported for test patching
 
 RECOMPILE_SNIPPET = '''
 string assetPath = {asset_path};
@@ -67,6 +68,9 @@ def recompile_via_mcp(
     mcp_url: str = "http://127.0.0.1:8080/mcp",
     instance_token: str | None = None,
     allow_remote_mcp: bool = False,
+    *,
+    backend: str = "auto",
+    codely_port: int | None = None,
 ) -> dict:
     """Open the shader in ASE inside the running editor and force save (regenerate HLSL)."""
     p = Path(shader_path).resolve()
@@ -75,22 +79,27 @@ def recompile_via_mcp(
     before = hashlib.sha1(p.read_bytes()).hexdigest()
     project_root = _detect_project_root(p)
     asset_path = p.as_posix().removeprefix(project_root.as_posix() + "/")
-    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
-    client.connect()
-    result = client.call_tool(
-        "execute_code", {"action": "execute", "code": RECOMPILE_SNIPPET.replace("{asset_path}", json.dumps(asset_path))}
+    code = RECOMPILE_SNIPPET.replace("{asset_path}", json.dumps(asset_path))
+    result_text, used = run_editor_code(
+        p,
+        code,
+        backend=backend,
+        mcp_url=mcp_url,
+        instance_token=instance_token,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        mcp_factory=McpClient,
     )
-    result_text = tool_text(result, instance_token)
     saved_match = re.search(r"\brecompiled,\s*saved=(true|false)\b", result_text, re.IGNORECASE)
     if not saved_match:
-        raise McpError("MCP tool result did not confirm saved state")
+        raise McpError("Editor result did not confirm saved state")
     saved = saved_match.group(1).lower() == "true"
     if not saved:
-        raise McpError("MCP tool did not confirm saved=True")
+        raise McpError("Editor did not confirm saved=True")
     after = hashlib.sha1(p.read_bytes()).hexdigest()
     return {
-        "transport": "mcp",
-        "server": mcp_url,
+        "transport": used,
+        "server": mcp_url if used == "mcp" else "codely",
         "asset_path": asset_path,
         "saved": saved,
         "changed": before != after,
@@ -109,7 +118,9 @@ def _detect_project_root(shader_path: Path) -> Path:
 
 def import_shader_via_mcp(shader_path: str, *, mcp_url: str,
                           instance_token: str | None = None,
-                          allow_remote_mcp: bool = False) -> dict:
+                          allow_remote_mcp: bool = False,
+                          backend: str = "auto",
+                          codely_port: int | None = None) -> dict:
     """Synchronize the target after restoring metadata outside the Editor."""
     path = Path(shader_path).resolve()
     if not path.is_file():
@@ -122,9 +133,16 @@ def import_shader_via_mcp(shader_path: str, *, mcp_url: str,
         'UnityEditor.ImportAssetOptions.ForceSynchronousImport); '
         'return "asecli_target_import_complete";'
     )
-    client = McpClient(mcp_url, instance_token=instance_token, allow_remote=allow_remote_mcp)
-    client.connect()
-    result = client.call_tool('execute_code', {'action': 'execute', 'code': code})
-    if 'asecli_target_import_complete' not in tool_text(result, instance_token):
-        raise McpError('MCP tool did not confirm target asset import')
-    return {'asset_path': asset_path, 'synchronized': True}
+    result_text, used = run_editor_code(
+        path,
+        code,
+        backend=backend,
+        mcp_url=mcp_url,
+        instance_token=instance_token,
+        allow_remote_mcp=allow_remote_mcp,
+        codely_port=codely_port,
+        mcp_factory=McpClient,
+    )
+    if 'asecli_target_import_complete' not in result_text:
+        raise McpError('Editor did not confirm target asset import')
+    return {'asset_path': asset_path, 'synchronized': True, 'transport': used}
