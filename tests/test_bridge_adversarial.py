@@ -199,3 +199,46 @@ def test_unknown_backend_is_rejected_by_payload_extraction():
     with pytest.raises(ValueError, match="unknown backend"):
         extract_payload("anything", "typo")
     assert extract_payload("bare", "raw") == "bare"
+
+
+def test_timeout_after_processing_is_reported_as_processed(project):
+    """AA-OPT-040: a done/ marker proves work was taken up even without an answer."""
+    write_instance(project)
+    done = project / "Library" / "DSHBridge" / "boot01" / "done"
+
+    def take_and_vanish(request):
+        # Mimic the probe: move the request into done/, then fail to answer.
+        (done / f"{request['id']}.json").write_text(json.dumps(request))
+        return None
+
+    editor = FakeEditor(project, take_and_vanish)
+    editor.start()
+    try:
+        with BridgeClient(project, timeout=0.5) as client:
+            with pytest.raises(BridgeError) as excinfo:
+                client.execute_code("return 1;")
+    finally:
+        editor.stop()
+    error = excinfo.value
+    assert error.data["execution_state"] == "processed"
+    assert error.data["processed"] is True
+    assert "may already have run" in str(error) or "already been handled" in str(error)
+
+
+def test_payload_limit_is_per_transport():
+    """AA-LOGIC-043: only mcp-for-unity enforces the 50000-character ceiling."""
+    import random
+    import string
+
+    from asecli.bridge.editor_create import MCP_CODE_LIMIT, build_executor_code
+
+    random.seed(7)
+    incompressible = {"blob": "".join(random.choices(string.ascii_letters, k=120_000))}
+
+    with pytest.raises(ValueError, match="over the"):
+        build_executor_code(incompressible)
+    assert MCP_CODE_LIMIT == 50000
+
+    # Other transports must not inherit mcp's ceiling.
+    code = build_executor_code(incompressible, limit=None)
+    assert len(code) > MCP_CODE_LIMIT

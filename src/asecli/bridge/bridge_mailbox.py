@@ -61,3 +61,17 @@ def result_of(response: dict, error_type) -> str:
         return result
     import json
     return json.dumps(result, ensure_ascii=False)
+
+
+def was_processed(done: Path | None, request_id: str) -> bool | None:
+    """Report whether the probe took this request up, per the ``done/`` marker.
+
+    The probe moves a handled request out of ``inbox/`` into ``done/``, so the
+    file's presence proves processing even if no response reached us.
+    """
+    if done is None:
+        return None
+    try:
+        return (done / f"{request_id}.json").is_file()
+    except OSError:
+        return None

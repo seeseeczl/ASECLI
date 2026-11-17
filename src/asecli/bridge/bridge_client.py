@@ -28,7 +28,7 @@ import uuid
 from pathlib import Path
 
 from .bridge_instance import BRIDGE_ROOT, instance_is_stale, read_instance
-from .bridge_mailbox import GRACE_POLLS, ownership_mismatch, result_of, sweep_outbox
+from .bridge_mailbox import GRACE_POLLS, ownership_mismatch, result_of, sweep_outbox, was_processed
 
 COMMAND_EXECUTE = "unity.code.execute"
 DEFAULT_TIMEOUT = 180.0
@@ -126,7 +126,7 @@ class BridgeClient:
         try:
             expect = {"id": request_id, "instanceId": self.instance["instanceId"],
                       "bootId": self.instance["bootId"], "nonce": self.instance["nonce"]}
-            return self._await(request_id, outbox, backlog, expect)
+            return self._await(request_id, outbox, backlog, expect, mailbox / "done")
         finally:
             for path in (target, outbox / f"{request_id}.json"):
                 try:
@@ -135,7 +135,7 @@ class BridgeClient:
                     pass
 
     def _await(self, request_id: str, outbox: Path, backlog: list[str],
-               expect: dict | None = None) -> str:
+               expect: dict | None = None, done: Path | None = None) -> str:
         """Poll ``outbox/`` until a response belonging to this request arrives.
 
         The probe validates our request; we must equally validate its answer.
@@ -162,6 +162,7 @@ class BridgeClient:
             late = self._read_response(request_id, outbox)
             if late is not None and not ownership_mismatch(late, expect or {}):
                 return result_of(late, BridgeError)
+        processed = was_processed(done, request_id) if done is not None else None
         hint = (
             f"; {len(backlog)} request(s) were already queued ahead, so the "
             "mailbox may be blocked by a malformed entry"
@@ -177,10 +178,13 @@ class BridgeClient:
                 "request_id": request_id,
                 "delivery": "delivered",
                 "inbox_backlog": len(backlog),
-                # 没读到任何响应：无法判断脚本执行到哪一步。显式标成 unknown，
-                # 而不是让调用方猜——与探针侧的 executionState 语义保持一致。
-                "execution_state": "unknown",
-                "evidence": "no-response",
+                # The probe moves a request into done/ once it has taken it up,
+                # so its presence is side-channel proof of processing even when
+                # no answer arrived (AA-OPT-040).
+                "execution_state": "unknown" if processed is None else (
+                    "processed" if processed else "not-processed"),
+                "processed": processed,
+                "evidence": "done-marker" if processed is not None else "no-response",
             },
         )
 

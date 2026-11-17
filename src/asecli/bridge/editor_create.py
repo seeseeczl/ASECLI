@@ -51,7 +51,9 @@ def create_shader_via_mcp(
     transaction_nonce = secrets.token_hex(16)
     temporary_asset_path = _temporary_asset_path(asset_path, transaction_nonce)
     payload = spec.editor_payload(asset_path, temporary_asset_path)
-    code = build_executor_code(payload)
+    # Only mcp-for-unity rejects oversized payloads; the other transports are
+    # far more permissive, so do not impose its ceiling on them.
+    code = build_executor_code(payload, limit=MCP_CODE_LIMIT if backend == "mcp" else None)
     result_text, used = run_editor_code(
         target,
         code,
@@ -96,7 +98,12 @@ def create_shader_via_mcp(
     }
 
 
-def build_executor_code(payload: dict) -> str:
+#: mcp-for-unity rejects oversized execute_code payloads; other transports
+#: (mailbox, TCP) have far higher ceilings, so the limit is per-backend.
+MCP_CODE_LIMIT = 50000
+
+
+def build_executor_code(payload: dict, *, limit: int | None = MCP_CODE_LIMIT) -> str:
     """压缩大图的 JSON，固定执行器仍完整留在受控代码内。"""
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
     # 固定资源仅含单行字符串；去掉行首缩进不改动任何字符串内容。
@@ -104,7 +111,8 @@ def build_executor_code(payload: dict) -> str:
                         if line.strip() and not line.lstrip().startswith("//"))
     encoded = base64.b64encode(raw).decode("ascii")
     code = snippet.replace("{payload_base64}", encoded)
-    if len(code) > 50000:
+    threshold = limit if limit is not None else 0
+    if limit is not None and len(code) > threshold:
         encoded = base64.b64encode(gzip.compress(raw, mtime=0)).decode("ascii")
         first_line = snippet.split("\n", 1)[0]
         unpack = ('string payloadJson;\n'
@@ -112,8 +120,11 @@ def build_executor_code(payload: dict) -> str:
                   'using (var gzip = new System.IO.Compression.GZipStream(compressed, System.IO.Compression.CompressionMode.Decompress))\n'
                   'using (var reader = new System.IO.StreamReader(gzip, System.Text.Encoding.UTF8)) payloadJson = reader.ReadToEnd();')
         code = snippet.replace(first_line, unpack, 1).replace("{payload_base64}", encoded)
-    if len(code) > 50000:
-        raise ValueError("compressed Editor create request exceeds MCP's 50000-character limit")
+    if limit is not None and len(code) > limit:
+        raise ValueError(
+            f"compressed Editor create request is {len(code)} characters, over the "
+            f"{limit}-character limit this transport enforces"
+        )
     return code
 
 

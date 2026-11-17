@@ -10,6 +10,7 @@ import json
 import os
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -266,16 +267,17 @@ def test_late_response_after_timeout_is_accepted(project, monkeypatch):
         assert client.late_recovered == 1
 
 
-def test_timeout_without_response_reports_unknown_execution_state(project):
-    """No response at all means the outcome is genuinely unknown — say so."""
+def test_timeout_without_response_reports_not_processed(project):
+    """An untouched request leaves no done/ marker, so a retry is safe."""
     write_instance(project)
     with BridgeClient(project, timeout=0.1) as client:
         with pytest.raises(BridgeError) as excinfo:
             client.execute_code("return 1;")
     error = excinfo.value
     assert error.phase == "timeout"
-    assert error.data["execution_state"] == "unknown"
-    assert error.data["evidence"] == "no-response"
+    # AA-OPT-040: absence of a done/ marker proves the probe never took it up.
+    assert error.data["execution_state"] == "not-processed"
+    assert error.data["processed"] is False
     # 旧的可用信息不能丢
     assert error.data["delivery"] == "delivered"
     assert error.data["request_id"]
@@ -304,3 +306,21 @@ def test_late_response_still_validates_ownership(project, monkeypatch):
         with pytest.raises(BridgeError) as excinfo:
             client.execute_code("return 1;")
     assert excinfo.value.phase == "protocol"
+
+
+def test_live_suite_honours_the_project_override(tmp_path, monkeypatch):
+    """AA-OPT-042: the documented ASECLI_TEST_PROJECT switch must really apply."""
+    import subprocess
+    import sys
+
+    env = {
+        **__import__("os").environ,
+        "ASECLI_TEST_PROJECT": str(tmp_path / "elsewhere"),
+        "PYTHONPATH": "src",
+    }
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_bridge_live.py", "-q", "-p", "no:cacheprovider"],
+        capture_output=True, text=True, env=env, cwd=str(Path(__file__).parents[1]),
+    )
+    # No instance record under the overridden path, so every case skips.
+    assert "skipped" in proc.stdout

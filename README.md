@@ -4,7 +4,7 @@
 
 AseCLI 是面向 AI Agent 的本地 CLI：离线读取、编辑和校验 ASE 节点图；通过运行中的 Unity/团结引擎与 MCP，让真实 ASE 创建节点、提供精排几何并重新生成 HLSL。Skill 提供跨 Agent 的操作规则，CLI 提供可验证的执行结果。
 
-当前正式版：**[0.8.7](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.7)** · [PyPI](https://pypi.org/project/asecli/0.8.7/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
+当前正式版：**[0.8.8](https://github.com/seeseeczl/ASECLI/releases/tag/v0.8.8)** · [PyPI](https://pypi.org/project/asecli/0.8.8/) · [Agent 操作手册](skills/asecli/SKILL.md) · [SG 转换后整理流程](skills/asecli/references/conversion-workflow.md)
 
 ASECLI 接收 SGCLI 生成的裸 `EditorGraphSpec v3`，并可把受支持的 ASE Shader 直接导出为 SGCLI 的裸 `sgcli.native.v3`。两个方向都只有“生产者 spec 原文件→消费者 `--spec`”；spec 是唯一图规格；独立 report 与发布 receipt 通过各自参数提供转换认证证据，创建成功也不代表转换效果等价。
 
