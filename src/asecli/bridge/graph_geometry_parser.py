@@ -19,10 +19,15 @@ def parse_geometry_payload(payload: str, geometry_type):
                 values = [float(value) for value in parts[2:7]]
             except ValueError as exc:
                 raise McpError("graph-geometry result contains non-numeric node geometry") from exc
+            # values = x, y, width, height, title_height.  A zero title height is
+            # legitimate: ASE renders header-less nodes (wires, relays) that way,
+            # so only the body size must be positive.
             if (
                 parts[1] in nodes
                 or not all(math.isfinite(value) for value in values)
-                or min(values[2:]) <= 0
+                or values[2] <= 0
+                or values[3] <= 0
+                or values[4] < 0
             ):
                 raise McpError(f"graph-geometry result contains invalid node geometry for {parts[1]}")
             node_title = ""

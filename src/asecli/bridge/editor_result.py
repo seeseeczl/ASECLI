@@ -32,11 +32,15 @@ def _unwrap_codely(text: str) -> str:
     return parsed if isinstance(parsed, str) else text
 
 
+#: Transports that hand back the script's own string, with no JSON envelope.
+RAW_PAYLOAD_BACKENDS = frozenset({"bridge", "codely", "raw"})
+
+
 def extract_payload(text: str, backend: str) -> str:
     """Return the script's own payload from a backend's response text."""
-    if backend not in ("mcp", "codely", "raw"):
+    if backend != "mcp" and backend not in RAW_PAYLOAD_BACKENDS:
         raise ValueError(f"unknown backend {backend!r} for payload extraction")
-    if backend in ("codely", "raw"):
+    if backend in RAW_PAYLOAD_BACKENDS:
         return _unwrap_codely(text)
     try:
         envelope = json.loads(text.strip())

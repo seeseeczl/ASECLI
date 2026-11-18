@@ -104,5 +104,6 @@
 | 2026-09-14 | v0.8.6 双渠道发布及本机升级完成 | tag 48d9fc4；CI/publish 全绿，GitHub 五资产和 PyPI SHA 一致；本机正式 0.8.6/Skill 校验通过；三份未跟踪副本已删除 | CR-0031 TASK-0068 REG-0064 REL-0019 |
 | 2026-11-17 | v0.8.7 双渠道发布及本机升级完成 | tag b8fbb38；CI 44095064917 / publish 44095133142 全绿；GitHub 五资产与 PyPI SHA 一致；本机 0.8.7 校验通过 | AUD-0087 REL-0020 |
 | 2026-11-17 | v0.8.8 双渠道发布及本机升级完成 | tag 65c94ea；CI 44103856604 / publish 44103864593 全绿；GitHub 五资产与 PyPI SHA 一致；本机 0.8.8 校验通过 | AUD-0088 REL-0021 |
+| 2026-11-18 | v0.8.9 双桥验证修复准备 | 双桥真机等价性验证发现并修复 0.8.8 的 bridge 后端回归（payload 白名单缺 bridge）与无标题节点误判 | AUD-0089 REL-0022 |
 | 2026-11-17 | v0.8.8 真机回归与探针兼容准备 | 第 5–8 轮红队审计：补真机验证（探针 v8→v11）、超时侧信道判定、`ASECLI_TEST_PROJECT`、上限按后端区分 | AUD-0088 REL-0021 |
 | 2026-11-17 | v0.8.7 三编辑器后端准备 | 新增 Codely Bridge 与 DSH-Bridge 后端，MCP 保留；`--editor-backend` 默认改为 auto（DSH-Bridge → Codely → MCP）；四轮红队审计关闭 2×P1 + 3×P2 + 2×P3 | AUD-0087 REL-0020 |

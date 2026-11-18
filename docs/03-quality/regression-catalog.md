@@ -68,3 +68,4 @@
 | REG-0064 | CR-0031 | export-fidelity：已知算法折叠、精度提示、属性篡改拒绝、设置负例与后缀 receipt | `uv run --frozen pytest tests/test_export_precision_diagnostics.py tests/test_export_property_visibility.py tests/test_export_fidelity.py tests/test_surface_semantics.py` | 自动通过；私有真实 Shader 仅显式 opt-in，不作为公开 CI 必需输入 |
 | REG-0065 | AUD-0087 | 三编辑器后端：传输层协议、CLI 开关转发、响应归属与资源卫生 | `uv run --frozen pytest tests/test_codely_bridge.py tests/test_bridge_transport.py tests/test_bridge_adversarial.py tests/test_cli_backend_forwarding.py` | 自动通过；真机端到端需编辑器在线，作为独立验收项 |
 | REG-0066 | AUD-0088 | 侧信道超时判定、按后端的大 payload 上限、真机冒烟套件 | `uv run --frozen pytest tests/test_bridge_adversarial.py tests/test_bridge_transport.py` | 自动通过；真机用例离线自动跳过 |
+| REG-0067 | AUD-0089 | 双桥等价性：真实后端名解包、无标题节点几何 | `uv run --frozen pytest tests/test_bridge_adversarial.py` | 自动通过；真机等价性另行黑盒验证 |

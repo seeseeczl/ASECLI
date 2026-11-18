@@ -242,3 +242,28 @@ def test_payload_limit_is_per_transport():
     # Other transports must not inherit mcp's ceiling.
     code = build_executor_code(incompressible, limit=None)
     assert len(code) > MCP_CODE_LIMIT
+
+
+def test_every_transport_name_is_accepted_by_payload_extraction():
+    """The real backend name must work; only genuinely unknown ones are rejected."""
+    from asecli.bridge.editor_result import extract_payload
+
+    for backend in ("mcp", "bridge", "codely", "raw"):
+        assert extract_payload("ASECLI_X\n1|2", backend) == "ASECLI_X\n1|2"
+    with pytest.raises(ValueError, match="unknown backend"):
+        extract_payload("x", "nonsense")
+
+
+def test_headerless_nodes_are_valid_geometry():
+    """ASE renders header-less nodes with title_height 0; that is not malformed."""
+    from asecli.bridge.graph_geometry import EditorNodeGeometry, parse_geometry_payload
+
+    payload = "ASECLI_GEOMETRY_V3\nN|1018|-961.9|-1079.8|32.0|32.0|0.0"
+    parsed = parse_geometry_payload(payload, EditorNodeGeometry)
+    assert parsed["1018"].title_height == 0.0
+    assert parsed["1018"].width == 32.0
+
+    # A zero body size is still malformed.
+    bad = "ASECLI_GEOMETRY_V3\nN|1019|0|0|0|0|0"
+    with pytest.raises(Exception, match="invalid node geometry"):
+        parse_geometry_payload(bad, EditorNodeGeometry)
